@@ -29,6 +29,7 @@ Thank you for your interest in contributing to the Flight Test Interactive Analy
 ### Initial Setup
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/Martinolli/flight-test-interactive-analysis-suite.git
    cd flight-test-interactive-analysis-suite
@@ -37,6 +38,7 @@ Thank you for your interest in contributing to the Flight Test Interactive Analy
 2. Install recommended VSCode extensions (see `.vscode/extensions.json`)
 
 3. Start the development environment:
+
    ```bash
    docker-compose up
    ```
@@ -59,11 +61,13 @@ We follow a **feature branch workflow**:
 ### Branch Protection Rules
 
 **Main Branch:**
+
 - Requires pull request reviews (minimum 1 approval)
 - Requires status checks to pass
 - No direct commits allowed
 
 **Develop Branch:**
+
 - Requires pull request reviews
 - Requires CI/CD pipeline to pass
 
@@ -71,7 +75,7 @@ We follow a **feature branch workflow**:
 
 We follow the **Conventional Commits** specification:
 
-```
+```bash
 <type>(<scope>): <subject>
 
 <body>
@@ -80,6 +84,7 @@ We follow the **Conventional Commits** specification:
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -91,7 +96,7 @@ We follow the **Conventional Commits** specification:
 
 **Examples:**
 
-```
+```bash
 feat(backend): add parameter search API endpoint
 
 Implement /api/parameters/search endpoint with filtering
@@ -100,7 +105,7 @@ by name, description, and workgroup.
 Closes #42
 ```
 
-```
+```bash
 fix(frontend): resolve chart rendering issue on time filter
 
 Fixed issue where chart would not update when time interval
@@ -136,11 +141,13 @@ git push origin feature/your-feature-name
 **Style Guide:** PEP 8
 
 **Formatting:**
+
 - Use **Black** for code formatting (line length: 100)
 - Use **isort** for import sorting
 - Use **flake8** for linting
 
 **Type Hints:**
+
 - All functions must have type hints
 - Use `typing` module for complex types
 
@@ -182,12 +189,14 @@ async def get_parameters(
 ```
 
 **Naming Conventions:**
+
 - Variables and functions: `snake_case`
 - Classes: `PascalCase`
 - Constants: `UPPER_SNAKE_CASE`
 - Private methods: `_leading_underscore`
 
 **Documentation:**
+
 - Use docstrings for all public functions and classes
 - Follow Google-style docstring format
 
@@ -196,11 +205,13 @@ async def get_parameters(
 **Style Guide:** Airbnb TypeScript Style Guide
 
 **Formatting:**
+
 - Use **Prettier** for code formatting
 - Use **ESLint** for linting
 - Indentation: 2 spaces
 
 **Type Safety:**
+
 - Avoid `any` type - use proper TypeScript types
 - Define interfaces for all props and state
 - Use strict mode
@@ -241,13 +252,15 @@ export const ParameterBrowser: React.FC<ParameterBrowserProps> = ({
 ```
 
 **Naming Conventions:**
+
 - Components: `PascalCase` (e.g., `ParameterBrowser.tsx`)
 - Hooks: `camelCase` with `use` prefix (e.g., `useParameters`)
 - Utilities: `camelCase` (e.g., `formatDate`)
 - Constants: `UPPER_SNAKE_CASE`
 
 **Component Structure:**
-```
+
+```bash
 ComponentName/
 ├── index.ts              # Public exports
 ├── ComponentName.tsx     # Main component
@@ -259,12 +272,14 @@ ComponentName/
 ### SQL (Database)
 
 **Naming Conventions:**
+
 - Tables: `snake_case`, plural (e.g., `flight_parameters`)
 - Columns: `snake_case` (e.g., `created_at`)
 - Indexes: `idx_<table>_<column>` (e.g., `idx_parameters_code`)
 - Foreign keys: `fk_<table>_<referenced_table>` (e.g., `fk_flights_users`)
 
 **Best Practices:**
+
 - Always use migrations for schema changes
 - Include rollback scripts
 - Add comments for complex queries
@@ -279,11 +294,13 @@ ComponentName/
 **Framework:** pytest
 
 **Coverage Requirements:**
+
 - Minimum 80% code coverage for new code
 - 100% coverage for critical business logic
 
 **Test Structure:**
-```
+
+```bash
 tests/
 ├── unit/              # Unit tests
 ├── integration/       # Integration tests
@@ -320,6 +337,7 @@ def test_get_parameters_with_filter():
 **Framework:** Jest + React Testing Library
 
 **Coverage Requirements:**
+
 - Minimum 70% code coverage for new components
 - All user interactions must be tested
 
@@ -369,11 +387,13 @@ pnpm test:coverage
 ### Before Creating a PR
 
 1. **Ensure all tests pass:**
+
    ```bash
    pnpm test
    ```
 
 2. **Run linters and formatters:**
+
    ```bash
    pnpm lint
    pnpm format
@@ -382,6 +402,7 @@ pnpm test:coverage
 3. **Update documentation** if needed
 
 4. **Rebase on latest main:**
+
    ```bash
    git checkout main
    git pull origin main
@@ -396,6 +417,7 @@ When creating a pull request, include:
 **Title:** Follow commit message format
 
 **Description:**
+
 ```markdown
 ## Description
 Brief description of changes
@@ -466,13 +488,15 @@ Closes #(issue number)
 **Example Comments:**
 
 ✅ Good:
-```
+
+```bash
 Consider extracting this logic into a separate function for reusability.
 This would make the code more maintainable and easier to test.
 ```
 
 ❌ Avoid:
-```
+
+```bash
 This is wrong. Fix it.
 ```
 
