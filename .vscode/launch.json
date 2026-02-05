@@ -1,0 +1,107 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // Backend Debugging
+    {
+      "name": "Python: FastAPI",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "jinja": true,
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "Python: pytest",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "-s",
+        "${file}"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "Python: All Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "tests/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/backend"
+    },
+
+    // Frontend Debugging (Chrome)
+    {
+      "name": "Chrome: Frontend",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      }
+    },
+
+    // Docker Debugging
+    {
+      "name": "Docker: Attach to Backend",
+      "type": "python",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/backend",
+          "remoteRoot": "/app"
+        }
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack",
+      "configurations": [
+        "Python: FastAPI",
+        "Chrome: Frontend"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "fullstack",
+        "order": 1
+      }
+    }
+  ]
+}

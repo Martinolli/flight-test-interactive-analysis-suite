@@ -1,0 +1,54 @@
+{
+  "recommendations": [
+    // Python Development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.flake8",
+
+    // JavaScript/TypeScript/React Development
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "dsznajder.es7-react-js-snippets",
+    "bradlc.vscode-tailwindcss",
+
+    // Docker
+    "ms-azuretools.vscode-docker",
+
+    // Database
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // API Testing
+    "rangav.vscode-thunder-client",
+    "humao.rest-client",
+
+    // Utilities
+    "editorconfig.editorconfig",
+    "christian-kohler.path-intellisense",
+    "visualstudioexptteam.vscodeintellicode",
+    "streetsidesoftware.code-spell-checker",
+
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+
+    // YAML/JSON
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+
+    // Code Quality
+    "sonarsource.sonarlint-vscode",
+
+    // Productivity
+    "usernamehw.errorlens",
+    "gruntfuggly.todo-tree",
+    "wayou.vscode-todo-highlight"
+  ],
+  "unwantedRecommendations": []
+}

@@ -1,0 +1,229 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // Docker Tasks
+    {
+      "label": "Docker: Start All Services",
+      "type": "shell",
+      "command": "docker-compose up",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Docker: Start All Services (Detached)",
+      "type": "shell",
+      "command": "docker-compose up -d",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Docker: Stop All Services",
+      "type": "shell",
+      "command": "docker-compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Rebuild and Start",
+      "type": "shell",
+      "command": "docker-compose up --build",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Docker: View Logs",
+      "type": "shell",
+      "command": "docker-compose logs -f",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+
+    // Backend Tasks
+    {
+      "label": "Backend: Install Dependencies",
+      "type": "shell",
+      "command": "pip install -r requirements.txt",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Run Tests",
+      "type": "shell",
+      "command": "pytest -v",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Backend: Run Tests with Coverage",
+      "type": "shell",
+      "command": "pytest --cov=app --cov-report=html",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Backend: Format Code (Black)",
+      "type": "shell",
+      "command": "black .",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Lint (Flake8)",
+      "type": "shell",
+      "command": "flake8 .",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Sort Imports (isort)",
+      "type": "shell",
+      "command": "isort .",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Type Check (mypy)",
+      "type": "shell",
+      "command": "mypy .",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": []
+    },
+
+    // Frontend Tasks
+    {
+      "label": "Frontend: Install Dependencies",
+      "type": "shell",
+      "command": "pnpm install",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: Dev Server",
+      "type": "shell",
+      "command": "pnpm dev",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Frontend: Build",
+      "type": "shell",
+      "command": "pnpm build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Frontend: Run Tests",
+      "type": "shell",
+      "command": "pnpm test",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Frontend: Lint",
+      "type": "shell",
+      "command": "pnpm lint",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: Format (Prettier)",
+      "type": "shell",
+      "command": "pnpm format",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+
+    // Database Tasks
+    {
+      "label": "Database: Connect (psql)",
+      "type": "shell",
+      "command": "docker-compose exec postgres psql -U ftias_user -d ftias_db",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Database: Create Backup",
+      "type": "shell",
+      "command": "docker-compose exec postgres pg_dump -U ftias_user ftias_db > backup_$(date +%Y%m%d_%H%M%S).sql",
+      "problemMatcher": []
+    },
+
+    // Compound Tasks
+    {
+      "label": "Setup: Install All Dependencies",
+      "dependsOn": [
+        "Backend: Install Dependencies",
+        "Frontend: Install Dependencies"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run All Tests",
+      "dependsOn": [
+        "Backend: Run Tests",
+        "Frontend: Run Tests"
+      ],
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Format: Format All Code",
+      "dependsOn": [
+        "Backend: Format Code (Black)",
+        "Backend: Sort Imports (isort)",
+        "Frontend: Format (Prettier)"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
