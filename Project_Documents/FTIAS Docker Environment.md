@@ -33,10 +33,10 @@ docker-compose up -d
 
 ### 3. Access Services
 
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:8000
-- **API Documentation:** http://localhost:8000/docs
-- **pgAdmin (optional):** http://localhost:5050
+- **Frontend:** [http://localhost:5173](http://localhost:5173)
+- **Backend API:** [http://localhost:8000](http://localhost:8000)
+- **API Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **pgAdmin (optional):** [http://localhost:5050](http://localhost:5050)
 
 ### 4. Stop Services
 
@@ -83,7 +83,8 @@ docker-compose --profile tools up pgadmin
 ```
 
 Default credentials:
-- **Email:** admin@ftias.local
+
+- **Email:** <admin@ftias.local>
 - **Password:** admin
 
 ## Common Commands
@@ -175,16 +176,19 @@ docker-compose logs backend
 ### Database Connection Issues
 
 1. Ensure PostgreSQL is healthy:
+
    ```bash
    docker-compose ps
    ```
 
 2. Check database logs:
+
    ```bash
    docker-compose logs postgres
    ```
 
 3. Verify connection from backend:
+
    ```bash
    docker-compose exec backend python -c "from sqlalchemy import create_engine; engine = create_engine('postgresql://ftias_user:ftias_password@postgres:5432/ftias_db'); print(engine.connect())"
    ```
@@ -202,6 +206,7 @@ docker-compose up
 ## Development Workflow
 
 1. **Start the environment:**
+
    ```bash
    docker-compose up
    ```
@@ -211,6 +216,7 @@ docker-compose up
 3. **Changes are automatically reflected** (hot reload enabled)
 
 4. **Run tests:**
+
    ```bash
    # Backend tests
    docker-compose exec backend pytest
@@ -220,6 +226,7 @@ docker-compose up
    ```
 
 5. **Stop when done:**
+
    ```bash
    docker-compose down
    ```
@@ -240,7 +247,7 @@ This Docker setup is optimized for **development**. For production:
 
 All services are connected via the `ftias-network` bridge network:
 
-```
+```bash
 ┌─────────────────────────────────────────┐
 │         ftias-network (bridge)          │
 │                                         │
@@ -263,6 +270,7 @@ See `.env.example` for all available environment variables and their description
 ## Support
 
 For issues or questions:
+
 1. Check the troubleshooting section above
 2. Review Docker logs: `docker-compose logs`
 3. Consult the main project documentation
