@@ -9,7 +9,6 @@ sample_data/
 Thumbs.db
 
 # Ignore editor files
-.vscode/
 .idea/
 
 # Ignore log files
