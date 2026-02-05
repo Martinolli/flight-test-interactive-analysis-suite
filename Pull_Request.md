@@ -32,11 +32,11 @@ Closes #
 
 <!-- List the specific changes made in this PR -->
 
-- 
+-
 
-- 
+-
 
-- 
+-
 
 ## Testing
 
@@ -54,7 +54,7 @@ Closes #
 
 ### Test Results
 
-```
+```bash
 # Paste test results here
 ```
 
@@ -109,4 +109,3 @@ Closes #
 ## Additional Notes
 
 <!-- Any additional information that reviewers should know -->
-
