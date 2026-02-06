@@ -131,5 +131,5 @@
   // Minimap
   "editor.minimap.enabled": false,
   "editor.minimap.maxColumn": 100,
-  "cSpell.words": ["FTIAS", "psql"]
+  "cSpell.words": ["FTIAS", "Geospatial", "Plotly", "psql", "wireframes"]
 }
