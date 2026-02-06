@@ -131,5 +131,34 @@
   // Minimap
   "editor.minimap.enabled": false,
   "editor.minimap.maxColumn": 100,
-  "cSpell.words": ["FTIAS", "Geospatial", "Plotly", "psql", "wireframes"]
+  "cSpell.words": [
+    "ASGI",
+    "asyncio",
+    "asyncpg",
+    "Dockerfiles",
+    "dotenv",
+    "fastapi",
+    "FTIAS",
+    "Geospatial",
+    "htmlcov",
+    "httpx",
+    "isort",
+    "mypy",
+    "numpy",
+    "passlib",
+    "Plotly",
+    "psql",
+    "psycopg",
+    "pycache",
+    "pydantic",
+    "pytest",
+    "PYTHONDONTWRITEBYTECODE",
+    "PYTHONUNBUFFERED",
+    "sdist",
+    "sqlalchemy",
+    "uvicorn",
+    "venv",
+    "Vite",
+    "wireframes"
+  ]
 }
