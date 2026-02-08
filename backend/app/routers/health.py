@@ -3,10 +3,12 @@ FTIAS Backend - Health Check Router
 Health check and status endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.schemas import HealthResponse
 
@@ -17,11 +19,11 @@ router = APIRouter()
 async def health_check(db: Session = Depends(get_db)):
     """
     Health check endpoint
-    
+
     Checks:
     - API is running
     - Database connection is working
-    
+
     Returns:
         HealthResponse: Health status
     """
@@ -31,7 +33,7 @@ async def health_check(db: Session = Depends(get_db)):
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
-    
+
     return HealthResponse(
         status="healthy" if db_status == "connected" else "unhealthy",
         database=db_status,
@@ -43,7 +45,7 @@ async def health_check(db: Session = Depends(get_db)):
 async def ping():
     """
     Simple ping endpoint
-    
+
     Returns:
         dict: Pong response
     """

@@ -3,10 +3,12 @@ FTIAS Backend - Users Router
 User management endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserResponse, UserUpdate
@@ -31,25 +33,25 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     """
     Create a new user
-    
+
     Args:
         user: User data
         db: Database session
-    
+
     Returns:
         UserResponse: Created user
     """
     # Check if user already exists
-    existing_user = db.query(User).filter(
-        (User.email == user.email) | (User.username == user.username)
-    ).first()
-    
+    existing_user = (
+        db.query(User).filter((User.email == user.email) | (User.username == user.username)).first()
+    )
+
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email or username already exists",
         )
-    
+
     # Create new user
     db_user = User(
         email=user.email,
@@ -57,11 +59,11 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
         full_name=user.full_name,
         hashed_password=hash_password(user.password),
     )
-    
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
     return db_user
 
 
@@ -69,12 +71,12 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
 async def get_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Get all users
-    
+
     Args:
         skip: Number of records to skip
         limit: Maximum number of records to return
         db: Database session
-    
+
     Returns:
         List[UserResponse]: List of users
     """
@@ -86,62 +88,58 @@ async def get_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
 async def get_user(user_id: int, db: Session = Depends(get_db)):
     """
     Get a user by ID
-    
+
     Args:
         user_id: User ID
         db: Database session
-    
+
     Returns:
         UserResponse: User data
     """
     user = db.query(User).filter(User.id == user_id).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    
+
     return user
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-async def update_user(
-    user_id: int,
-    user_update: UserUpdate,
-    db: Session = Depends(get_db)
-):
+async def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)):
     """
     Update a user
-    
+
     Args:
         user_id: User ID
         user_update: Updated user data
         db: Database session
-    
+
     Returns:
         UserResponse: Updated user
     """
     user = db.query(User).filter(User.id == user_id).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    
+
     # Update fields
     update_data = user_update.model_dump(exclude_unset=True)
-    
+
     if "password" in update_data:
         update_data["hashed_password"] = hash_password(update_data.pop("password"))
-    
+
     for field, value in update_data.items():
         setattr(user, field, value)
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return user
 
 
@@ -149,20 +147,20 @@ async def update_user(
 async def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
     Delete a user
-    
+
     Args:
         user_id: User ID
         db: Database session
     """
     user = db.query(User).filter(User.id == user_id).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    
+
     db.delete(user)
     db.commit()
-    
+
     return None
