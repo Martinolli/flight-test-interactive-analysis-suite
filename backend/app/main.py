@@ -3,6 +3,8 @@ FTIAS Backend - Main Application
 FastAPI application entry point
 """
 
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,8 +25,9 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     """Startup event handler"""
-    # Create database tables
-    Base.metadata.create_all(bind=engine)  # ← Runs at startup only
+    # Avoid touching the real DB during pytest runs; tests provide their own in-memory DB.
+    if "pytest" not in sys.modules:
+        Base.metadata.create_all(bind=engine)
     print("🚀 FTIAS Backend starting...")
 
 
