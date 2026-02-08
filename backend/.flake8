@@ -1,0 +1,49 @@
+[flake8]
+# Flake8 configuration for FTIAS Backend
+
+# Maximum line length
+max-line-length = 100
+
+# Exclude patterns
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .eggs,
+    *.egg,
+    build,
+    dist,
+    .cache,
+    htmlcov,
+    .pytest_cache,
+    alembic/versions
+
+# Ignore specific errors
+ignore =
+    # E203: whitespace before ':' (conflicts with Black)
+    E203,
+    # W503: line break before binary operator (conflicts with Black)
+    W503,
+    # E501: line too long (handled by Black)
+    E501,
+    # F401: module imported but unused (sometimes needed for __init__.py)
+    # F401
+
+# Maximum complexity
+max-complexity = 10
+
+# Show source code for errors
+show-source = True
+
+# Show pep8 violation statistics
+statistics = True
+
+# Count errors
+count = True
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py:F401
+    alembic/env.py:E402
