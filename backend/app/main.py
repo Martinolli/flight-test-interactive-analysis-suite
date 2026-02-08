@@ -10,9 +10,6 @@ from app.config import settings
 from app.database import Base, engine
 from app.routers import health, users
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
-
 # Initialize FastAPI application
 app = FastAPI(
     title="FTIAS API",
@@ -21,6 +18,15 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Startup event handler"""
+    # Create database tables
+    Base.metadata.create_all(bind=engine)  # ← Runs at startup only
+    print("🚀 FTIAS Backend starting...")
+
 
 # Configure CORS
 app.add_middleware(
@@ -47,12 +53,7 @@ async def root():
     }
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Startup event handler"""
-    print("🚀 FTIAS Backend starting...")
-    print(f"📊 Database: {settings.DATABASE_URL}")
-    print(f"🔧 Debug mode: {settings.DEBUG}")
+# Shutdown event is defined below, startup event is defined above
 
 
 @app.on_event("shutdown")
