@@ -1,5 +1,5 @@
 # Ignore Python virtual environment
-venv/
+.venv/
 
 # Ignore sample data folder
 sample_data/
