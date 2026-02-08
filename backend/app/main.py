@@ -25,7 +25,8 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     """Startup event handler"""
-    # Avoid touching the real DB during pytest runs; tests provide their own in-memory DB.
+    # Avoid touching the real DB during pytest runs; tests provide
+    # their own in-memory DB.
     if "pytest" not in sys.modules:
         Base.metadata.create_all(bind=engine)
     print("🚀 FTIAS Backend starting...")

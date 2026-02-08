@@ -16,7 +16,8 @@ from app.schemas import UserCreate, UserResponse, UserUpdate
 router = APIRouter()
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use a pure-python scheme to avoid bcrypt backend compatibility issues in dev/test environments.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
@@ -49,7 +50,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email or username already exists",
+            detail="User already registered",
         )
 
     # Create new user
@@ -143,7 +144,7 @@ async def update_user(user_id: int, user_update: UserUpdate, db: Session = Depen
     return user
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK)
 async def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
     Delete a user
@@ -163,4 +164,4 @@ async def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
 
-    return None
+    return {"message": "User deleted successfully"}
