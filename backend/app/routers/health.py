@@ -5,8 +5,9 @@ Health check and status endpoints
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -31,7 +32,7 @@ async def health_check(db: Session = Depends(get_db)):
         # Test database connection
         db.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception as e:
+    except SQLAlchemyError as e:
         db_status = f"error: {str(e)}"
 
     return HealthResponse(
