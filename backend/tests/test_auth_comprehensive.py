@@ -2,9 +2,8 @@
 Comprehensive test suite for Authentication API
 Tests login, logout, token refresh, and security features
 """
-
-import pytest
 from datetime import datetime, timedelta
+import pytest
 from fastapi import status
 from jose import jwt
 from app.config import settings
