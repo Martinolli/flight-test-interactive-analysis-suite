@@ -103,7 +103,7 @@ The user has implemented an excellent documentation naming convention:
 ### Code Coverage by Module
 
 | Module | Coverage | Status |
-| --------|----------|--------|
+| ---------- | ---------- | --------- |
 | `app/__init__.py` | 100% | ✅ Perfect |
 | `app/routers/__init__.py` | 100% | ✅ Perfect |
 | `app/config.py` | 94% | ✅ Excellent |
