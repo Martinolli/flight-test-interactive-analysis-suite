@@ -51,3 +51,116 @@ class HealthResponse(BaseModel):
     status: str
     database: str
     timestamp: datetime
+
+
+# Flight Test Schemas
+
+
+class FlightTestBase(BaseModel):
+    """Base flight test schema"""
+
+    test_name: str = Field(..., min_length=1, max_length=255)
+    aircraft_type: Optional[str] = Field(None, max_length=100)
+    test_date: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+    description: Optional[str] = None
+
+
+class FlightTestCreate(FlightTestBase):
+    """Schema for creating a flight test"""
+
+    pass
+
+
+class FlightTestUpdate(BaseModel):
+    """Schema for updating a flight test"""
+
+    test_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    aircraft_type: Optional[str] = Field(None, max_length=100)
+    test_date: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+    description: Optional[str] = None
+
+
+class FlightTestResponse(FlightTestBase):
+    """Schema for flight test response"""
+
+    id: int
+    created_by_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Test Parameter Schemas
+
+
+class TestParameterBase(BaseModel):
+    """Base test parameter schema"""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    unit: Optional[str] = Field(None, max_length=50)
+    system: Optional[str] = Field(None, max_length=100)
+    category: Optional[str] = Field(None, max_length=100)
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+
+
+class TestParameterCreate(TestParameterBase):
+    """Schema for creating a test parameter"""
+
+    pass
+
+
+class TestParameterUpdate(BaseModel):
+    """Schema for updating a test parameter"""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    unit: Optional[str] = Field(None, max_length=50)
+    system: Optional[str] = Field(None, max_length=100)
+    category: Optional[str] = Field(None, max_length=100)
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+
+
+class TestParameterResponse(TestParameterBase):
+    """Schema for test parameter response"""
+
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Data Point Schemas
+
+
+class DataPointBase(BaseModel):
+    """Base data point schema"""
+
+    flight_test_id: int
+    parameter_id: int
+    timestamp: datetime
+    value: float
+
+
+class DataPointCreate(DataPointBase):
+    """Schema for creating a data point"""
+
+    pass
+
+
+class DataPointResponse(DataPointBase):
+    """Schema for data point response"""
+
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
