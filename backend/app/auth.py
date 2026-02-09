@@ -17,7 +17,7 @@ from app.database import get_db
 from app.models import User
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -76,8 +76,12 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
-    user_id: int = payload.get("sub")
-    if user_id is None:
+    user_id_str: str = payload.get("sub")
+    if user_id_str is None:
+        raise credentials_exception
+    try:
+        user_id = int(user_id_str)
+    except (ValueError, TypeError):
         raise credentials_exception
 
     user = db.query(User).filter(User.id == user_id).first()

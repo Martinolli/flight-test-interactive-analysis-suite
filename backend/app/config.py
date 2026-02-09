@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "ftias_user"
     POSTGRES_PASSWORD: str = "ftias_password"
     POSTGRES_DB: str = "ftias_db"
-    POSTGRES_HOST: str = "postgres"
+    POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
 
     @property

@@ -16,7 +16,6 @@ from app.schemas import UserCreate, UserResponse, UserUpdate
 router = APIRouter()
 
 # Password hashing
-# Use a pure-python scheme to avoid bcrypt backend compatibility issues in dev/test environments.
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
