@@ -5,7 +5,7 @@ Tests login, logout, token refresh, and security features
 from datetime import datetime, timedelta
 import pytest
 from fastapi import status
-from jose import jwt
+from jose import jwt, exceptions
 from app.config import settings
 from app.models import User
 from app.auth import get_password_hash, verify_password
@@ -119,7 +119,7 @@ class TestLogin:
 class TestTokenRefresh:
     """Test token refresh functionality"""
 
-    def test_refresh_token_success(self, client, test_user, auth_headers):
+    def test_refresh_token_success(self, client, test_user):
         """Test successful token refresh"""
         # Login to get refresh token
         login_response = client.post(
@@ -255,7 +255,8 @@ class TestTokenSecurity:
                              algorithms=[settings.ALGORITHM])
 
         assert "exp" in payload
-        exp_time = datetime.fromtimestamp(payload["exp"])
+        # `exp` is an absolute unix timestamp (UTC); use UTC conversion.
+        exp_time = datetime.utcfromtimestamp(payload["exp"])
         now = datetime.utcnow()
         assert exp_time > now
         assert exp_time < now + timedelta(hours=1)
@@ -286,7 +287,7 @@ class TestTokenSecurity:
             headers = {"Authorization": f"Bearer {fake_token}"}
             response = client.get("/api/auth/me", headers=headers)
             assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        except Exception:
+        except (exceptions.JWTError, ValueError):
             # If algorithm mismatch is caught during creation, that's also good
             pass
 
@@ -325,7 +326,7 @@ class TestTokenSecurity:
 class TestPasswordSecurity:
     """Test password security features"""
 
-    def test_password_hashing(self, db_session):
+    def test_password_hashing(self):
         """Test that passwords are hashed"""
         password = "securepassword123"
         hashed = get_password_hash(password)
@@ -382,7 +383,7 @@ class TestRateLimiting:
     def test_login_rate_limiting(self, client):
         """Test that login attempts are rate limited"""
         # Make multiple failed login attempts
-        for i in range(10):
+        for _ in range(10):
             response = client.post(
                 "/api/auth/login",
                 json={

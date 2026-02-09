@@ -101,6 +101,58 @@ async def get_flight_test(
     return flight_test
 
 
+@router.put("/{test_id}", response_model=schemas.FlightTestResponse)
+async def update_flight_test(
+    test_id: int,
+    flight_test: schemas.FlightTestUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """
+    Update a flight test owned by the current user.
+    """
+    db_flight_test = (
+        db.query(FlightTest)
+        .filter(
+            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
+        )
+        .first()
+    )
+
+    if not db_flight_test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
+        )
+
+    update_data = flight_test.model_dump(exclude_unset=True)
+    if "test_name" in update_data:
+        existing = (
+            db.query(FlightTest)
+            .filter(
+                and_(
+                    FlightTest.test_name == update_data["test_name"],
+                    FlightTest.created_by_id == current_user.id,
+                    FlightTest.id != test_id,
+                )
+            )
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Flight test with name '{update_data['test_name']}' already exists",
+            )
+
+    for key, value in update_data.items():
+        setattr(db_flight_test, key, value)
+
+    db.add(db_flight_test)
+    db.commit()
+    db.refresh(db_flight_test)
+
+    return db_flight_test
+
+
 @router.delete("/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_flight_test(
     test_id: int,
@@ -299,6 +351,8 @@ async def upload_flight_data_csv(
             "data_points_created": len(data_points),
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(

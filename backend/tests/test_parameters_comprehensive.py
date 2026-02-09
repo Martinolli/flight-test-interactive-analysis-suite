@@ -482,10 +482,11 @@ class TestBulkOperations:
             param_ids.append(response.json()["id"])
 
         # Bulk delete
-        response = client.delete(
+        response = client.request(
+            "DELETE",
             "/api/parameters/bulk",
             json={"parameter_ids": param_ids},
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_204_NO_CONTENT

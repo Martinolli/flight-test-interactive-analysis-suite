@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "dev-jwt-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    @property
+    def ALGORITHM(self) -> str:
+        """Back-compat alias used by tests and older code."""
+        return self.JWT_ALGORITHM
 
     # CORS
     CORS_ORIGINS: Union[str, List[str]] = (

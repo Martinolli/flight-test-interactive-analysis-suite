@@ -5,6 +5,7 @@ JWT token generation, validation, and password hashing
 
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -33,11 +34,21 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(
-    data: dict, expires_delta: Optional[timedelta] = None
+def _create_jwt(
+    data: dict,
+    *,
+    token_type: str,
+    expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """Create a JWT access token"""
+    """Create a signed JWT."""
     to_encode = data.copy()
+    to_encode.update(
+        {
+            "type": token_type,
+            "iat": datetime.utcnow(),
+            "jti": uuid4().hex,
+        }
+    )
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -46,20 +57,54 @@ def create_access_token(
         )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+        to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[dict]:
-    """Decode and validate a JWT access token"""
+def create_access_token(
+    data: dict, expires_delta: Optional[timedelta] = None
+) -> str:
+    """Create a JWT access token."""
+    return _create_jwt(
+        data,
+        token_type="access",
+        expires_delta=expires_delta,
+    )
+
+
+def create_refresh_token(
+    data: dict, expires_delta: Optional[timedelta] = None
+) -> str:
+    """Create a JWT refresh token."""
+    if expires_delta is None:
+        expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    return _create_jwt(
+        data,
+        token_type="refresh",
+        expires_delta=expires_delta,
+    )
+
+
+def decode_token(token: str) -> Optional[dict]:
+    """Decode and validate a JWT (access or refresh)."""
     try:
         payload = jwt.decode(
-            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         return payload
     except JWTError:
         return None
+
+
+def decode_access_token(token: str) -> Optional[dict]:
+    """Decode and validate a JWT access token."""
+    payload = decode_token(token)
+    if not payload:
+        return None
+    if payload.get("type") not in (None, "access"):
+        return None
+    return payload
 
 
 async def get_current_user(

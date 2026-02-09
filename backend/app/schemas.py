@@ -3,10 +3,10 @@ FTIAS Backend - Pydantic Schemas
 Data validation and serialization schemas
 """
 
-from datetime import datetime
-from typing import Optional
+from datetime import date, datetime, time
+from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class UserBase(BaseModel):
@@ -60,6 +60,7 @@ class Token(BaseModel):
     """Schema for JWT token response"""
 
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
 
 
@@ -76,6 +77,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    """Schema for refresh-token request"""
+
+    refresh_token: str
+
+
 # Flight Test Schemas
 
 
@@ -87,6 +94,25 @@ class FlightTestBase(BaseModel):
     test_date: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     description: Optional[str] = None
+
+    @field_validator("test_date", mode="before")
+    @classmethod
+    def parse_test_date(cls, value):
+        """Accept either a datetime or a YYYY-MM-DD date string."""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, date):
+            return datetime.combine(value, time.min)
+        if isinstance(value, str):
+            try:
+                # Full ISO datetime
+                return datetime.fromisoformat(value)
+            except ValueError:
+                # Date-only
+                return datetime.combine(date.fromisoformat(value), time.min)
+        return value
 
 
 class FlightTestCreate(FlightTestBase):
@@ -103,6 +129,23 @@ class FlightTestUpdate(BaseModel):
     test_date: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     description: Optional[str] = None
+
+    @field_validator("test_date", mode="before")
+    @classmethod
+    def parse_test_date(cls, value):
+        """Accept either a datetime or a YYYY-MM-DD date string."""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, date):
+            return datetime.combine(value, time.min)
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except ValueError:
+                return datetime.combine(date.fromisoformat(value), time.min)
+        return value
 
 
 class FlightTestResponse(FlightTestBase):
@@ -159,6 +202,29 @@ class TestParameterResponse(TestParameterBase):
 
     class Config:
         from_attributes = True
+
+
+class BulkParametersCreateRequest(BaseModel):
+    parameters: List[TestParameterCreate]
+
+
+class BulkParameterUpdateItem(BaseModel):
+    id: int
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    unit: Optional[str] = Field(None, max_length=50)
+    system: Optional[str] = Field(None, max_length=100)
+    category: Optional[str] = Field(None, max_length=100)
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+
+
+class BulkParametersUpdateRequest(BaseModel):
+    parameters: List[BulkParameterUpdateItem]
+
+
+class BulkParametersDeleteRequest(BaseModel):
+    parameter_ids: List[int]
 
 
 # Data Point Schemas
