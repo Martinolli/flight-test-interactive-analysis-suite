@@ -40,3 +40,6 @@ Thumbs.db
 # Node
 node_modules/
 npm-debug.log
+
+# Sample Data
+sample_data/
