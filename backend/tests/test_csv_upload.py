@@ -1,78 +1,82 @@
-#!/usr/bin/env python3.11
-"""
-Test CSV upload functionality
-"""
-import requests
-import json
+"""Test CSV upload functionality."""
 
-BASE_URL = "http://localhost:8000"
+from pathlib import Path
 
-def main():
-    print("\n🚀 Testing CSV Upload\n")
-    print("=" * 60)
-    
-    # Step 1: Login
-    print("Step 1: Login...")
-    response = requests.post(
-        f"{BASE_URL}/api/auth/login",
-        json={"username": "testuser", "password": "testpass123"}
+import pytest
+from fastapi import status
+
+
+def _get_csv_path() -> Path:
+    repo_root = Path(__file__).resolve().parents[2]
+    return repo_root / "sample_data" / "Flight_Test_Data_2025_08_06.csv"
+
+
+def _create_user(client, user_data: dict) -> None:
+    response = client.post("/api/users/", json=user_data)
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+def _login(client, username: str, password: str) -> str:
+    response = client.post(
+        "/api/auth/login",
+        json={"username": username, "password": password},
     )
-    
-    if response.status_code != 200:
-        print(f"❌ Login failed: {response.status_code}")
-        return
-    
-    token = response.json()["access_token"]
-    print(f"✅ Token obtained: {token[:50]}...")
-    
-    # Step 2: Upload CSV
-    print("\nStep 2: Upload CSV file...")
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    with open("/home/ubuntu/ftias-project/Flight_Test_Data_2025_08_06.csv", "rb") as f:
-        files = {"file": ("Flight_Test_Data_2025_08_06.csv", f, "text/csv")}
-        response = requests.post(
-            f"{BASE_URL}/api/flight-tests/1/upload-csv",
-            headers=headers,
-            files=files
+    assert response.status_code == status.HTTP_200_OK
+    return response.json()["access_token"]
+
+
+def _create_flight_test(client, token: str) -> int:
+    response = client.post(
+        "/api/flight-tests/",
+        json={
+            "test_name": "CSV Upload Test",
+            "aircraft_type": "TestCraft",
+            "description": "Upload CSV and validate data points",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()["id"]
+
+
+@pytest.mark.api
+@pytest.mark.database
+def test_csv_upload_flow(client, sample_user_data):
+    """Upload a CSV file and verify data points are created."""
+    _create_user(client, sample_user_data)
+    token = _login(
+        client,
+        sample_user_data["username"],
+        sample_user_data["password"],
+    )
+    flight_test_id = _create_flight_test(client, token)
+
+    csv_path = _get_csv_path()
+    assert csv_path.exists(), f"Sample CSV not found at {csv_path}"
+
+    with csv_path.open("rb") as csv_file:
+        response = client.post(
+            f"/api/flight-tests/{flight_test_id}/upload-csv",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": (csv_path.name, csv_file, "text/csv")},
         )
-    
-    print(f"Status: {response.status_code}")
-    if response.status_code == 200:
-        result = response.json()
-        print(f"✅ CSV uploaded successfully!")
-        print(f"   Rows processed: {result.get('rows_processed', 'N/A')}")
-        print(f"   Data points created: {result.get('data_points_created', 'N/A')}")
-    else:
-        print(f"❌ Upload failed")
-        try:
-            print(f"   Error: {response.json()}")
-        except:
-            print(f"   Response: {response.text}")
-    
-    # Step 3: Get data points
-    print("\nStep 3: Retrieve data points...")
-    response = requests.get(
-        f"{BASE_URL}/api/flight-tests/1/data?limit=5",
-        headers=headers
-    )
-    
-    print(f"Status: {response.status_code}")
-    if response.status_code == 200:
-        data_points = response.json()
-        print(f"✅ Retrieved {len(data_points)} data points (showing first 5)")
-        for i, dp in enumerate(data_points[:3], 1):
-            print(f"   {i}. Timestamp: {dp['timestamp']}, Value: {dp['value']}")
-    else:
-        print(f"❌ Failed to retrieve data points")
-        try:
-            print(f"   Error: {response.json()}")
-        except:
-            print(f"   Response: {response.text}")
-    
-    print("\n" + "=" * 60)
-    print("✅ CSV Upload Test Complete!")
-    print("=" * 60)
 
-if __name__ == "__main__":
-    main()
+    assert response.status_code == status.HTTP_201_CREATED
+    result = response.json()
+    assert result["message"] == "CSV data uploaded successfully"
+    assert "rows_processed" in result
+    assert "data_points_created" in result
+    assert result["rows_processed"] >= 1
+
+    response = client.get(
+        f"/api/flight-tests/{flight_test_id}/data?limit=5",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    data_points = response.json()
+    assert isinstance(data_points, list)
+    assert len(data_points) <= 5
+    if data_points:
+        assert "timestamp" in data_points[0]
+        assert "value" in data_points[0]
