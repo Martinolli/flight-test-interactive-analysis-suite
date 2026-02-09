@@ -53,6 +53,29 @@ class HealthResponse(BaseModel):
     timestamp: datetime
 
 
+# Authentication Schemas
+
+
+class Token(BaseModel):
+    """Schema for JWT token response"""
+
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    """Schema for token data"""
+
+    user_id: Optional[int] = None
+
+
+class LoginRequest(BaseModel):
+    """Schema for login request"""
+
+    username: str
+    password: str
+
+
 # Flight Test Schemas
 
 
