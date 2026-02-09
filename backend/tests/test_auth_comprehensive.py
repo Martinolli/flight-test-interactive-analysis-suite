@@ -7,6 +7,8 @@ import pytest
 from fastapi import status
 from jose import jwt
 from app.config import settings
+from app.models import User
+from app.auth import get_password_hash, verify_password
 
 
 class TestLogin:
@@ -90,8 +92,6 @@ class TestLogin:
 
     def test_login_inactive_user(self, client, db_session):
         """Test login with inactive user"""
-        from app.models import User
-        from app.auth import get_password_hash
 
         # Create inactive user
         inactive_user = User(
@@ -327,9 +327,6 @@ class TestPasswordSecurity:
 
     def test_password_hashing(self, db_session):
         """Test that passwords are hashed"""
-        from app.models import User
-        from app.auth import get_password_hash
-
         password = "securepassword123"
         hashed = get_password_hash(password)
 
@@ -344,7 +341,6 @@ class TestPasswordSecurity:
 
     def test_password_verification(self):
         """Test password verification"""
-        from app.auth import get_password_hash, verify_password
 
         password = "testpassword123"
         hashed = get_password_hash(password)
