@@ -3,7 +3,16 @@ FTIAS Backend - Database Models
 SQLAlchemy ORM models
 """
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -26,7 +35,10 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
-        return f"<User(id={self.id}, username={self.username}, " f"email={self.email})>"
+        return (
+            f"<User(id={self.id}, username={self.username}, "
+            f"email={self.email})>"
+        )
 
 
 class FlightTest(Base):
@@ -46,10 +58,17 @@ class FlightTest(Base):
 
     # Relationships
     created_by = relationship("User", backref="flight_tests")
-    data_points = relationship("DataPoint", back_populates="flight_test", cascade="all, delete-orphan")
+    data_points = relationship(
+        "DataPoint",
+        back_populates="flight_test",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
-        return f"<FlightTest(id={self.id}, test_name={self.test_name}, test_date={self.test_date})>"
+        return (
+            f"<FlightTest(id={self.id}, test_name={self.test_name}, "
+            f"test_date={self.test_date})>"
+        )
 
 
 class TestParameter(Base):
@@ -72,7 +91,10 @@ class TestParameter(Base):
     data_points = relationship("DataPoint", back_populates="parameter")
 
     def __repr__(self):
-        return f"<TestParameter(id={self.id}, name={self.name}, unit={self.unit})>"
+        return (
+            f"<TestParameter(id={self.id}, name={self.name}, "
+            f"unit={self.unit})>"
+        )
 
 
 class DataPoint(Base):
@@ -81,9 +103,21 @@ class DataPoint(Base):
     __tablename__ = "data_points"
 
     id = Column(Integer, primary_key=True, index=True)
-    flight_test_id = Column(Integer, ForeignKey("flight_tests.id"), nullable=False, index=True)
-    parameter_id = Column(Integer, ForeignKey("test_parameters.id"), nullable=False, index=True)
-    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    flight_test_id = Column(
+        Integer,
+        ForeignKey("flight_tests.id"),
+        nullable=False,
+        index=True,
+    )
+    parameter_id = Column(
+        Integer,
+        ForeignKey("test_parameters.id"),
+        nullable=False,
+        index=True,
+    )
+    timestamp = Column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     value = Column(Float, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -92,4 +126,9 @@ class DataPoint(Base):
     parameter = relationship("TestParameter", back_populates="data_points")
 
     def __repr__(self):
-        return f"<DataPoint(id={self.id}, flight_test_id={self.flight_test_id}, parameter_id={self.parameter_id}, value={self.value})>"
+        return (
+            f"<DataPoint(id={self.id}, "
+            f"flight_test_id={self.flight_test_id}, "
+            f"parameter_id={self.parameter_id}, "
+            f"value={self.value})>"
+        )
