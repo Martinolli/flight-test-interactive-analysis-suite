@@ -1,27 +1,42 @@
-# Ignore Python virtual environment
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 .venv/
+venv/
+ENV/
+env/
 
-# Ignore sample data folder
-sample_data/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
 
-# Ignore OS files
+# Environment
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Ignore editor files
-.idea/
-
-# Ignore log files
+# Logs
 *.log
 
-# Ignore Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Database
+*.db
+*.sqlite3
 
-# Ignore node modules (if using Node.js)
+# Node
 node_modules/
-
-# Ignore environment files
-.env
+npm-debug.log
