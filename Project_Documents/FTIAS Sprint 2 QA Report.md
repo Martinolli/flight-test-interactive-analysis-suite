@@ -1,9 +1,9 @@
 # FTIAS Sprint 2 QA Report
 
-**Project:** Flight Test Interactive Analysis Suite (FTIAS)  
-**Sprint:** 2 (Phases 3 & 4)  
-**Date:** February 9, 2026  
-**Report By:** Manus AI  
+**Project:** Flight Test Interactive Analysis Suite (FTIAS)
+**Sprint:** 2 (Phases 3 & 4)
+**Date:** February 9, 2026
+**Report By:** Manus AI
 **Status:** ✅ COMPLETE
 
 ---
@@ -17,6 +17,7 @@ This report summarizes the Quality Assurance (QA) activities and results for Spr
 All implemented features have been thoroughly tested and are functioning correctly. The system successfully handles user authentication, flight test data management, and large CSV file uploads. The test suite has been significantly expanded to cover all new functionality, achieving an overall code coverage of **77%**.
 
 **Key Achievements:**
+
 - ✅ **100% Test Pass Rate:** All 14 automated tests passed successfully.
 - ✅ **77% Code Coverage:** Significant improvement in test coverage.
 - ✅ **CSV Upload Success:** Successfully processed a 1.4 MB CSV file with 4,801 data rows and 28 parameters.
@@ -40,6 +41,7 @@ All implemented features have been thoroughly tested and are functioning correct
 ### 3.1. Automated Test Results
 
 **Test Run Summary:**
+
 - **Total Tests:** 14
 - **Passed:** 14 (100%)
 - **Failed:** 0
@@ -49,7 +51,7 @@ All implemented features have been thoroughly tested and are functioning correct
 **Test Suite Breakdown:**
 
 | Test File | Tests | Passed | Failed | Status |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `tests/test_csv_upload.py` | 1 | 1 | 0 | ✅ PASSED |
 | `tests/test_health.py` | 3 | 3 | 0 | ✅ PASSED |
 | `tests/test_users.py` | 10 | 10 | 0 | ✅ PASSED |
@@ -60,7 +62,7 @@ All implemented features have been thoroughly tested and are functioning correct
 **Overall Coverage:** **77%**
 
 | Module | Statements | Missing | Coverage | Priority |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `app/schemas.py` | 91 | 0 | **100%** | ✅ Complete |
 | `app/config.py` | 27 | 1 | **93%** | ✅ Good |
 | `app/models.py` | 59 | 4 | **93%** | ✅ Good |
@@ -75,6 +77,7 @@ All implemented features have been thoroughly tested and are functioning correct
 | **Total** | **541** | **100** | **77%** | |
 
 **Coverage Recommendations:**
+
 - **Highest Priority:** Increase coverage for `app/routers/parameters.py` by testing the Excel upload and bulk operations.
 - **Medium Priority:** Add tests for error handling and edge cases in `app/routers/flight_tests.py` and `app/routers/auth.py`.
 - **Goal:** Achieve >90% overall code coverage in the next sprint.
@@ -86,6 +89,7 @@ All implemented features have been thoroughly tested and are functioning correct
 In addition to automated tests, extensive manual testing was performed on the CSV upload functionality.
 
 **Scenario:** Upload `Flight_Test_Data_2025_08_06.csv`
+
 - **File Size:** 1.4 MB
 - **Data:** 4,801 rows, 28 parameters
 - **Result:** ✅ **SUCCESS**
@@ -93,6 +97,7 @@ In addition to automated tests, extensive manual testing was performed on the CS
 - **Data Points Created:** ~134,428
 
 **Manual Test Cases:**
+
 - ✅ Verified two-header format parsing (parameter names + units).
 - ✅ Verified custom timestamp format conversion (`Day:Hour:Minute:Second.Millisecond`).
 - ✅ Verified automatic parameter creation with correct units.
@@ -106,7 +111,7 @@ In addition to automated tests, extensive manual testing was performed on the CS
 Six critical issues were identified and resolved during this sprint.
 
 | ID | Issue | Description | Resolution | Status |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | Password Hashing Mismatch | `auth.py` used bcrypt, `users.py` used pbkdf2_sha256. | Standardized on pbkdf2_sha256 for both. | ✅ FIXED |
 | 2 | JWT Subject Type Error | JWT library expected string, but integer was provided. | Converted user ID to string in token creation. | ✅ FIXED |
 | 3 | DB Column Name Mismatch | Code used `user_id`, model used `created_by_id`. | Updated all references to `created_by_id`. | ✅ FIXED |
@@ -120,17 +125,17 @@ Six critical issues were identified and resolved during this sprint.
 
 To improve test coverage and ensure future stability, three new comprehensive test suites were created:
 
-1.  **`tests/test_flight_tests_comprehensive.py`**
-    -   **Coverage:** Flight Test CRUD, CSV upload (simple, two-header, invalid), data retrieval, pagination, security.
-    -   **Total Tests:** 20+
+1. **`tests/test_flight_tests_comprehensive.py`**
+   - **Coverage:** Flight Test CRUD, CSV upload (simple, two-header, invalid), data retrieval, pagination, security.
+   - **Total Tests:** 20+
 
-2.  **`tests/test_auth_comprehensive.py`**
-    -   **Coverage:** Login, logout, token refresh, current user, password security, token security.
-    -   **Total Tests:** 20+
+2. **`tests/test_auth_comprehensive.py`**
+   - **Coverage:** Login, logout, token refresh, current user, password security, token security.
+   - **Total Tests:** 20+
 
-3.  **`tests/test_parameters_comprehensive.py`**
-    -   **Coverage:** Parameter CRUD, Excel upload, bulk operations, data validation.
-    -   **Total Tests:** 20+
+3. **`tests/test_parameters_comprehensive.py`**
+   - **Coverage:** Parameter CRUD, Excel upload, bulk operations, data validation.
+   - **Total Tests:** 20+
 
 These new test suites provide a solid foundation for future development and will help maintain high code quality.
 
@@ -140,21 +145,22 @@ These new test suites provide a solid foundation for future development and will
 
 ### 7.1. Development
 
--   **Implement Excel Upload for Parameters:** Complete the `parameters.py` router to handle the upload of the 985-parameter Excel file.
--   **Implement Rate Limiting:** Add rate limiting to login and other sensitive endpoints to prevent abuse.
--   **Implement Async CSV Processing:** For very large files, consider moving CSV processing to a background task to avoid blocking the API.
+- **Implement Excel Upload for Parameters:**
+  Complete the `parameters.py` router to handle the upload of the 985-parameter Excel file.
+- **Implement Rate Limiting:** Add rate limiting to login and other sensitive endpoints to prevent abuse.
+- **Implement Async CSV Processing:** For very large files, consider moving CSV processing to a background task to avoid blocking the API.
 
 ### 7.2. Testing
 
--   **Increase Code Coverage to >90%:** Focus on the modules with the lowest coverage (`parameters.py`, `flight_tests.py`, `auth.py`).
--   **Run Comprehensive Test Suites:** Integrate the new test suites into the CI/CD pipeline.
--   **Add Integration Tests:** Create tests that cover the full user workflow, from login to data upload and retrieval.
+- **Increase Code Coverage to >90%:** Focus on the modules with the lowest coverage (`parameters.py`, `flight_tests.py`, `auth.py`).
+- **Run Comprehensive Test Suites:** Integrate the new test suites into the CI/CD pipeline.
+- **Add Integration Tests:** Create tests that cover the full user workflow, from login to data upload and retrieval.
 
 ### 7.3. CI/CD & DevOps
 
--   **Set Up GitHub Actions:** Implement the recommended CI/CD pipeline to automate testing on every push and pull request.
--   **Add Code Coverage Reporting:** Integrate with a tool like Codecov to track coverage over time.
--   **Implement Branch Protection:** Protect the `main` and `develop` branches from direct pushes.
+- **Set Up GitHub Actions:** Implement the recommended CI/CD pipeline to automate testing on every push and pull request.
+- **Add Code Coverage Reporting:** Integrate with a tool like Codecov to track coverage over time.
+- **Implement Branch Protection:** Protect the `main` and `develop` branches from direct pushes.
 
 ---
 
@@ -166,5 +172,5 @@ Sprint 2 (Phases 3 & 4) was a major success. The core functionality of the FTIAS
 
 ---
 
-**Report Generated By:** Manus AI  
+**Report Generated By:** Manus AI
 **Date:** February 9, 2026
