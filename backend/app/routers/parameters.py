@@ -37,7 +37,7 @@ async def upload_parameters_excel(
         workbook = load_workbook(filename=io.BytesIO(contents))
         sheet = workbook.active
         headers = [cell.value for cell in sheet[1]]
-        
+
         parameters = []
         row_count = 0
 
@@ -45,7 +45,7 @@ async def upload_parameters_excel(
             if not row[0]:
                 continue
             row_count += 1
-            
+
             existing = db.query(TestParameter).filter(TestParameter.parameter_name == row[0]).first()
             if not existing:
                 parameter = TestParameter(
@@ -67,10 +67,7 @@ async def upload_parameters_excel(
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing Excel file: {str(e)}",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error processing Excel file: {str(e)}") from e
 
 
 @router.get("/", response_model=List[schemas.TestParameterResponse])
