@@ -73,7 +73,14 @@ export default function DashboardLayout({
           </div>
           <Button
             onClick={() => {
-              window.location.href = getLoginUrl();
+              const loginUrl = getLoginUrl();
+              if (!loginUrl) {
+                window.alert(
+                  "OAuth is not configured.\n\nSet VITE_OAUTH_PORTAL_URL and VITE_APP_ID in frontend/.env to enable sign-in."
+                );
+                return;
+              }
+              window.location.href = loginUrl;
             }}
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"

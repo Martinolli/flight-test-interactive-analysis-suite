@@ -3,17 +3,31 @@ FTIAS Backend - Configuration
 Application settings and environment variables
 """
 
+from pathlib import Path
 from typing import List, Union
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_CONFIG_FILE = Path(__file__).resolve()
+_REPO_ROOT = _CONFIG_FILE.parents[2]
+
+
 class Settings(BaseSettings):
     """Application settings"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Load env vars regardless of where the app is launched from:
+        # - backend/app/.env (rare, but allow)
+        # - backend/.env (optional)
+        # - repo-root/.env (expected)
+        env_file=[
+            str(_CONFIG_FILE.parent / ".env"),
+            str(_CONFIG_FILE.parents[1] / ".env"),
+            str(_REPO_ROOT / ".env"),
+        ],
+        env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
     )

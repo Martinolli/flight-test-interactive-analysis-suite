@@ -10,6 +10,31 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+const maybeInstallAnalytics = () => {
+  if (typeof document === "undefined") return;
+
+  const endpoint = (import.meta.env.VITE_ANALYTICS_ENDPOINT as string | undefined) ?? "";
+  const websiteId = (import.meta.env.VITE_ANALYTICS_WEBSITE_ID as string | undefined) ?? "";
+
+  if (!endpoint || !websiteId) return;
+
+  const normalizedEndpoint = endpoint.trim().replace(/\/+$/, "");
+  if (!normalizedEndpoint) return;
+
+  const src =
+    normalizedEndpoint.startsWith("http://") || normalizedEndpoint.startsWith("https://")
+      ? `${normalizedEndpoint}/umami`
+      : normalizedEndpoint.startsWith("/")
+        ? `${normalizedEndpoint}/umami`
+        : `/${normalizedEndpoint}/umami`;
+
+  const script = document.createElement("script");
+  script.defer = true;
+  script.src = src;
+  script.setAttribute("data-website-id", websiteId);
+  document.head.appendChild(script);
+};
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
@@ -18,7 +43,15 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  const loginUrl = getLoginUrl();
+  if (!loginUrl) {
+    console.warn(
+      "[Auth] OAuth is not configured (missing VITE_OAUTH_PORTAL_URL/VITE_APP_ID); skipping redirect."
+    );
+    return;
+  }
+
+  window.location.href = loginUrl;
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -51,6 +84,8 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+
+maybeInstallAnalytics();
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>

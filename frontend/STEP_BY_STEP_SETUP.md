@@ -94,6 +94,15 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 
    # JWT Secret (use the same one from your backend)
    JWT_SECRET_KEY=your-secret-key-here-change-in-production
+
+   # Optional: Analytics (leave unset to disable)
+   # VITE_ANALYTICS_ENDPOINT=https://your-umami-domain.example
+   # VITE_ANALYTICS_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+   # Optional: OAuth (leave unset to disable sign-in)
+   # VITE_OAUTH_PORTAL_URL=https://your-oauth-portal.example
+   # VITE_APP_ID=your-app-id
+   # OAUTH_SERVER_URL=https://your-oauth-api.example
    ```
 
 3. **Important:** Replace `your-secret-key-here-change-in-production` with the same JWT secret from your backend's `.env` file
