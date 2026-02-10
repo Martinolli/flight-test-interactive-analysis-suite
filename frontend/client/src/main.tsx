@@ -1,7 +1,8 @@
 import { trpc } from "@/lib/trpc";
+import type { AppRouter } from "@shared/server";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { httpBatchLink, TRPCClientError, createTRPCClient } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
@@ -9,31 +10,6 @@ import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
-
-const maybeInstallAnalytics = () => {
-  if (typeof document === "undefined") return;
-
-  const endpoint = (import.meta.env.VITE_ANALYTICS_ENDPOINT as string | undefined) ?? "";
-  const websiteId = (import.meta.env.VITE_ANALYTICS_WEBSITE_ID as string | undefined) ?? "";
-
-  if (!endpoint || !websiteId) return;
-
-  const normalizedEndpoint = endpoint.trim().replace(/\/+$/, "");
-  if (!normalizedEndpoint) return;
-
-  const src =
-    normalizedEndpoint.startsWith("http://") || normalizedEndpoint.startsWith("https://")
-      ? `${normalizedEndpoint}/umami`
-      : normalizedEndpoint.startsWith("/")
-        ? `${normalizedEndpoint}/umami`
-        : `/${normalizedEndpoint}/umami`;
-
-  const script = document.createElement("script");
-  script.defer = true;
-  script.src = src;
-  script.setAttribute("data-website-id", websiteId);
-  document.head.appendChild(script);
-};
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -44,14 +20,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!isUnauthorized) return;
 
   const loginUrl = getLoginUrl();
-  if (!loginUrl) {
-    console.warn(
-      "[Auth] OAuth is not configured (missing VITE_OAUTH_PORTAL_URL/VITE_APP_ID); skipping redirect."
-    );
-    return;
+  if (loginUrl) {
+    window.location.href = loginUrl;
   }
-
-  window.location.href = loginUrl;
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -70,7 +41,7 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
-const trpcClient = trpc.createClient({
+const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
       url: "/api/trpc",
@@ -84,8 +55,6 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
-
-maybeInstallAnalytics();
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>

@@ -1,5 +1,8 @@
 // Import the backend adapter instead of tRPC
-import { backendAdapter } from './backendAdapter';
+import { createTRPCReact } from "@trpc/react-query";
 
 // Export it as 'trpc' so existing code works without changes
-export const trpc = backendAdapter;
+
+import type { AppRouter } from "../../../server/routers";
+
+export const trpc = createTRPCReact<AppRouter>();
