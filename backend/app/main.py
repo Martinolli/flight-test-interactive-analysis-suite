@@ -51,7 +51,8 @@ async def startup_event():
                     print(
                         "❌ Database connection failed after multiple retries. "
                         "Check that Postgres is running and that your `.env` "
-                        "values match (POSTGRES_HOST/PORT/USER/PASSWORD/DB or DATABASE_URL)."
+                        "values match (POSTGRES_HOST/PORT/USER/PASSWORD/DB "
+                        "or DATABASE_URL)."
                     )
                     raise exc
                 sleep_seconds = min(2 ** min(attempt, 5), max(1.0, remaining))
