@@ -90,10 +90,10 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
    DATABASE_URL=postgresql://ftias_user:ftias_password@localhost:5432/ftias_db
 
    # Backend API URL
-   VITE_BACKEND_URL=http://localhost:8000
+   VITE_API_URL=http://localhost:8000
 
    # JWT Secret (use the same one from your backend)
-   JWT_SECRET=your-secret-key-here-change-in-production
+   JWT_SECRET_KEY=your-secret-key-here-change-in-production
    ```
 
 3. **Important:** Replace `your-secret-key-here-change-in-production` with the same JWT secret from your backend's `.env` file
@@ -111,6 +111,14 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
    ```
 
 3. Make sure PostgreSQL is running (start it if needed)
+
+   If you're using Docker (recommended on Windows):
+
+   ```powershell
+   # From the repo root (flight-test-interactive-analysis-suite/)
+   docker compose up -d postgres
+   docker compose ps
+   ```
 
 4. Start the backend:
 
@@ -196,7 +204,7 @@ Check that everything is working:
   uvicorn app.main:app --reload --port 8001
   ```
 
-  Then update `VITE_BACKEND_URL` in frontend `.env` to `http://localhost:8001`
+  Then update `VITE_API_URL` in frontend `.env` to `http://localhost:8001`
 
 ### **Problem: "Port 3000 already in use"**
 

@@ -17,7 +17,7 @@ Your project has two parts:
 
 - **Node.js** 18+ and pnpm installed
 - **Python** 3.11+ installed
-- **PostgreSQL** database running locally
+- **PostgreSQL** database running (local install or via Docker Compose)
 - **Git** for cloning repositories
 
 ---
@@ -86,6 +86,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The backend should now be running at `http://localhost:8000`
+
+If you don't have PostgreSQL installed locally, you can start it with Docker from the repo root:
+
+```powershell
+docker compose up -d postgres
+docker compose ps
+```
 
 ---
 

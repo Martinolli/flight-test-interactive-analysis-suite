@@ -26,7 +26,7 @@ Create an adapter that translates tRPC calls to REST API calls without modifying
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
 });
 
 // Add JWT token to requests
@@ -258,7 +258,7 @@ Once integrated, deploy both:
 
 1. **Backend**: Deploy FastAPI to your server (Railway, Render, etc.)
 2. **Frontend**: Deploy React app to Vercel, Netlify, or your server
-3. **Environment Variables**: Set `VITE_BACKEND_URL` to your production backend URL
+3. **Environment Variables**: Set `VITE_API_URL` to your production backend URL
 
 ---
 
