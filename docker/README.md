@@ -81,11 +81,14 @@ cp .env.example .env
 ### Step 3: Start Services
 
 ```powershell
-# Start all services (first run will download images)
-docker-compose up
+# Start database + backend API (first run will download images)
+docker compose up
 
 # Or start in detached mode (runs in background)
-docker-compose up -d
+docker compose up -d
+
+# Optional: start frontend (requires frontend source under ./frontend)
+docker compose --profile frontend up -d
 ```
 
 **First Run:** Docker will download images (~2GB) which may take 5-10 minutes depending on your internet connection.
@@ -94,21 +97,21 @@ docker-compose up -d
 
 ```powershell
 # Check all services are running
-docker-compose ps
+docker compose ps
 
 # Expected output:
 # NAME              STATUS    PORTS
 # ftias-postgres    Up        0.0.0.0:5432->5432/tcp
 # ftias-backend     Up        0.0.0.0:8000->8000/tcp
-# ftias-frontend    Up        0.0.0.0:5173->5173/tcp
+# ftias-frontend    Up        0.0.0.0:5173->5173/tcp   (only if --profile frontend is enabled)
 ```
 
 ### Step 5: Access Services
 
 Open your web browser and navigate to:
 
-- **Frontend Application:** http://localhost:5173
 - **Backend API:** http://localhost:8000
+- **Health Check:** http://localhost:8000/api/health
 - **API Documentation (Swagger):** http://localhost:8000/docs
 - **API Documentation (ReDoc):** http://localhost:8000/redoc
 
@@ -152,7 +155,8 @@ Open your web browser and navigate to:
 - **Dependencies:** Installed from `backend/requirements.txt`
 
 **Environment Variables:**
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - PostgreSQL connection string (preferred)
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT` - Used to construct a connection string when `DATABASE_URL` is not set
 - `SECRET_KEY` - Application secret key
 - `DEBUG` - Debug mode (true for development)
 - `CORS_ORIGINS` - Allowed CORS origins
@@ -166,6 +170,8 @@ Open your web browser and navigate to:
 - **Port:** `5173` (configurable via `FRONTEND_PORT`)
 - **Working Directory:** `/app`
 - **Source Code:** Mounted from `./frontend`
+
+**Note:** The frontend service is behind the `frontend` Compose profile and requires the frontend source (e.g. `frontend/package.json`) to be present.
 
 **Features:**
 - **Hot Module Replacement (HMR):** Instant updates without page refresh
@@ -187,7 +193,7 @@ Open your web browser and navigate to:
 
 **Starting pgAdmin:**
 ```powershell
-docker-compose --profile tools up pgadmin
+docker compose --profile tools up pgadmin
 ```
 
 **Access:**
