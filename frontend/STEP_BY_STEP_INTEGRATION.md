@@ -17,12 +17,14 @@ The frontend currently uses **tRPC** to talk to the backend, but your backend us
 ### **Step 1: Create the API Adapter File**
 
 1. Navigate to your frontend folder:
+
    ```bash
    cd flight-test-interactive-analysis-suite/frontend
    ```
 
 2. Create a new file at this exact path:
-   ```
+
+   ```bash
    frontend/client/src/lib/backendAdapter.ts
    ```
 
@@ -235,14 +237,15 @@ export const backendAdapter = {
 import { useState, useEffect } from 'react';
 ```
 
-4. **Save the file**
+4.**Save the file**
 
 ---
 
 ### **Step 2: Update the tRPC Client File**
 
 1. Open this file:
-   ```
+
+   ```bash
    frontend/client/src/lib/trpc.ts
    ```
 
@@ -256,7 +259,7 @@ import { backendAdapter } from './backendAdapter';
 export const trpc = backendAdapter;
 ```
 
-3. **Save the file**
+3.**Save the file**
 
 ---
 
@@ -276,7 +279,8 @@ pnpm add axios
 Your backend needs to allow requests from the frontend.
 
 1. Open this file:
-   ```
+
+   ```bash
    backend/app/main.py
    ```
 
@@ -299,9 +303,9 @@ app.add_middleware(
 )
 ```
 
-4. **Save the file**
+4.**Save the file**
 
-5. **Restart your backend** (press CTRL+C in the backend terminal, then run `uvicorn` again)
+5.**Restart your backend** (press CTRL+C in the backend terminal, then run `uvicorn` again)
 
 ---
 
@@ -337,6 +341,7 @@ app.add_middleware(
 ### **Problem: "CORS policy" error in browser console**
 
 **Solution:**
+
 1. Check that your backend's `main.py` has the CORS middleware (Step 4)
 2. Make sure `http://localhost:3000` is in the `allow_origins` list
 3. Restart the backend after making changes
@@ -344,6 +349,7 @@ app.add_middleware(
 ### **Problem: "Network Error" or "Failed to fetch"**
 
 **Solution:**
+
 1. Check that backend is running at `http://localhost:8000`
 2. Test the backend directly: Open `http://localhost:8000/api/health` in your browser
 3. Check the backend terminal for error messages
@@ -351,6 +357,7 @@ app.add_middleware(
 ### **Problem: "401 Unauthorized" errors**
 
 **Solution:**
+
 1. The authentication system needs to be connected
 2. For now, you can test without auth by temporarily removing the JWT token check in your backend
 3. Or implement the login flow (see Step 6 below)
@@ -361,17 +368,19 @@ app.add_middleware(
 
 The authentication system needs special handling. For now, you can:
 
-**Option A: Test without authentication**
+*Option A: Test without authentication**
+
 - Temporarily disable JWT requirements in your backend for testing
 
-**Option B: Implement login flow**
+*Option B: Implement login flow**
+
 - I can help you create a login page that works with your backend's `/api/auth/login` endpoint
 
 **Which would you prefer?** Let me know and I'll provide exact instructions.
 
 ---
 
-## 🎉 Success!
+## 🎉 Success
 
 If you can create and view flight tests, congratulations! The frontend and backend are now connected.
 
@@ -386,6 +395,7 @@ If you can create and view flight tests, congratulations! The frontend and backe
 5. ✅ Tested the integration
 
 **Next Steps:**
+
 - Connect the authentication system
 - Test file uploads (CSV/Excel)
 - Add more features as needed
@@ -395,6 +405,7 @@ If you can create and view flight tests, congratulations! The frontend and backe
 ## 🆘 Need Help?
 
 If you encounter any issues:
+
 1. Check the browser console (F12) for error messages
 2. Check the backend terminal for error messages
 3. Let me know the exact error message and I'll help you fix it!

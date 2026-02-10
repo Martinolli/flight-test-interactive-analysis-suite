@@ -44,7 +44,7 @@ async def startup_event():
                 if attempt == 1:
                     print(
                         "🗄️  Database not reachable yet. "
-                        "If you're running Postgres via Docker, start it with: "
+                        "If you're running Postgres via Docker, start it with:"
                         "`docker compose up -d postgres` (from repo root)."
                     )
                 if remaining <= 0:
