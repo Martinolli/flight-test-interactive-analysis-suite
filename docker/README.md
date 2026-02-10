@@ -8,7 +8,7 @@ The FTIAS project uses Docker and Docker Compose to provide a consistent, reprod
 
 ## Directory Contents
 
-```
+```bash
 docker/
 ├── README.md              # This file - Docker documentation
 ├── backend.Dockerfile     # Backend (FastAPI) container configuration
@@ -110,10 +110,10 @@ docker compose ps
 
 Open your web browser and navigate to:
 
-- **Backend API:** http://localhost:8000
-- **Health Check:** http://localhost:8000/api/health
-- **API Documentation (Swagger):** http://localhost:8000/docs
-- **API Documentation (ReDoc):** http://localhost:8000/redoc
+- **Backend API:** <http://localhost:8000>
+- **Health Check:** <http://localhost:8000/api/health>
+- **API Documentation (Swagger):** <http://localhost:8000/docs>
+- **API Documentation (ReDoc):** <http://localhost:8000/redoc>
 
 ---
 
@@ -124,6 +124,7 @@ Open your web browser and navigate to:
 **Container Name:** `ftias-postgres`
 
 **Configuration:**
+
 - **Image:** `postgres:15-alpine`
 - **Port:** `5432` (configurable via `POSTGRES_PORT` in `.env`)
 - **Database:** `ftias_db` (configurable via `POSTGRES_DB`)
@@ -131,11 +132,13 @@ Open your web browser and navigate to:
 - **Password:** Set in `.env` file (`POSTGRES_PASSWORD`)
 
 **Data Persistence:**
+
 - Data is stored in Docker volume `postgres_data`
 - Survives container restarts and rebuilds
 - Initialization scripts in `database/init/` run on first startup
 
 **Health Check:**
+
 - Checks database is ready to accept connections
 - Other services wait for database to be healthy before starting
 
@@ -144,17 +147,20 @@ Open your web browser and navigate to:
 **Container Name:** `ftias-backend`
 
 **Configuration:**
+
 - **Base Image:** `python:3.12-slim`
 - **Port:** `8000` (configurable via `BACKEND_PORT`)
 - **Working Directory:** `/app`
 - **Source Code:** Mounted from `./backend`
 
 **Features:**
+
 - **Hot Reload:** Code changes automatically restart the server
 - **Auto-reload:** Enabled via `--reload` flag in uvicorn
 - **Dependencies:** Installed from `backend/requirements.txt`
 
 **Environment Variables:**
+
 - `DATABASE_URL` - PostgreSQL connection string (preferred)
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT` - Used to construct a connection string when `DATABASE_URL` is not set
 - `SECRET_KEY` - Application secret key
@@ -166,6 +172,7 @@ Open your web browser and navigate to:
 **Container Name:** `ftias-frontend`
 
 **Configuration:**
+
 - **Base Image:** `node:20-alpine`
 - **Port:** `5173` (configurable via `FRONTEND_PORT`)
 - **Working Directory:** `/app`
@@ -174,12 +181,14 @@ Open your web browser and navigate to:
 **Note:** The frontend service is behind the `frontend` Compose profile and requires the frontend source (e.g. `frontend/package.json`) to be present.
 
 **Features:**
+
 - **Hot Module Replacement (HMR):** Instant updates without page refresh
 - **Fast Refresh:** Preserves component state during updates
 - **Package Manager:** pnpm (faster than npm)
 
 **Environment Variables:**
-- `VITE_API_URL` - Backend API URL (default: http://localhost:8000)
+
+- `VITE_API_URL` - Backend API URL (default: <http://localhost:8000>)
 - `NODE_ENV` - Node environment (development/production)
 
 ### pgAdmin (Optional)
@@ -187,22 +196,26 @@ Open your web browser and navigate to:
 **Container Name:** `ftias-pgadmin`
 
 **Configuration:**
+
 - **Image:** `dpage/pgadmin4:latest`
 - **Port:** `5050` (configurable via `PGADMIN_PORT`)
 - **Profile:** `tools` (not started by default)
 
 **Starting pgAdmin:**
+
 ```powershell
 docker compose --profile tools up pgadmin
 ```
 
 **Access:**
-- **URL:** http://localhost:5050
+
+- **URL:** <http://localhost:5050>
 - **Email:** `admin@ftias.local` (configurable via `PGADMIN_EMAIL`)
 - **Password:** `admin` (configurable via `PGADMIN_PASSWORD`)
 
 **Connecting to Database:**
-1. Open pgAdmin at http://localhost:5050
+
+1. Open pgAdmin at <http://localhost:5050>
 2. Right-click "Servers" → "Register" → "Server"
 3. **General Tab:** Name: `FTIAS Database`
 4. **Connection Tab:**
@@ -385,11 +398,13 @@ docker-compose exec -T postgres psql -U ftias_user -d ftias_db < backup.sql
 ### Services Won't Start
 
 **Check Docker is running:**
+
 ```powershell
 docker info
 ```
 
 **Check for port conflicts:**
+
 ```powershell
 # Windows
 netstat -ano | findstr :5432
@@ -400,6 +415,7 @@ netstat -ano | findstr :5173
 ```
 
 **View error logs:**
+
 ```powershell
 docker-compose logs
 ```
@@ -407,17 +423,20 @@ docker-compose logs
 ### Database Connection Errors
 
 **Ensure database is healthy:**
+
 ```powershell
 docker-compose ps
 # postgres should show "healthy" status
 ```
 
 **Check database logs:**
+
 ```powershell
 docker-compose logs postgres
 ```
 
 **Verify connection string:**
+
 ```powershell
 docker-compose exec backend env | grep DATABASE_URL
 ```
@@ -425,16 +444,19 @@ docker-compose exec backend env | grep DATABASE_URL
 ### Backend Won't Start
 
 **Check Dockerfile exists:**
+
 ```powershell
 ls docker/backend.Dockerfile
 ```
 
 **Check requirements.txt exists:**
+
 ```powershell
 ls backend/requirements.txt
 ```
 
 **Rebuild backend:**
+
 ```powershell
 docker-compose build backend
 docker-compose up backend
@@ -443,16 +465,19 @@ docker-compose up backend
 ### Frontend Won't Start
 
 **Check Dockerfile exists:**
+
 ```powershell
 ls docker/frontend.Dockerfile
 ```
 
 **Check package.json exists:**
+
 ```powershell
 ls frontend/package.json
 ```
 
 **Rebuild frontend:**
+
 ```powershell
 docker-compose build frontend
 docker-compose up frontend
@@ -530,7 +555,7 @@ Refer to the deployment documentation when ready for production.
 
 ## Network Architecture
 
-```
+```bash
 ┌─────────────────────────────────────────────────────┐
 │           ftias-network (bridge)                    │
 │                                                     │
@@ -564,11 +589,13 @@ Refer to the deployment documentation when ready for production.
 See `.env.example` for all available environment variables and their descriptions.
 
 **Critical Variables:**
+
 - `SECRET_KEY` - Application secret (must be changed)
 - `JWT_SECRET_KEY` - JWT signing key (must be changed)
 - `POSTGRES_PASSWORD` - Database password (must be changed)
 
 **Optional Variables:**
+
 - `POSTGRES_PORT` - Database port (default: 5432)
 - `BACKEND_PORT` - API port (default: 8000)
 - `FRONTEND_PORT` - Frontend port (default: 5173)
@@ -578,17 +605,18 @@ See `.env.example` for all available environment variables and their description
 
 ## Additional Resources
 
-- **Docker Documentation:** https://docs.docker.com/
-- **Docker Compose Documentation:** https://docs.docker.com/compose/
-- **FastAPI Documentation:** https://fastapi.tiangolo.com/
-- **Vite Documentation:** https://vitejs.dev/
-- **PostgreSQL Documentation:** https://www.postgresql.org/docs/
+- **Docker Documentation:** <https://docs.docker.com/>
+- **Docker Compose Documentation:** <https://docs.docker.com/compose/>
+- **FastAPI Documentation:** <https://fastapi.tiangolo.com/>
+- **Vite Documentation:** <https://vitejs.dev/>
+- **PostgreSQL Documentation:** <https://www.postgresql.org/docs/>
 
 ---
 
 ## Support
 
 For Docker-related issues:
+
 1. Check this README
 2. Review `Docker_Troubleshooting_Guide.md` in project root
 3. Check Docker logs: `docker-compose logs`
@@ -596,6 +624,6 @@ For Docker-related issues:
 
 ---
 
-**Last Updated:** February 5, 2026  
-**Docker Compose Version:** 5.0.2  
+**Last Updated:** February 5, 2026
+**Docker Compose Version:** 5.0.2
 **Maintained by:** FTIAS Development Team
