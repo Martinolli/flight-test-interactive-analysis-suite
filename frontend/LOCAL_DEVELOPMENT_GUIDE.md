@@ -7,6 +7,7 @@ This guide explains how to run the Flight Test Interactive Analysis Suite locall
 ## 🏗️ Architecture Overview
 
 Your project has two parts:
+
 1. **Backend** - FastAPI application (Python) in `flight-test-interactive-analysis-suite` repo
 2. **Frontend** - React application (TypeScript) created by Manus in `ftias-frontend`
 
@@ -140,7 +141,7 @@ api.interceptors.request.use((config) => {
 export default api;
 ```
 
-2. Replace tRPC calls with REST API calls in your components.
+Replace tRPC calls with REST API calls in your components.
 
 ### **Option 2: Add tRPC Support to Backend** (Better long-term)
 
@@ -215,6 +216,7 @@ If port 3000 or 8000 is already in use, change the port in the respective config
 ## 🆘 Need Help?
 
 If you encounter any issues, feel free to ask! I can help you:
+
 - Merge the frontend into your existing repository
 - Update the frontend to use your REST API
 - Add tRPC support to your backend

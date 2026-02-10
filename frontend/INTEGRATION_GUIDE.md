@@ -82,7 +82,7 @@ export const backendAdapter = {
       const formData = new FormData();
       formData.append('username', credentials.username);
       formData.append('password', credentials.password);
-      
+
       const { data } = await api.post('/api/auth/login', formData);
       localStorage.setItem('access_token', data.access_token);
       return data;
@@ -99,7 +99,7 @@ export const backendAdapter = {
 };
 ```
 
-2. Update `client/src/lib/trpc.ts` to use the adapter:
+   Update `client/src/lib/trpc.ts` to use the adapter:
 
 ```typescript
 // Replace tRPC with the adapter
@@ -112,14 +112,15 @@ export const trpc = backendAdapter as any; // Type assertion for compatibility
 
 Add tRPC support to your FastAPI backend using `fastapi-trpc`.
 
-#### **Implementation:**
+#### *Implementation:*
 
 1. Install tRPC for Python:
+
 ```bash
 pip install fastapi-trpc
 ```
 
-2. Create `backend/app/trpc_router.py`:
+Create `backend/app/trpc_router.py`:
 
 ```python
 from fastapi_trpc import TRPCRouter
@@ -133,7 +134,7 @@ trpc_router.include_router(parameters.router)
 trpc_router.include_router(auth.router)
 ```
 
-3. Update `backend/app/main.py`:
+Update `backend/app/main.py`:
 
 ```python
 from app.trpc_router import trpc_router
@@ -160,27 +161,29 @@ Keep your FastAPI backend unchanged and update the frontend components to use RE
 Your backend uses JWT tokens. Update the frontend to work with your auth system:
 
 1. **Login Flow:**
+
 ```typescript
 // In Login component
 const handleLogin = async (username: string, password: string) => {
   const formData = new FormData();
   formData.append('username', username);
   formData.append('password', password);
-  
+
   const response = await fetch('http://localhost:8000/api/auth/login', {
     method: 'POST',
     body: formData,
   });
-  
+
   const data = await response.json();
   localStorage.setItem('access_token', data.access_token);
-  
+
   // Redirect to dashboard
   window.location.href = '/';
 };
 ```
 
-2. **Protected Routes:**
+1. **Protected Routes:**
+
 ```typescript
 // Add token to all API requests
 const token = localStorage.getItem('access_token');
@@ -200,9 +203,9 @@ Connect the frontend upload components to your backend endpoints:
 const handleCSVUpload = async (file: File, flightTestId: number) => {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const token = localStorage.getItem('access_token');
-  
+
   const response = await fetch(
     `http://localhost:8000/api/flight-tests/${flightTestId}/upload-csv`,
     {
@@ -213,7 +216,7 @@ const handleCSVUpload = async (file: File, flightTestId: number) => {
       body: formData,
     }
   );
-  
+
   if (response.ok) {
     toast.success('CSV uploaded successfully!');
   } else {
@@ -227,18 +230,21 @@ const handleCSVUpload = async (file: File, flightTestId: number) => {
 ## 🧪 Testing the Integration
 
 1. **Start Backend:**
+
 ```bash
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-2. **Start Frontend:**
+1. **Start Frontend:**
+
 ```bash
 cd frontend
 pnpm dev
 ```
 
-3. **Test Endpoints:**
+1. **Test Endpoints:**
+
 - Login at `http://localhost:3000`
 - Create a flight test
 - Upload CSV data
@@ -259,6 +265,7 @@ Once integrated, deploy both:
 ## 💡 Recommendation
 
 **I recommend Option 1 (Adapter Layer)** because:
+
 - ✅ No backend changes required
 - ✅ Fastest to implement
 - ✅ Keeps your existing backend stable
