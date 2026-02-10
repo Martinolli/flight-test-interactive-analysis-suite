@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # Database
+    DATABASE_URL: str | None = None
     POSTGRES_USER: str = "ftias_user"
     POSTGRES_PASSWORD: str = "ftias_password"
     POSTGRES_DB: str = "ftias_db"
@@ -30,8 +31,13 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
 
     @property
-    def DATABASE_URL(self) -> str:
-        """Construct database URL"""
+    def database_url(self) -> str:
+        """Resolved database URL.
+
+        Prefers explicit DATABASE_URL when set, otherwise builds from POSTGRES_*.
+        """
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
         return (
             f"postgresql://{self.POSTGRES_USER}:"
             f"{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:"

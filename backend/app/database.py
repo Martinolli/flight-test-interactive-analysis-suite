@@ -11,7 +11,7 @@ from app.config import settings
 
 # Create database engine
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.database_url,
     echo=settings.DEBUG,
     pool_pre_ping=True,
     pool_size=10,
