@@ -30,8 +30,13 @@ services:
     container_name: ftias-backend
     restart: unless-stopped
     environment:
-      # Database
-      DATABASE_URL: ${DATABASE_URL}
+      # Database (matches backend/app/config.py)
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-ftias_user}:${POSTGRES_PASSWORD:-ftias_password}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-ftias_db}"
+      POSTGRES_USER: ${POSTGRES_USER:-ftias_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ftias_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ftias_db}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       # Application
       APP_ENV: ${APP_ENV:-development}
       DEBUG: ${DEBUG:-true}
@@ -70,6 +75,8 @@ services:
     networks:
       - ftias-network
     command: pnpm dev --host 0.0.0.0
+    profiles:
+      - frontend
 
   # pgAdmin (Optional - Database Management UI)
   pgadmin:
