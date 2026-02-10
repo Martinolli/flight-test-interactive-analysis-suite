@@ -1,10 +1,10 @@
 # Frontend-Backend Integration Roadmap
 
-**Document Number:** 36  
-**Date:** February 10, 2026  
-**Author:** Manus AI  
-**Project:** Flight Test Interactive Analysis Suite (FTIAS)  
-**Repository:** https://github.com/Martinolli/flight-test-interactive-analysis-suite
+**Document Number:** 36
+**Date:** February 10, 2026
+**Author:** Manus AI
+**Project:** Flight Test Interactive Analysis Suite (FTIAS)
+**Repository:** <https://github.com/Martinolli/flight-test-interactive-analysis-suite>
 
 ---
 
@@ -13,6 +13,7 @@
 This document provides a comprehensive roadmap for integrating the FTIAS React frontend with the FastAPI backend. The integration requires replacing Manus OAuth with backend JWT authentication, creating an adapter layer to bridge tRPC and REST API, and connecting all frontend pages to backend endpoints.
 
 **Current Status:**
+
 - ✅ Backend fully functional (localhost:8000)
 - ✅ Frontend UI rendering (localhost:3000)
 - ⚠️ Frontend uses Manus OAuth (needs replacement)
@@ -28,7 +29,7 @@ The integration process involves four major components that must work together s
 
 ### Architecture Diagram
 
-```
+```bash
 ┌─────────────────────────────────────────────────────────────┐
 │                    React Frontend (Port 3000)                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
@@ -74,25 +75,29 @@ The integration process involves four major components that must work together s
 
 ### Integration Components
 
-**1. Authentication System**
+*1. Authentication System**
+
 - Replace Manus OAuth with backend JWT authentication
 - Implement login/logout flows
 - Store and manage JWT tokens
 - Add Authorization headers to all requests
 
-**2. API Adapter Layer**
+*2. API Adapter Layer**
+
 - Create bridge between tRPC and REST API
 - Translate procedure calls to HTTP requests
 - Handle request/response transformations
 - Manage error handling
 
-**3. Data Flow Integration**
+*3. Data Flow Integration**
+
 - Connect frontend pages to backend endpoints
 - Implement CRUD operations for flight tests
 - Implement file upload functionality
 - Implement data visualization queries
 
-**4. Type Safety**
+*4. Type Safety**
+
 - Define TypeScript interfaces matching backend schemas
 - Ensure type safety across frontend-backend boundary
 - Handle snake_case to camelCase conversions
@@ -111,9 +116,10 @@ The integration is divided into six phases, each building on the previous one.
 
 **Tasks:**
 
-**1.1 Create Authentication Types**
+*1.1 Create Authentication Types**
 
 Create `frontend/client/src/types/auth.ts`:
+
 ```typescript
 export interface LoginRequest {
   username: string;  // Email or username
@@ -139,9 +145,10 @@ export interface User {
 }
 ```
 
-**1.2 Create Authentication Service**
+*1.2 Create Authentication Service**
 
 Create `frontend/client/src/services/auth.ts`:
+
 ```typescript
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -150,40 +157,40 @@ export class AuthService {
     const formData = new FormData();
     formData.append('username', email);
     formData.append('password', password);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       body: formData,
     });
-    
+
     if (!response.ok) {
       throw new Error('Login failed');
     }
-    
+
     const data = await response.json();
-    
+
     // Store tokens
     localStorage.setItem('access_token', data.access_token);
     localStorage.setItem('refresh_token', data.refresh_token);
-    localStorage.setItem('token_expiry', 
+    localStorage.setItem('token_expiry',
       String(Date.now() + data.expires_in * 1000));
-    
+
     return data;
   }
-  
+
   static async logout(): Promise<void> {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('token_expiry');
   }
-  
+
   static async refreshToken(): Promise<TokenResponse> {
     const refreshToken = localStorage.getItem('refresh_token');
-    
+
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
-    
+
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
@@ -191,66 +198,67 @@ export class AuthService {
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
-    
+
     if (!response.ok) {
       throw new Error('Token refresh failed');
     }
-    
+
     const data = await response.json();
-    
+
     // Update tokens
     localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('token_expiry', 
+    localStorage.setItem('token_expiry',
       String(Date.now() + data.expires_in * 1000));
-    
+
     return data;
   }
-  
+
   static async getCurrentUser(): Promise<User> {
     const token = this.getAccessToken();
-    
+
     if (!token) {
       throw new Error('No access token');
     }
-    
+
     const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to get current user');
     }
-    
+
     return response.json();
   }
-  
+
   static getAccessToken(): string | null {
     const token = localStorage.getItem('access_token');
     const expiry = localStorage.getItem('token_expiry');
-    
+
     if (!token || !expiry) {
       return null;
     }
-    
+
     // Check if token is expired
     if (Date.now() >= parseInt(expiry)) {
       return null;
     }
-    
+
     return token;
   }
-  
+
   static isAuthenticated(): boolean {
     return this.getAccessToken() !== null;
   }
 }
 ```
 
-**1.3 Create Auth Context**
+*1.3 Create Auth Context**
 
 Update `frontend/client/src/contexts/AuthContext.tsx`:
+
 ```typescript
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthService } from '@/services/auth';
@@ -269,7 +277,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     // Check if user is already logged in
     const loadUser = async () => {
@@ -284,29 +292,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setIsLoading(false);
     };
-    
+
     loadUser();
   }, []);
-  
+
   const login = async (email: string, password: string) => {
     await AuthService.login(email, password);
     const currentUser = await AuthService.getCurrentUser();
     setUser(currentUser);
   };
-  
+
   const logout = async () => {
     await AuthService.logout();
     setUser(null);
   };
-  
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        isAuthenticated: !!user, 
-        isLoading, 
-        login, 
-        logout 
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout
       }}
     >
       {children}
@@ -323,9 +331,10 @@ export function useAuth() {
 }
 ```
 
-**1.4 Create Login Page**
+*1.4 Create Login Page**
 
 Create `frontend/client/src/pages/Login.tsx`:
+
 ```typescript
 import { useState } from 'react';
 import { useNavigate } from 'wouter';
@@ -341,12 +350,12 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const [, navigate] = useNavigate();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
+
     try {
       await login(email, password);
       navigate('/');
@@ -356,7 +365,7 @@ export default function Login() {
       setIsLoading(false);
     }
   };
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
@@ -381,7 +390,7 @@ export default function Login() {
                 placeholder="engineer@example.com"
               />
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium mb-2">
                 Password
@@ -395,13 +404,13 @@ export default function Login() {
                 placeholder="••••••••"
               />
             </div>
-            
+
             {error && (
               <div className="text-sm text-red-600">
                 {error}
               </div>
             )}
-            
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
@@ -413,9 +422,10 @@ export default function Login() {
 }
 ```
 
-**1.5 Update App.tsx**
+*1.5 Update App.tsx**
 
 Update routing to use new authentication:
+
 ```typescript
 import { Route, Switch, Redirect } from 'wouter';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -427,11 +437,11 @@ import Profile from '@/pages/Profile';
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
-  
+
   return isAuthenticated ? <Component {...rest} /> : <Redirect to="/login" />;
 }
 
@@ -461,6 +471,7 @@ export default App;
 ```
 
 **Testing Phase 1:**
+
 1. Start backend: `cd backend && uvicorn app.main:app --reload`
 2. Start frontend: `cd frontend && pnpm dev`
 3. Navigate to `http://localhost:3000`
@@ -478,9 +489,10 @@ export default App;
 
 **Tasks:**
 
-**2.1 Create API Client**
+*2.1 Create API Client**
 
 Create `frontend/client/src/services/api.ts`:
+
 ```typescript
 import { AuthService } from './auth';
 
@@ -492,26 +504,26 @@ export class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const token = AuthService.getAccessToken();
-    
+
     const headers: HeadersInit = {
       ...options.headers,
     };
-    
+
     // Add auth header if token exists
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     // Add content-type for JSON requests
     if (options.body && typeof options.body === 'string') {
       headers['Content-Type'] = 'application/json';
     }
-    
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
     });
-    
+
     // Handle 401 Unauthorized - token expired
     if (response.status === 401) {
       try {
@@ -526,42 +538,42 @@ export class ApiClient {
         throw new Error('Session expired');
       }
     }
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.detail || 'Request failed');
     }
-    
+
     return response.json();
   }
-  
+
   static async get<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'GET' });
   }
-  
+
   static async post<T>(endpoint: string, data?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     });
   }
-  
+
   static async put<T>(endpoint: string, data: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
-  
+
   static async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'DELETE' });
   }
-  
+
   static async uploadFile<T>(endpoint: string, file: File): Promise<T> {
     const token = AuthService.getAccessToken();
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: {
@@ -569,20 +581,21 @@ export class ApiClient {
       },
       body: formData,
     });
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.detail || 'Upload failed');
     }
-    
+
     return response.json();
   }
 }
 ```
 
-**2.2 Create Type Definitions**
+*2.2 Create Type Definitions**
 
 Create `frontend/client/src/types/api.ts`:
+
 ```typescript
 // Flight Test Types
 export interface FlightTest {
@@ -672,9 +685,10 @@ export interface UpdateUserRequest {
 }
 ```
 
-**2.3 Create tRPC Adapter**
+*2.3 Create tRPC Adapter**
 
 Update `frontend/server/routers.ts` to use API client:
+
 ```typescript
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
@@ -686,13 +700,13 @@ export const appRouter = router({
     list: protectedProcedure.query(async () => {
       return ApiClient.get<FlightTest[]>('/api/flight-tests/');
     }),
-    
+
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return ApiClient.get<FlightTest>(`/api/flight-tests/${input.id}`);
       }),
-    
+
     create: protectedProcedure
       .input(z.object({
         test_name: z.string(),
@@ -704,7 +718,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return ApiClient.post<FlightTest>('/api/flight-tests/', input);
       }),
-    
+
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -718,13 +732,13 @@ export const appRouter = router({
         const { id, ...data } = input;
         return ApiClient.put<FlightTest>(`/api/flight-tests/${id}`, data);
       }),
-    
+
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return ApiClient.delete(`/api/flight-tests/${input.id}`);
       }),
-    
+
     uploadCsv: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -736,7 +750,7 @@ export const appRouter = router({
           input.file
         );
       }),
-    
+
     getDataPoints: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -756,19 +770,19 @@ export const appRouter = router({
         );
       }),
   }),
-  
+
   // Parameters
   parameters: router({
     list: protectedProcedure.query(async () => {
       return ApiClient.get<Parameter[]>('/api/parameters/');
     }),
-    
+
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return ApiClient.get<Parameter>(`/api/parameters/${input.id}`);
       }),
-    
+
     create: protectedProcedure
       .input(z.object({
         name: z.string(),
@@ -782,7 +796,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return ApiClient.post<Parameter>('/api/parameters/', input);
       }),
-    
+
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -798,26 +812,26 @@ export const appRouter = router({
         const { id, ...data } = input;
         return ApiClient.put<Parameter>(`/api/parameters/${id}`, data);
       }),
-    
+
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return ApiClient.delete(`/api/parameters/${input.id}`);
       }),
-    
+
     uploadExcel: protectedProcedure
       .input(z.object({ file: z.instanceof(File) }))
       .mutation(async ({ input }) => {
         return ApiClient.uploadFile('/api/parameters/upload-excel', input.file);
       }),
   }),
-  
+
   // User Profile
   user: router({
     me: protectedProcedure.query(async () => {
       return ApiClient.get<User>('/api/users/me');
     }),
-    
+
     update: protectedProcedure
       .input(z.object({
         email: z.string().optional(),
@@ -835,6 +849,7 @@ export type AppRouter = typeof appRouter;
 ```
 
 **Testing Phase 2:**
+
 1. Test tRPC procedures call backend API correctly
 2. Verify authentication headers are included
 3. Test error handling (401, 404, 500)
@@ -850,9 +865,10 @@ export type AppRouter = typeof appRouter;
 
 **Tasks:**
 
-**3.1 Update Dashboard Page**
+*3.1 Update Dashboard Page**
 
 Update `frontend/client/src/pages/Home.tsx`:
+
 ```typescript
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
@@ -868,11 +884,11 @@ export default function Home() {
       refetch();
     },
   });
-  
+
   if (isLoading) {
     return <div>Loading flight tests...</div>;
   }
-  
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
@@ -881,7 +897,7 @@ export default function Home() {
           New Flight Test
         </Button>
       </div>
-      
+
       <div className="grid gap-4">
         {flightTests?.map((test) => (
           <Card key={test.id}>
@@ -897,14 +913,14 @@ export default function Home() {
                 {test.description || 'No description'}
               </p>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => navigate(`/flight-test/${test.id}`)}
                 >
                   View Details
                 </Button>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   onClick={() => deleteMutation.mutate({ id: test.id })}
                   disabled={deleteMutation.isLoading}
                 >
@@ -914,13 +930,13 @@ export default function Home() {
             </CardContent>
           </Card>
         ))}
-        
+
         {flightTests?.length === 0 && (
           <Card>
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground">No flight tests yet</p>
-              <Button 
-                className="mt-4" 
+              <Button
+                className="mt-4"
                 onClick={() => navigate('/upload')}
               >
                 Create Your First Flight Test
@@ -935,6 +951,7 @@ export default function Home() {
 ```
 
 **Testing Phase 3:**
+
 1. Navigate to dashboard
 2. Verify flight tests are loaded from backend
 3. Test delete functionality
@@ -950,9 +967,10 @@ export default function Home() {
 
 **Tasks:**
 
-**4.1 Update Upload Page**
+*4.1 Update Upload Page**
 
 Update `frontend/client/src/pages/Upload.tsx`:
+
 ```typescript
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
@@ -968,14 +986,14 @@ export default function Upload() {
   const [description, setDescription] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   const createMutation = trpc.flightTests.create.useMutation();
   const uploadMutation = trpc.flightTests.uploadCsv.useMutation();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-    
+
     try {
       // Create flight test
       const flightTest = await createMutation.mutateAsync({
@@ -983,7 +1001,7 @@ export default function Upload() {
         aircraft_type: aircraftType || undefined,
         description: description || undefined,
       });
-      
+
       // Upload CSV if provided
       if (csvFile) {
         await uploadMutation.mutateAsync({
@@ -991,7 +1009,7 @@ export default function Upload() {
           file: csvFile,
         });
       }
-      
+
       // Navigate to dashboard
       navigate('/');
     } catch (error) {
@@ -1001,7 +1019,7 @@ export default function Upload() {
       setIsUploading(false);
     }
   };
-  
+
   return (
     <div className="container mx-auto py-8 max-w-2xl">
       <Card>
@@ -1024,7 +1042,7 @@ export default function Upload() {
                 placeholder="F-16 High-G Maneuver Test"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 Aircraft Type
@@ -1035,7 +1053,7 @@ export default function Upload() {
                 placeholder="F-16C"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 Description
@@ -1047,7 +1065,7 @@ export default function Upload() {
                 placeholder="Test description..."
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 CSV Data File (Optional)
@@ -1061,14 +1079,14 @@ export default function Upload() {
                 CSV format: First column = timestamp, remaining columns = parameters
               </p>
             </div>
-            
+
             <div className="flex gap-2">
               <Button type="submit" disabled={isUploading}>
                 {isUploading ? 'Creating...' : 'Create Flight Test'}
               </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => navigate('/')}
               >
                 Cancel
@@ -1083,6 +1101,7 @@ export default function Upload() {
 ```
 
 **Testing Phase 4:**
+
 1. Navigate to upload page
 2. Create flight test without CSV
 3. Create flight test with CSV
@@ -1099,9 +1118,10 @@ export default function Upload() {
 
 **Tasks:**
 
-**5.1 Update Parameters Page**
+*5.1 Update Parameters Page**
 
 Update `frontend/client/src/pages/Parameters.tsx`:
+
 ```typescript
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
@@ -1119,10 +1139,10 @@ export default function Parameters() {
       setExcelFile(null);
     },
   });
-  
+
   const handleUpload = async () => {
     if (!excelFile) return;
-    
+
     try {
       await uploadMutation.mutateAsync({ file: excelFile });
       alert('Parameters uploaded successfully');
@@ -1131,17 +1151,17 @@ export default function Parameters() {
       alert('Upload failed. Please try again.');
     }
   };
-  
+
   if (isLoading) {
     return <div>Loading parameters...</div>;
   }
-  
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Parameters</h1>
       </div>
-      
+
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Upload Parameters from Excel</CardTitle>
@@ -1156,8 +1176,8 @@ export default function Parameters() {
               accept=".xlsx,.xls"
               onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
             />
-            <Button 
-              onClick={handleUpload} 
+            <Button
+              onClick={handleUpload}
               disabled={!excelFile || uploadMutation.isLoading}
             >
               {uploadMutation.isLoading ? 'Uploading...' : 'Upload'}
@@ -1165,7 +1185,7 @@ export default function Parameters() {
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>All Parameters ({parameters?.length || 0})</CardTitle>
@@ -1205,6 +1225,7 @@ export default function Parameters() {
 ```
 
 **Testing Phase 5:**
+
 1. Navigate to parameters page
 2. Verify parameters are loaded from backend
 3. Test Excel upload functionality
@@ -1220,9 +1241,10 @@ export default function Parameters() {
 
 **Tasks:**
 
-**6.1 Update Profile Page**
+*6.1 Update Profile Page**
 
 Update `frontend/client/src/pages/Profile.tsx`:
+
 ```typescript
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
@@ -1236,13 +1258,13 @@ export default function Profile() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
-  
+
   const updateMutation = trpc.user.update.useMutation({
     onSuccess: () => {
       alert('Profile updated successfully');
     },
   });
-  
+
   useEffect(() => {
     if (user) {
       setEmail(user.email);
@@ -1250,10 +1272,10 @@ export default function Profile() {
       setFullName(user.full_name || '');
     }
   }, [user]);
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       await updateMutation.mutateAsync({
         email,
@@ -1265,7 +1287,7 @@ export default function Profile() {
       alert('Update failed. Please try again.');
     }
   };
-  
+
   return (
     <div className="container mx-auto py-8 max-w-2xl">
       <Card>
@@ -1288,7 +1310,7 @@ export default function Profile() {
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 Username
@@ -1299,7 +1321,7 @@ export default function Profile() {
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 Full Name
@@ -1309,14 +1331,14 @@ export default function Profile() {
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
-            
+
             <div className="flex gap-2">
               <Button type="submit" disabled={updateMutation.isLoading}>
                 {updateMutation.isLoading ? 'Saving...' : 'Save Changes'}
               </Button>
-              <Button 
-                type="button" 
-                variant="destructive" 
+              <Button
+                type="button"
+                variant="destructive"
                 onClick={logout}
               >
                 Logout
@@ -1331,6 +1353,7 @@ export default function Profile() {
 ```
 
 **Testing Phase 6:**
+
 1. Navigate to profile page
 2. Verify user data is loaded
 3. Test profile update
@@ -1345,16 +1368,19 @@ Comprehensive testing is required to ensure integration works correctly.
 ### 3.1 Unit Testing
 
 **Frontend Tests:**
+
 - Test authentication service (login, logout, token refresh)
 - Test API client (request handling, error handling)
 - Test tRPC procedures
 
 **Backend Tests:**
+
 - Already complete (88% coverage)
 
 ### 3.2 Integration Testing
 
 **End-to-End Tests:**
+
 1. **Authentication Flow**
    - Login with valid credentials
    - Login with invalid credentials
@@ -1402,27 +1428,31 @@ Comprehensive testing is required to ensure integration works correctly.
 ### 4.1 Local Development
 
 **Start Backend:**
+
 ```bash
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Start Frontend:**
+
 ```bash
 cd frontend
 pnpm dev
 ```
 
 **Access Application:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:8000>
+- API Docs: <http://localhost:8000/docs>
 
 ### 4.2 Production Deployment
 
 **Environment Variables:**
 
 Backend `.env`:
+
 ```env
 DATABASE_URL=postgresql://user:password@db-host:5432/ftias_db
 JWT_SECRET=your-production-secret-min-32-chars
@@ -1431,6 +1461,7 @@ DEBUG=False
 ```
 
 Frontend `.env`:
+
 ```env
 VITE_API_BASE_URL=https://api.ftias.com
 ```
@@ -1438,6 +1469,7 @@ VITE_API_BASE_URL=https://api.ftias.com
 **Docker Deployment:**
 
 Update `docker-compose.yml`:
+
 ```yaml
 version: '3.8'
 
@@ -1454,7 +1486,7 @@ services:
       - CORS_ORIGINS=https://ftias.com
     depends_on:
       - postgres
-  
+
   frontend:
     build:
       context: .
@@ -1463,7 +1495,7 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_BASE_URL=https://api.ftias.com
-  
+
   postgres:
     image: postgres:14
     environment:
@@ -1478,6 +1510,7 @@ volumes:
 ```
 
 **Deploy:**
+
 ```bash
 docker-compose up -d
 ```
@@ -1488,23 +1521,28 @@ docker-compose up -d
 
 ### Common Issues
 
-**Issue: CORS errors in browser console**
+*Issue: CORS errors in browser console**
+
 - **Cause:** Backend CORS configuration doesn't include frontend URL
 - **Solution:** Update `CORS_ORIGINS` in backend `config.py`
 
-**Issue: 401 Unauthorized errors**
+*Issue: 401 Unauthorized errors**
+
 - **Cause:** Missing or expired JWT token
 - **Solution:** Check token storage, implement token refresh
 
-**Issue: Token refresh loop**
+*Issue: Token refresh loop**
+
 - **Cause:** Refresh token is also expired
 - **Solution:** Logout user and redirect to login
 
-**Issue: CSV upload fails**
+*Issue: CSV upload fails**
+
 - **Cause:** File format doesn't match expected structure
 - **Solution:** Add better error messages, validate file format
 
-**Issue: Type errors in TypeScript**
+*Issue: Type errors in TypeScript**
+
 - **Cause:** Backend response doesn't match frontend types
 - **Solution:** Update type definitions to match backend schemas
 
@@ -1515,18 +1553,21 @@ docker-compose up -d
 After completing the integration, consider these enhancements:
 
 **Short-term:**
+
 1. Add data visualization charts for flight test data
 2. Implement real-time data updates with WebSockets
 3. Add export functionality (PDF reports, CSV exports)
 4. Implement advanced search and filtering
 
 **Medium-term:**
+
 1. Add user roles and permissions
 2. Implement data comparison between flight tests
 3. Add automated analysis and anomaly detection
 4. Implement data archiving
 
 **Long-term:**
+
 1. Add machine learning for predictive analysis
 2. Implement collaborative features (comments, sharing)
 3. Add mobile application
@@ -1539,6 +1580,7 @@ After completing the integration, consider these enhancements:
 This integration roadmap provides a comprehensive, step-by-step guide to connecting the FTIAS frontend with the backend API. The approach uses an adapter layer to bridge tRPC and REST API without modifying the backend, ensuring a clean separation of concerns.
 
 **Key Milestones:**
+
 1. ✅ Authentication integration (2-3 hours)
 2. ✅ API adapter layer (3-4 hours)
 3. ✅ Dashboard integration (2-3 hours)
@@ -1549,6 +1591,7 @@ This integration roadmap provides a comprehensive, step-by-step guide to connect
 **Total Estimated Time:** 12-16 hours
 
 **Success Criteria:**
+
 - User can login with backend credentials
 - User can create and manage flight tests
 - User can upload CSV and Excel files
@@ -1560,6 +1603,6 @@ This integration roadmap provides a comprehensive, step-by-step guide to connect
 
 ---
 
-**Document Status:** ✅ Complete  
-**Last Updated:** February 10, 2026  
+**Document Status:** ✅ Complete
+**Last Updated:** February 10, 2026
 **Ready for Implementation:** Yes
