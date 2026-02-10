@@ -4,7 +4,7 @@
 **Date:** February 10, 2026
 **Author:** Manus AI
 **Project:** Flight Test Interactive Analysis Suite (FTIAS)
-**Repository:** https://github.com/Martinolli/flight-test-interactive-analysis-suite
+**Repository:** <https://github.com/Martinolli/flight-test-interactive-analysis-suite>
 
 ---
 
@@ -229,7 +229,7 @@ dataPoints {
 The existing FastAPI backend has a similar but not identical schema:
 
 | Table | Frontend | Backend | Status |
-| -------|----------|---------|--------|
+| ------- | ---------- | --------- | -------- |
 | **Users** | Manus OAuth schema | FastAPI JWT schema | ⚠️ **Needs alignment** |
 | **FlightTests** | `flightTests` | `flight_tests` | ✅ **Compatible** |
 | **Parameters** | `testParameters` | `test_parameters` | ✅ **Compatible** |
@@ -700,7 +700,7 @@ CMD ["nginx", "-g", "daemon off;"]
 The following table summarizes all required changes:
 
 | Category | File | Change Type | Priority |
- |----------|------|-------------|----------|
+| ---------- | ------ | ------------ | ---------- |
 | **Authentication** | `client/src/_core/hooks/useAuth.ts` | Modify | 🔴 High |
 | **Authentication** | `client/src/const.ts` | Modify | 🔴 High |
 | **Authentication** | `client/src/pages/Login.tsx` | Create | 🔴 High |
