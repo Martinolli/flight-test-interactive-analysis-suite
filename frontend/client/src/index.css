@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 @import "tw-animate-css";
 
 :root {
@@ -110,6 +112,7 @@
 
 @layer base {
   * {
+    /* stylelint-disable-next-line at-rule-no-unknown */
     @apply border-border outline-ring/50;
   }
   body {
