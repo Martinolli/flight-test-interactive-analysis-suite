@@ -1,9 +1,10 @@
 import { Route, Switch, Redirect } from 'wouter';
+import type { ComponentType } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
