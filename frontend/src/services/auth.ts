@@ -12,14 +12,18 @@ export class AuthService {
    * Login with email and password
    * Stores tokens in localStorage on success
    */
-  static async login(email: string, password: string ): Promise<TokenResponse> {
-    const formData = new FormData();
-    formData.append('username', email);
-    formData.append('password', password);
+    static async login(email: string, password: string): Promise<TokenResponse> {
+    // Create URL-encoded form data (FastAPI OAuth2 expects this format)
+    const formBody = new URLSearchParams();
+    formBody.append('username', email);
+    formBody.append('password', password);
 
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formBody.toString(),
     });
 
     if (!response.ok) {
@@ -36,6 +40,7 @@ export class AuthService {
 
     return data;
   }
+
 
   /**
    * Logout - clear tokens from localStorage
