@@ -11,11 +11,10 @@ export interface TokenResponse {
 
 export interface User {
   id: number;
-  email: string;
   username: string;
+  email: string;
   full_name: string | null;
+  role?: string; // Add this line
   is_active: boolean;
-  is_superuser: boolean;
-  created_at: string;
-  updated_at: string | null;
 }
+
