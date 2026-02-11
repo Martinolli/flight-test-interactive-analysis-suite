@@ -5,7 +5,6 @@
 
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
-import { User } from 'lucide-react';
 
 export default function Profile() {
   const { user } = useAuth();
