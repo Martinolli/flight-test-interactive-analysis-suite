@@ -8,35 +8,59 @@ import type { TokenResponse, User } from '../types/auth';
 const API_BASE_URL = 'http://localhost:8000';
 
 export class AuthService {
+  private static getJwtExpiryMs(token: string): number | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+
+      const json = atob(padded);
+      const payload = JSON.parse(json) as { exp?: unknown };
+      if (typeof payload.exp !== 'number') return null;
+
+      return payload.exp * 1000;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Login with email and password
    * Stores tokens in localStorage on success
    */
     static async login(email: string, password: string): Promise<TokenResponse> {
-    // Create URL-encoded form data (FastAPI OAuth2 expects this format)
-    const formBody = new URLSearchParams();
-    formBody.append('username', email);
-    formBody.append('password', password);
-
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: formBody.toString(),
+      body: JSON.stringify({ username: email, password }),
     });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Login failed' }));
-      throw new Error(error.detail || 'Login failed');
+      const detail = (error as { detail?: unknown }).detail;
+      if (typeof detail === 'string') throw new Error(detail);
+      throw new Error('Login failed');
     }
 
     const data: TokenResponse = await response.json();
 
     // Store tokens in localStorage
     localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    localStorage.setItem('token_expiry', String(Date.now() + data.expires_in * 1000));
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token);
+    }
+
+    const expiryMs = this.getJwtExpiryMs(data.access_token);
+    if (expiryMs) {
+      localStorage.setItem('token_expiry', String(expiryMs));
+    } else {
+      localStorage.removeItem('token_expiry');
+    }
 
     return data;
   }
@@ -77,7 +101,13 @@ export class AuthService {
 
     // Update tokens in localStorage
     localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('token_expiry', String(Date.now() + data.expires_in * 1000));
+
+    const expiryMs = this.getJwtExpiryMs(data.access_token);
+    if (expiryMs) {
+      localStorage.setItem('token_expiry', String(expiryMs));
+    } else {
+      localStorage.removeItem('token_expiry');
+    }
 
     return data;
   }
@@ -118,7 +148,8 @@ export class AuthService {
     }
 
     // Check if token is expired
-    if (Date.now() >= parseInt(expiry)) {
+    const expiryMs = Number(expiry);
+    if (!Number.isFinite(expiryMs) || Date.now() >= expiryMs) {
       return null;
     }
 

@@ -6,6 +6,7 @@ Login, logout, and token management endpoints
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import auth, schemas
@@ -22,8 +23,17 @@ async def login(login_data: schemas.LoginRequest,
     """
     Login endpoint - authenticate user and return JWT token
     """
-    # Find user by username
-    user = db.query(User).filter(User.username == login_data.username).first()
+    # Find user by username or email (frontend allows either)
+    user = (
+        db.query(User)
+        .filter(
+            or_(
+                User.username == login_data.username,
+                User.email == login_data.username,
+            )
+        )
+        .first()
+    )
 
     # Verify user exists and password is correct
     if not user or not auth.verify_password(
