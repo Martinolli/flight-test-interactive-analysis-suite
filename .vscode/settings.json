@@ -168,6 +168,7 @@
     "uvicorn",
     "venv",
     "Vite",
-    "wireframes"
+    "wireframes",
+    "wouter"
   ]
 }
