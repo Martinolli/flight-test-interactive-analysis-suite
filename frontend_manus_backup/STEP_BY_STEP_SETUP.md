@@ -28,6 +28,7 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 1. Open your existing repository folder: `flight-test-interactive-analysis-suite`
 
 2. **Delete the old frontend folder** (it only has `.dockerignore` and `.gitkeep`):
+
    ```bash
    # On Windows (PowerShell)
    Remove-Item -Recurse -Force frontend
@@ -37,7 +38,8 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
    ```
 
 3. **Copy the new frontend folder** from the extracted ZIP into your repository:
-   ```
+
+   ```bash
    flight-test-interactive-analysis-suite/
    ├── backend/              (your existing backend)
    ├── frontend/             (NEW - copy here)
@@ -58,16 +60,19 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 1. Open a terminal/command prompt
 
 2. Navigate to the frontend folder:
+
    ```bash
    cd flight-test-interactive-analysis-suite/frontend
    ```
 
 3. Install dependencies:
+
    ```bash
    pnpm install
    ```
 
    **Don't have pnpm?** Install it first:
+
    ```bash
    npm install -g pnpm
    ```
@@ -79,13 +84,14 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 1. In the `frontend/` folder, create a file named `.env`
 
 2. Copy this content into `.env`:
+
    ```env
    # Database connection
    DATABASE_URL=postgresql://ftias_user:ftias_password@localhost:5432/ftias_db
-   
+
    # Backend API URL
    VITE_BACKEND_URL=http://localhost:8000
-   
+
    # JWT Secret (use the same one from your backend)
    JWT_SECRET=your-secret-key-here-change-in-production
    ```
@@ -99,6 +105,7 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 1. Open a **new terminal** (keep this one open)
 
 2. Navigate to your backend folder:
+
    ```bash
    cd flight-test-interactive-analysis-suite/backend
    ```
@@ -106,16 +113,18 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 3. Make sure PostgreSQL is running (start it if needed)
 
 4. Start the backend:
+
    ```bash
    # If using virtual environment
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   
+
    # Start the server
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 5. You should see:
-   ```
+
+   ```bash
    INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
    INFO:     Started reloader process
    ```
@@ -129,19 +138,22 @@ Follow these steps **exactly** to set up and run the Flight Test application loc
 1. Open **another new terminal** (you should now have 2 terminals open)
 
 2. Navigate to the frontend folder:
+
    ```bash
    cd flight-test-interactive-analysis-suite/frontend
    ```
 
 3. Start the frontend development server:
+
    ```bash
    pnpm dev
    ```
 
 4. You should see:
-   ```
+
+   ```bash
    VITE v7.x.x  ready in xxx ms
-   
+
    ➜  Local:   http://localhost:3000/
    ➜  Network: use --host to expose
    ```
@@ -176,23 +188,28 @@ Check that everything is working:
 ### **Problem: "Port 8000 already in use"**
 
 **Solution:** Another program is using port 8000. Either:
+
 - Stop the other program, OR
 - Change the backend port:
+
   ```bash
   uvicorn app.main:app --reload --port 8001
   ```
+
   Then update `VITE_BACKEND_URL` in frontend `.env` to `http://localhost:8001`
 
 ### **Problem: "Port 3000 already in use"**
 
 **Solution:** Change the frontend port:
+
 ```bash
 pnpm dev --port 3001
 ```
 
 ### **Problem: "Database connection error"**
 
-**Solution:** 
+**Solution:**
+
 1. Make sure PostgreSQL is running
 2. Check that the database `ftias_db` exists
 3. Verify the username and password in `.env` are correct
@@ -200,6 +217,7 @@ pnpm dev --port 3001
 ### **Problem: "pnpm: command not found"**
 
 **Solution:** Install pnpm:
+
 ```bash
 npm install -g pnpm
 ```
@@ -207,6 +225,7 @@ npm install -g pnpm
 ### **Problem: "Cannot find module" errors**
 
 **Solution:** Delete `node_modules` and reinstall:
+
 ```bash
 cd frontend
 rm -rf node_modules
@@ -215,7 +234,7 @@ pnpm install
 
 ---
 
-## 🎉 Success!
+## 🎉 Success
 
 If you see the dashboard at `http://localhost:3000`, congratulations! You've successfully set up the local development environment.
 
@@ -226,6 +245,7 @@ If you see the dashboard at `http://localhost:3000`, congratulations! You've suc
 ## 📝 Quick Reference
 
 **To start everything:**
+
 ```bash
 # Terminal 1: Backend
 cd backend
@@ -237,6 +257,7 @@ pnpm dev
 ```
 
 **To stop everything:**
+
 - Press `CTRL+C` in each terminal
 
 ---
