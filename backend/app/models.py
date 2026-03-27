@@ -3,6 +3,7 @@ FTIAS Backend - Database Models
 SQLAlchemy ORM models
 """
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     Column,
@@ -131,4 +132,70 @@ class DataPoint(Base):
             f"flight_test_id={self.flight_test_id}, "
             f"parameter_id={self.parameter_id}, "
             f"value={self.value})>"
+        )
+
+
+class Document(Base):
+    """
+    Document model — stores metadata for uploaded reference documents
+    (standards, handbooks, regulations, etc.) used by the RAG pipeline.
+    """
+
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(512), nullable=False)
+    title = Column(String(512), nullable=True)          # extracted or user-supplied
+    doc_type = Column(String(100), nullable=True)       # e.g. "standard", "handbook"
+    description = Column(Text, nullable=True)
+    total_pages = Column(Integer, nullable=True)
+    total_chunks = Column(Integer, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    status = Column(String(50), default="processing")  # processing | ready | error
+    error_message = Column(Text, nullable=True)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    uploaded_by = relationship("User", backref="documents")
+    chunks = relationship(
+        "DocumentChunk",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self):
+        return (
+            f"<Document(id={self.id}, filename={self.filename}, "
+            f"status={self.status})>"
+        )
+
+
+class DocumentChunk(Base):
+    """
+    DocumentChunk model — stores individual text chunks from a Document
+    together with their pgvector embedding for semantic search.
+    """
+
+    __tablename__ = "document_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(
+        Integer, ForeignKey("documents.id"), nullable=False, index=True
+    )
+    chunk_index = Column(Integer, nullable=False)       # order within the document
+    text = Column(Text, nullable=False)                 # raw chunk text
+    page_numbers = Column(String(255), nullable=True)   # e.g. "12-14"
+    section_title = Column(String(512), nullable=True)  # heading from Docling
+    embedding = Column(Vector(1536), nullable=True)     # OpenAI text-embedding-3-small
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    document = relationship("Document", back_populates="chunks")
+
+    def __repr__(self):
+        return (
+            f"<DocumentChunk(id={self.id}, document_id={self.document_id}, "
+            f"chunk_index={self.chunk_index})>"
         )

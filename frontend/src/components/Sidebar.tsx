@@ -5,7 +5,9 @@ import {
   User,
   BarChart3,
   LogOut,
-  Plane
+  Plane,
+  BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,12 +22,29 @@ export default function Sidebar({ children }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
 
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Upload Data', href: '/upload', icon: Upload },
-    { name: 'Parameters', href: '/parameters', icon: BarChart3 },
-    { name: 'Profile', href: '/profile', icon: User },
-    { name: 'Settings', href: '/settings', icon: Settings },
+  const navGroups = [
+    {
+      label: 'Flight Tests',
+      items: [
+        { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+        { name: 'Upload Data', href: '/upload', icon: Upload },
+        { name: 'Parameters', href: '/parameters', icon: BarChart3 },
+      ],
+    },
+    {
+      label: 'AI & Documents',
+      items: [
+        { name: 'Document Library', href: '/documents', icon: BookOpen },
+        { name: 'AI Standards Query', href: '/ai-query', icon: Sparkles },
+      ],
+    },
+    {
+      label: 'Account',
+      items: [
+        { name: 'Profile', href: '/profile', icon: User },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ],
+    },
   ];
 
   const handleLogout = async () => {
@@ -48,27 +67,35 @@ export default function Sidebar({ children }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1">
-          {navigation.map((item) => {
-            const isActive = location === item.href;
-            const Icon = item.icon;
-
-            return (
-              <button
-                key={item.name}
-                onClick={() => setLocation(item.href)}
-                className={cn(
-                  "w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
-                )}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{item.name}</span>
-              </button>
-            );
-          })}
+        <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <p className="px-3 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = location === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => setLocation(item.href)}
+                      className={cn(
+                        'w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span>{item.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User section */}

@@ -73,6 +73,41 @@ export interface ParameterSeries {
   };
 }
 
+// ─── Document / RAG Types ───────────────────────────────────────────────────
+
+export interface Document {
+  id: number;
+  filename: string;
+  title: string | null;
+  doc_type: string | null;
+  description: string | null;
+  total_pages: number | null;
+  total_chunks: number | null;
+  file_size_bytes: number | null;
+  status: 'processing' | 'ready' | 'error';
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface QuerySource {
+  filename: string;
+  title: string | null;
+  page_numbers: string | null;
+  section_title: string | null;
+  similarity: number;
+}
+
+export interface QueryResponse {
+  answer: string;
+  sources: QuerySource[];
+}
+
+export interface AIAnalysisResponse {
+  analysis: string;
+  flight_test_name: string;
+  parameters_analysed: number;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export class ApiService {
@@ -244,6 +279,76 @@ export class ApiService {
     const query = paramNames.map((n) => `parameters=${encodeURIComponent(n)}`).join('&');
     return this.request<ParameterSeries[]>(
       `/api/flight-tests/${flightTestId}/parameters/data?${query}`
+    );
+  }
+
+  // ─── Document Library ─────────────────────────────────────────────────────
+
+  static async getDocuments(): Promise<Document[]> {
+    return this.request<Document[]>('/api/documents/');
+  }
+
+  static uploadDocument(
+    file: File,
+    meta: { title?: string; doc_type?: string; description?: string },
+    onProgress: (percent: number) => void
+  ): Promise<Document> {
+    return new Promise((resolve, reject) => {
+      const token = AuthService.getAccessToken();
+      const formData = new FormData();
+      formData.append('file', file);
+      if (meta.title) formData.append('title', meta.title);
+      if (meta.doc_type) formData.append('doc_type', meta.doc_type);
+      if (meta.description) formData.append('description', meta.description);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE_URL}/api/documents/upload`);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('Invalid response from server')); }
+        } else {
+          try {
+            const err = JSON.parse(xhr.responseText);
+            reject(new Error(err.detail || `Upload failed with status ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+      xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+      xhr.send(formData);
+    });
+  }
+
+  static async deleteDocument(docId: number): Promise<void> {
+    return this.request<void>(`/api/documents/${docId}`, { method: 'DELETE' });
+  }
+
+  static async queryDocuments(
+    question: string,
+    topK = 6
+  ): Promise<QueryResponse> {
+    return this.request<QueryResponse>('/api/documents/query', {
+      method: 'POST',
+      body: JSON.stringify({ question, top_k: topK }),
+    });
+  }
+
+  // ─── AI Analysis ──────────────────────────────────────────────────────────
+
+  static async getAIAnalysis(flightTestId: number): Promise<AIAnalysisResponse> {
+    return this.request<AIAnalysisResponse>(
+      `/api/documents/flight-tests/${flightTestId}/ai-analysis`,
+      { method: 'POST' }
     );
   }
 }

@@ -10,12 +10,17 @@ import {
   Edit,
   Trash2,
   AlertCircle,
+  Sparkles,
+  Loader2,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import FlightTestModal from '../components/FlightTestModal';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ToastContainer, useToast } from '../components/ui/toast';
-import { ApiService, FlightTest } from '../services/api';
+import { ApiService, FlightTest, AIAnalysisResponse } from '../services/api';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -47,6 +52,127 @@ function formatDuration(seconds: number | null): string {
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 }
+
+// ─── AI Analysis Panel ────────────────────────────────────────────────────────
+
+function AIAnalysisPanel({ flightTestId }: { flightTestId: number }) {
+  const [result, setResult] = useState<AIAnalysisResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(true);
+
+  async function runAnalysis() {
+    setLoading(true);
+    setError('');
+    setResult(null);
+    try {
+      const data = await ApiService.getAIAnalysis(flightTestId);
+      setResult(data);
+    } catch (err) {
+      setError((err as Error).message || 'AI analysis failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="mt-4 border-purple-200">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base text-purple-700">
+            <Sparkles className="w-4 h-4" />
+            AI Analysis
+          </CardTitle>
+          {result && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Cross-references your flight data against indexed standards and handbooks using RAG.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {!result && !loading && !error && (
+          <div className="text-center py-6">
+            <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-6 h-6 text-purple-400" />
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Run an AI analysis to compare this flight test's parameters against relevant
+              standards (MIL-STD, FAR/CS, DO-xxx) from the Document Library.
+            </p>
+            <Button
+              onClick={runAnalysis}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Analyse with AI
+            </Button>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center justify-center py-8 gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+            <span className="text-sm text-gray-600">
+              Retrieving relevant standards and generating analysis…
+            </span>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-red-700">{error}</p>
+              <button
+                onClick={runAnalysis}
+                className="text-xs text-red-600 underline mt-1"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {result && expanded && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-xs text-gray-500 pb-2 border-b border-gray-100">
+              <span>{result.parameters_analysed} parameters analysed</span>
+              <span>·</span>
+              <span>Flight test: {result.flight_test_name}</span>
+            </div>
+
+            <div className="prose prose-sm max-w-none">
+              <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-relaxed">
+                {result.analysis}
+              </pre>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runAnalysis}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                <Sparkles className="w-3 h-3 mr-1" />
+                Re-run Analysis
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function FlightTestDetail() {
   const { id } = useParams<{ id: string }>();
@@ -268,6 +394,9 @@ export default function FlightTestDetail() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* AI Analysis panel */}
+            <AIAnalysisPanel flightTestId={flightTest.id} />
           </>
         )}
       </div>

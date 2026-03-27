@@ -8,6 +8,8 @@ import Upload from './pages/Upload';
 import Parameters from './pages/Parameters';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import DocumentLibrary from './pages/DocumentLibrary';
+import AIQuery from './pages/AIQuery';
 
 function App() {
   return (
@@ -50,6 +52,18 @@ function App() {
         <Route path="/settings">
           <ProtectedRoute>
             <Settings />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/documents">
+          <ProtectedRoute>
+            <DocumentLibrary />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/ai-query">
+          <ProtectedRoute>
+            <AIQuery />
           </ProtectedRoute>
         </Route>
 

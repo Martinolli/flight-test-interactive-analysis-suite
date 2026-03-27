@@ -63,13 +63,30 @@
 - [x] Settings page (date format, chart defaults, notifications, about)
 
 ## Phase 5: LLM Integration
-- [ ] AI Analysis button on FlightTestDetail
-- [ ] Analysis result display (markdown rendering)
+- [x] AI Analysis button on FlightTestDetail
+- [x] Analysis result display (structured text rendering)
 - [ ] Natural language search
 - [ ] Automated report generation (PDF)
 - [ ] Anomaly detection panel
 
-## Phase 6: Performance & Polish
+## Phase 6: LLM / RAG Integration
+- [x] Migrate PostgreSQL Docker image from postgres:15-alpine to pgvector/pgvector:pg15
+- [x] Enable pgvector extension in database
+- [x] Install backend Python deps: docling, openai, pgvector, sentence-transformers
+- [x] Add DB tables: documents, document_chunks (with vector(1536) embedding column)
+- [x] Backend router: POST /api/documents/upload (Docling parse + chunk + embed + store)
+- [x] Backend router: GET /api/documents (list all documents)
+- [x] Backend router: DELETE /api/documents/{id} (remove doc + chunks)
+- [x] Backend router: POST /api/documents/query (semantic search + LLM answer)
+- [x] Backend router: POST /api/flight-tests/{id}/ai-analysis (stats-based AI report)
+- [x] Frontend: Document Library page (upload, list, delete standards/handbooks)
+- [x] Frontend: AI Standards Query page (chat-style semantic search)
+- [x] Frontend: AI Analysis panel on FlightTestDetail page
+- [x] Frontend: Sidebar navigation — grouped with 'AI & Documents' section
+- [x] Update docker-compose.yml and all project MD docs
+- [x] Project_Documents/40_RAG_System_Implementation_Phase6.md created
+
+## Phase 5: Performance & Polish
 - [ ] React Query data caching
 - [ ] Lazy-loaded routes
 - [ ] Global error boundary
