@@ -1,7 +1,7 @@
 # FTIAS Frontend — Project Achievement Summary
 
-**Last Updated:** March 27, 2026  
-**Version:** 4.0  
+**Last Updated:** March 27, 2026
+**Version:** 4.0
 **Status:** Phase 6 Complete — RAG System Integrated, Application Fully Operational
 
 ---
@@ -15,7 +15,7 @@ The Flight Test Interactive Analysis Suite (FTIAS) frontend is a standalone Reac
 ## Technology Stack
 
 | Layer | Technology | Version |
-|---|---|---|
+| --- | --- | --- |
 | UI Framework | React | 18 |
 | Language | TypeScript | 5.x |
 | Build Tool | Vite | 7.x |
@@ -35,7 +35,7 @@ The Flight Test Interactive Analysis Suite (FTIAS) frontend is a standalone Reac
 
 The application follows a clean layered architecture:
 
-```
+```bash
 frontend/src/
 ├── types/          TypeScript interfaces (auth, flight tests, documents)
 ├── services/       API service classes (auth.ts, api.ts)
@@ -83,7 +83,7 @@ This session implemented the full Retrieval-Augmented Generation pipeline, enabl
 **Backend changes (verified and committed):**
 
 | File | Change |
-|---|---|
+| --- | --- |
 | `backend/app/models.py` | Added `Document` and `DocumentChunk` models with `Vector(1536)` pgvector column; imports made optional for graceful degradation |
 | `backend/app/routers/documents.py` | Full RAG router: upload (Docling parse + chunk + embed), list, delete, semantic query, AI analysis; all AI endpoints return `503` with clear message if packages not installed |
 | `backend/app/main.py` | Documents router registered at `/api/documents` |
@@ -95,7 +95,7 @@ This session implemented the full Retrieval-Augmented Generation pipeline, enabl
 **Frontend changes:**
 
 | File | Change |
-|---|---|
+| --- | --- |
 | `src/services/api.ts` | Added `Document`, `QueryResponse`, `AIAnalysisResponse` types and four new API methods |
 | `src/pages/DocumentLibrary.tsx` | Upload PDFs with drag-and-drop, view processing status (processing / ready / error), delete documents |
 | `src/pages/AIQuery.tsx` | Chat-style semantic search with collapsible source citations |
@@ -114,7 +114,7 @@ The Docker backend image was rebuilt from scratch to include all AI packages. Th
 The application is **fully operational** with the following services running:
 
 | Service | How to Start | URL |
-|---|---|---|
+| --- | --- | --- |
 | PostgreSQL + pgvector | `docker compose up -d` (project root) | `localhost:5432` |
 | FastAPI backend | `docker compose up -d` (project root) | `http://localhost:8000` |
 | React frontend | `npm run dev` (inside `frontend/`) | `http://localhost:5173` |
@@ -122,7 +122,7 @@ The application is **fully operational** with the following services running:
 **Login credentials:**
 
 | Field | Value |
-|---|---|
+| --- | --- |
 | Username | `testuser` |
 | Password | `Ftias2026!` |
 
@@ -133,7 +133,7 @@ If login fails after a Docker rebuild, run: `docker exec ftias-backend python /a
 ## API Endpoints
 
 | Method | Endpoint | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | POST | `/api/auth/login` | Authenticate user, receive JWT tokens |
 | GET | `/api/auth/me` | Fetch current user profile |
 | GET | `/api/flight-tests` | List all flight tests |
@@ -153,7 +153,7 @@ If login fails after a Docker rebuild, run: `docker exec ftias-backend python /a
 ## Known Issues
 
 | Issue | Status | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Document Library page (`/documents`) appears empty | **Open** | The page renders but the document list does not load. Likely a CORS issue or the API call is hitting the wrong URL. To investigate next session. |
 | AI features require OpenAI API key | By design | Add `OPENAI_API_KEY` to `backend/.env` to enable document upload, AI query, and AI analysis |
 | Node.js version warning | Minor | Vite 7 requires Node 20.19+ or 22.12+; current version is 20.18.1. Upgrade recommended but not blocking |
@@ -200,7 +200,7 @@ Add an admin panel for creating new users, resetting passwords, and assigning ro
 ## Git Commit History (This Session)
 
 | Commit | Description |
-|---|---|
+| --- | --- |
 | `67b0d6c` | feat: Phase 6 RAG — Document Library, AI Query, AI Analysis panel |
 | `70ea940` | fix: import get_current_user from app.auth not app.routers.auth |
 | `75105e1` | fix: make pgvector/openai/docling imports optional; add reset_password.py |
@@ -210,7 +210,7 @@ Add an admin panel for creating new users, resetting passwords, and assigning ro
 ## Project Documentation Index
 
 | File | Purpose |
-|---|---|
+| --- | --- |
 | `README.md` | Project overview and quick-start guide |
 | `FTIAS_Frontend_Achievement_Summary.md` | This file — session-by-session achievement log |
 | `Project_Documents/40_RAG_System_Implementation_Phase6.md` | Technical deep-dive on the RAG pipeline |
