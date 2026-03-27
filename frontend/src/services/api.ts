@@ -36,12 +36,11 @@ export interface UploadRecord {
 }
 
 export interface UploadResponse {
-  upload_id: number;
-  filename: string;
-  row_count: number;
-  columns: string[];
-  preview: Record<string, unknown>[];
   message: string;
+  rows_processed: number;
+  data_points_created: number;
+  // convenience alias so callers can use row_count uniformly
+  row_count?: number;
 }
 
 export interface ParameterInfo {
@@ -148,7 +147,7 @@ export class ApiService {
       formData.append('file', file);
 
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_BASE_URL}/api/flight-tests/${flightTestId}/upload`);
+      xhr.open('POST', `${API_BASE_URL}/api/flight-tests/${flightTestId}/upload-csv`);
 
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -184,12 +183,14 @@ export class ApiService {
     });
   }
 
-  static async getUploadHistory(flightTestId: number): Promise<UploadRecord[]> {
-    return this.request<UploadRecord[]>(`/api/flight-tests/${flightTestId}/uploads`);
+  static async getUploadHistory(_flightTestId: number): Promise<UploadRecord[]> {
+    // Upload history tracking is not yet implemented in the backend.
+    // Return an empty array so the UI renders gracefully.
+    return [];
   }
 
   static async getAllUploads(): Promise<UploadRecord[]> {
-    return this.request<UploadRecord[]>('/api/uploads');
+    return [];
   }
 
   // ─── Parameters ────────────────────────────────────────────────────────────

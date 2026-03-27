@@ -27,7 +27,10 @@ export default function Profile() {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
         },
-        body: JSON.stringify({ full_name: fullName, email }),
+        body: JSON.stringify({
+          ...(fullName !== (user?.full_name ?? '') && { full_name: fullName }),
+          ...(email !== (user?.email ?? '') && { email }),
+        }),
       });
 
       if (!response.ok) {

@@ -65,9 +65,10 @@ export default function Upload() {
       );
 
       setUploadStatus('success');
-      setLastRowCount(result.row_count);
+      const rowCount = result.rows_processed ?? result.row_count ?? 0;
+      setLastRowCount(rowCount);
       setSelectedFile(null);
-      toast.success('Upload complete', `${result.row_count ?? 0} rows imported from "${selectedFile.name}".`);
+      toast.success('Upload complete', `${rowCount} rows imported from "${selectedFile.name}".`);
 
       // Refresh history
       const updated = await ApiService.getUploadHistory(Number(selectedTestId)).catch(() => []);

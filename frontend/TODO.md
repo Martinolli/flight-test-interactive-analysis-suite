@@ -33,6 +33,11 @@
 - [x] Statistical summary panel (min, max, avg, std dev)
 - [ ] Export chart as PNG
 
+## Bug Fixes
+- [x] Upload: 404 Not Found — wrong URL /upload → /upload-csv
+- [x] Profile: 405 Method Not Allowed — added PATCH /api/auth/me to backend
+- [x] Upload history: graceful empty array when backend endpoint not yet implemented
+
 ## Phase 4: Advanced Features
 - [x] Date-range filter on Dashboard
 - [x] Aircraft-type filter on Dashboard

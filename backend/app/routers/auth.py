@@ -4,8 +4,10 @@ Login, logout, and token management endpoints
 """
 
 from datetime import timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -85,6 +87,44 @@ async def get_current_user_info(
     """
     Get current authenticated user information
     """
+    return current_user
+
+
+class ProfileUpdate(BaseModel):
+    """Schema for updating the current user's own profile."""
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+@router.patch("/me", response_model=schemas.UserResponse)
+async def update_current_user(
+    update: ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """
+    Update the authenticated user's own profile (full_name, email).
+    """
+    if update.full_name is not None:
+        current_user.full_name = update.full_name
+
+    if update.email is not None:
+        # Check that the new email is not already taken by another account
+        existing = (
+            db.query(User)
+            .filter(User.email == update.email, User.id != current_user.id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address is already in use by another account.",
+            )
+        current_user.email = update.email
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
