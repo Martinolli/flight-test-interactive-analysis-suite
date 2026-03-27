@@ -189,10 +189,15 @@ async def upload_flight_data_csv(
     current_user: User = Depends(auth.get_current_active_user),
 ):
     """
-    Upload CSV file with flight test data
-    Expected format: timestamp, parameter1, parameter2, ...
+    Upload CSV file with flight test data.
+    Expected format: row 1 = parameter names, row 2 = units, rows 3+ = data.
+    Uses batched inserts and a pre-built parameter cache to handle large files
+    without blocking the server or exhausting the DB connection pool.
     """
-    # Verify flight test exists and belongs to user
+    MAX_ROWS = 100_000
+    BATCH_SIZE = 1_000
+
+    # Verify flight test exists and belongs to the current user
     flight_test = (
         db.query(FlightTest)
         .filter(
@@ -200,155 +205,162 @@ async def upload_flight_data_csv(
         )
         .first()
     )
-
     if not flight_test:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
-    # Verify file is CSV
-    if not file.filename.endswith(".csv"):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File must be a CSV file",
         )
 
     try:
-        # Read CSV file
         contents = await file.read()
-        csv_data = io.StringIO(contents.decode("utf-8"))
-        
-        # Read all lines
-        lines = csv_data.getvalue().split('\n')
+        try:
+            text = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            text = contents.decode("latin-1")
+
+        lines = text.splitlines()
         if len(lines) < 3:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="CSV file must have at least 3 rows (headers + data)",
+                detail="CSV file must have at least 3 rows (header, units, data)",
             )
-        
-        # First row: parameter names
-        # Second row: units
-        # Third row onwards: data
+
         header_row = lines[0]
         units_row = lines[1]
-        
-        # Parse headers and units
-        headers = header_row.split(',')
-        units = units_row.split(',')
-        
-        # Create a mapping of parameter names to units
-        param_units = {}
-        for i, header in enumerate(headers):
-            if i < len(units):
-                param_units[header.strip()] = units[i].strip()
-        
-        # Parse data rows (skip first 2 rows)
-        csv_data_only = io.StringIO('\n'.join([header_row] + lines[2:]))
+
+        # Build parameter-name → unit mapping from the first two rows
+        headers = [h.strip() for h in header_row.split(",")]
+        units_list = [u.strip() for u in units_row.split(",")]
+        param_units: dict[str, str] = {
+            headers[i]: (units_list[i] if i < len(units_list) else "")
+            for i in range(len(headers))
+        }
+
+        # ── Pre-load all existing parameters into a cache (1 query) ──────────
+        existing_params = db.query(TestParameter).all()
+        param_cache: dict[str, TestParameter] = {p.name: p for p in existing_params}
+
+        # Identify which parameter names appear in this CSV (skip timestamp cols)
+        TIMESTAMP_COLS = {"timestamp", "time", "description"}
+        data_col_names = [
+            h for h in headers if h.lower() not in TIMESTAMP_COLS and h
+        ]
+
+        # Create any missing parameters in a single batch
+        new_params: list[TestParameter] = []
+        for col in data_col_names:
+            if col not in param_cache:
+                p = TestParameter(
+                    name=col,
+                    description=col,
+                    unit=param_units.get(col, ""),
+                )
+                db.add(p)
+                new_params.append(p)
+        if new_params:
+            db.flush()  # assigns IDs to all new params in one round-trip
+            for p in new_params:
+                param_cache[p.name] = p
+
+        # ── Parse data rows ───────────────────────────────────────────────────
+        csv_data_only = io.StringIO(header_row + "\n" + "\n".join(lines[2:]))
         csv_reader = csv.DictReader(csv_data_only)
 
-        # Get or create parameters
-        data_points = []
+        base_date = datetime(2025, 8, 6, 0, 0, 0)
         row_count = 0
+        total_data_points = 0
+        batch: list[DataPoint] = []
+
+        def _parse_timestamp(ts_str: str, fallback_offset: float) -> datetime:
+            """Parse the custom Day:HH:MM:SS.mmm format or a plain float offset."""
+            ts_str = ts_str.strip()
+            try:
+                return base_date + timedelta(seconds=float(ts_str))
+            except ValueError:
+                pass
+            try:
+                parts = ts_str.split(":")
+                if len(parts) == 4:
+                    day = int(parts[0])
+                    hour = int(parts[1])
+                    minute = int(parts[2])
+                    sec_parts = parts[3].split(".")
+                    second = int(sec_parts[0])
+                    millisecond = int(sec_parts[1]) if len(sec_parts) > 1 else 0
+                    return base_date + timedelta(
+                        days=day, hours=hour, minutes=minute,
+                        seconds=second, milliseconds=millisecond,
+                    )
+            except (ValueError, IndexError):
+                pass
+            return base_date + timedelta(seconds=fallback_offset)
 
         for row in csv_reader:
             row_count += 1
-
-            # Extract timestamp
-            timestamp = row.get("timestamp") or row.get("Timestamp") or row.get("TIME") or row.get("Description")
-            if not timestamp:
+            if row_count > MAX_ROWS:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Missing timestamp in row {row_count}",
+                    detail=f"File exceeds the {MAX_ROWS:,} row limit. "
+                           "Please split the file and upload in parts.",
                 )
 
-            # Process each parameter in the row
-            for param_name, value_str in row.items():
-                if param_name.lower() in ["timestamp", "time", "description"]:
+            ts_raw = (
+                row.get("timestamp")
+                or row.get("Timestamp")
+                or row.get("TIME")
+                or row.get("Description")
+                or ""
+            ).strip()
+            if not ts_raw:
+                continue  # skip rows with no timestamp rather than aborting
+
+            parsed_ts = _parse_timestamp(ts_raw, row_count * 0.1)
+
+            for col in data_col_names:
+                value_str = (row.get(col) or "").strip()
+                if not value_str:
                     continue
-
-                # Skip empty values
-                if not value_str or value_str.strip() == "":
-                    continue
-
-                # Get or create parameter
-                parameter = (
-                    db.query(TestParameter)
-                    .filter(TestParameter.name == param_name)
-                    .first()
-                )
-
-                if not parameter:
-                    # Create new parameter with unit from CSV
-                    unit = param_units.get(param_name, "")
-                    parameter = TestParameter(
-                        name=param_name,
-                        description=param_name,
-                        unit=unit,
-                    )
-                    db.add(parameter)
-                    db.flush()  # Get the ID
-
-                # Parse value
                 try:
                     value = float(value_str)
                 except ValueError:
-                    continue  # Skip non-numeric values
+                    continue
 
-                # Parse timestamp
-                try:
-                    # Try parsing as float first
-                    ts_float = float(timestamp)
-                    # Use base date + seconds offset
-                    base_date = datetime(2025, 8, 6, 0, 0, 0)
-                    parsed_timestamp = base_date + timedelta(seconds=ts_float)
-                except ValueError:
-                    # Try parsing custom format: Day:Hour:Minute:Second.Millisecond
-                    try:
-                        parts = timestamp.split(':')
-                        if len(parts) == 4:
-                            day = int(parts[0])
-                            hour = int(parts[1])
-                            minute = int(parts[2])
-                            sec_ms = parts[3].split('.')
-                            second = int(sec_ms[0])
-                            millisecond = int(sec_ms[1]) if len(sec_ms) > 1 else 0
-                            
-                            # Convert to datetime (use day as offset from base date)
-                            base_date = datetime(2025, 8, 6, 0, 0, 0)
-                            parsed_timestamp = base_date + timedelta(
-                                days=day,
-                                hours=hour,
-                                minutes=minute,
-                                seconds=second,
-                                milliseconds=millisecond
-                            )
-                        else:
-                            # Fallback: use current time + row offset
-                            base_date = datetime(2025, 8, 6, 0, 0, 0)
-                            parsed_timestamp = base_date + timedelta(seconds=row_count * 0.1)
-                    except:
-                        # Last fallback
-                        base_date = datetime(2025, 8, 6, 0, 0, 0)
-                        parsed_timestamp = base_date + timedelta(seconds=row_count * 0.1)
-                
-                # Create data point
-                data_point = DataPoint(
-                    flight_test_id=test_id,
-                    parameter_id=parameter.id,
-                    timestamp=parsed_timestamp,
-                    value=value,
+                param = param_cache.get(col)
+                if param is None:
+                    continue  # should not happen after pre-load, but guard anyway
+
+                batch.append(
+                    DataPoint(
+                        flight_test_id=test_id,
+                        parameter_id=param.id,
+                        timestamp=parsed_ts,
+                        value=value,
+                    )
                 )
-                data_points.append(data_point)
 
-        # Bulk insert data points
-        if data_points:
-            db.bulk_save_objects(data_points)
-            db.commit()
+            # Flush a batch to the DB every BATCH_SIZE data points
+            if len(batch) >= BATCH_SIZE:
+                db.bulk_save_objects(batch)
+                db.flush()
+                total_data_points += len(batch)
+                batch = []
+
+        # Insert any remaining data points
+        if batch:
+            db.bulk_save_objects(batch)
+            total_data_points += len(batch)
+
+        db.commit()
 
         return {
             "message": "CSV data uploaded successfully",
             "rows_processed": row_count,
-            "data_points_created": len(data_points),
+            "data_points_created": total_data_points,
         }
 
     except HTTPException:

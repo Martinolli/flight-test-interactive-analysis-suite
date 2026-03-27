@@ -37,6 +37,8 @@
 - [x] Upload: 404 Not Found — wrong URL /upload → /upload-csv
 - [x] Profile: 405 Method Not Allowed — added PATCH /api/auth/me to backend
 - [x] Upload history: graceful empty array when backend endpoint not yet implemented
+- [x] Upload freezes on large CSV (48k rows) — replaced per-row queries with pre-cached params + batched inserts (1,000 rows/batch)
+- [x] Login fails after upload freeze — fixed by releasing DB connections properly via batched commits
 
 ## Phase 4: Advanced Features
 - [x] Date-range filter on Dashboard
