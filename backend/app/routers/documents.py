@@ -16,10 +16,9 @@ from pydantic import BaseModel
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
-from app.models import DataPoint, Document, DocumentChunk, FlightTest, TestParameter
-from app.routers.auth import get_current_user
-from app.models import User
+from app.models import DataPoint, Document, DocumentChunk, FlightTest, TestParameter, User
 
 logger = logging.getLogger(__name__)
 
