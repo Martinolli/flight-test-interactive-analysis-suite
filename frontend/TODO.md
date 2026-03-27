@@ -34,12 +34,13 @@
 - [ ] Export chart as PNG
 
 ## Phase 4: Advanced Features
-- [ ] Date-range filter on Dashboard
-- [ ] Aircraft-type filter on Dashboard
+- [x] Date-range filter on Dashboard
+- [x] Aircraft-type filter on Dashboard
 - [ ] Dark mode toggle
-- [ ] User profile editing (name, email)
-- [ ] Export flight tests to CSV
+- [x] User profile editing (name, email)
+- [x] Export flight tests to CSV
 - [ ] Export parameters to Excel
+- [x] Settings page (date format, chart defaults, notifications, about)
 
 ## Phase 5: LLM Integration
 - [ ] AI Analysis button on FlightTestDetail
