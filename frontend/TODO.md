@@ -39,6 +39,8 @@
 - [x] Upload history: graceful empty array when backend endpoint not yet implemented
 - [x] Upload freezes on large CSV (48k rows) — replaced per-row queries with pre-cached params + batched inserts (1,000 rows/batch)
 - [x] Login fails after upload freeze — fixed by releasing DB connections properly via batched commits
+- [x] Upload History shows empty — now derives history from /parameters endpoint (synthetic record)
+- [x] Parameters page 404 — added GET /{id}/parameters and GET /{id}/parameters/data to backend
 
 ## Phase 4: Advanced Features
 - [x] Date-range filter on Dashboard

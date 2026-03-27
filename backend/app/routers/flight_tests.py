@@ -8,8 +8,8 @@ import io
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import and_
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm import Session
 
 from app import auth, schemas
@@ -385,7 +385,6 @@ async def get_flight_test_data(
     """
     Get data points for a flight test, optionally filtered by parameter
     """
-    # Verify flight test exists and belongs to user
     flight_test = (
         db.query(FlightTest)
         .filter(
@@ -399,13 +398,138 @@ async def get_flight_test_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
-    # Build query
     query = db.query(DataPoint).filter(DataPoint.flight_test_id == test_id)
 
     if parameter_id:
         query = query.filter(DataPoint.parameter_id == parameter_id)
 
-    # Get data points
     data_points = query.order_by(DataPoint.timestamp).offset(skip).limit(limit).all()
-
     return data_points
+
+
+@router.get("/{test_id}/parameters")
+async def get_flight_test_parameters(
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """
+    Return the list of parameters that have data for this flight test,
+    together with basic statistics (count, min, max, mean).
+    """
+    flight_test = (
+        db.query(FlightTest)
+        .filter(
+            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
+        )
+        .first()
+    )
+    if not flight_test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
+        )
+
+    # One aggregation query: group data_points by parameter_id
+    rows = (
+        db.query(
+            TestParameter.name,
+            TestParameter.unit,
+            TestParameter.description,
+            func.count(DataPoint.id).label("sample_count"),
+            func.min(DataPoint.value).label("min_value"),
+            func.max(DataPoint.value).label("max_value"),
+            func.avg(DataPoint.value).label("mean_value"),
+        )
+        .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
+        .filter(DataPoint.flight_test_id == test_id)
+        .group_by(TestParameter.id, TestParameter.name, TestParameter.unit, TestParameter.description)
+        .order_by(TestParameter.name)
+        .all()
+    )
+
+    return [
+        {
+            "name": r.name,
+            "unit": r.unit,
+            "data_type": "float",
+            "sample_count": r.sample_count,
+            "min_value": r.min_value,
+            "max_value": r.max_value,
+            "mean_value": float(r.mean_value) if r.mean_value is not None else None,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/{test_id}/parameters/data")
+async def get_flight_test_parameter_data(
+    test_id: int,
+    parameters: Optional[List[str]] = Query(default=None),
+    limit: int = 5000,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """
+    Return time-series data for one or more named parameters of a flight test.
+    Query: ?parameters=altitude&parameters=airspeed
+    Each series includes timestamps, values, and statistics.
+    """
+
+    flight_test = (
+        db.query(FlightTest)
+        .filter(
+            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
+        )
+        .first()
+    )
+    if not flight_test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
+        )
+
+    if not parameters:
+        return []
+
+    result = []
+    for param_name in parameters:
+        param = db.query(TestParameter).filter(TestParameter.name == param_name).first()
+        if not param:
+            continue
+
+        points = (
+            db.query(DataPoint)
+            .filter(
+                DataPoint.flight_test_id == test_id,
+                DataPoint.parameter_id == param.id,
+            )
+            .order_by(DataPoint.timestamp)
+            .limit(limit)
+            .all()
+        )
+
+        if not points:
+            continue
+
+        values = [p.value for p in points]
+        n = len(values)
+        mean = sum(values) / n
+        variance = sum((v - mean) ** 2 for v in values) / n
+        std_dev = variance ** 0.5
+
+        result.append({
+            "parameter_name": param.name,
+            "unit": param.unit,
+            "data": [
+                {"timestamp": p.timestamp.isoformat(), "value": p.value}
+                for p in points
+            ],
+            "statistics": {
+                "min": min(values),
+                "max": max(values),
+                "mean": mean,
+                "std_dev": std_dev,
+                "count": n,
+            },
+        })
+
+    return result
