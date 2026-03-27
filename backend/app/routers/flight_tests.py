@@ -217,6 +217,15 @@ async def upload_flight_data_csv(
         )
 
     try:
+        # ── Delete all existing data points for this flight test ─────────────
+        # This ensures re-uploads replace data rather than appending to it.
+        deleted = (
+            db.query(DataPoint)
+            .filter(DataPoint.flight_test_id == test_id)
+            .delete(synchronize_session=False)
+        )
+        db.flush()
+
         contents = await file.read()
         try:
             text = contents.decode("utf-8")
@@ -359,8 +368,10 @@ async def upload_flight_data_csv(
 
         return {
             "message": "CSV data uploaded successfully",
+            "filename": file.filename,
             "rows_processed": row_count,
             "data_points_created": total_data_points,
+            "previous_data_points_deleted": deleted,
         }
 
     except HTTPException:

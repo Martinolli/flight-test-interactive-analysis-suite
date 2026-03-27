@@ -41,6 +41,10 @@
 - [x] Login fails after upload freeze — fixed by releasing DB connections properly via batched commits
 - [x] Upload History shows empty — now derives history from /parameters endpoint (synthetic record)
 - [x] Parameters page 404 — added GET /{id}/parameters and GET /{id}/parameters/data to backend
+- [x] Upload merges/appends data instead of replacing on re-upload — backend now deletes existing data points before inserting new ones
+- [x] Upload history shows one inflated synthetic record — now shows actual CSV row count + real filename from localStorage
+- [x] Correlation chart Y-axis only shows same parameter as X-axis — dropdowns now use full parameters list; Y excludes X selection
+- [x] Parameters from different uploads mixed together — resolved by the replace-on-upload fix above
 
 ## Phase 4: Advanced Features
 - [x] Date-range filter on Dashboard

@@ -37,8 +37,10 @@ export interface UploadRecord {
 
 export interface UploadResponse {
   message: string;
+  filename?: string;
   rows_processed: number;
   data_points_created: number;
+  previous_data_points_deleted?: number;
   // convenience alias so callers can use row_count uniformly
   row_count?: number;
 }
@@ -194,19 +196,23 @@ export class ApiService {
         `/api/flight-tests/${flightTestId}/parameters`
       );
       if (!params || params.length === 0) return [];
-      const totalPoints = params.reduce((sum, p) => sum + p.sample_count, 0);
-      // Return a single synthetic record representing the most recent upload
+      // Use the sample_count of the first parameter as a proxy for CSV rows
+      // (each row produces one data point per parameter, so any single parameter's
+      // sample_count equals the number of CSV data rows)
+      const csvRowCount = params[0]?.sample_count ?? 0;
+      const storedFilename = localStorage.getItem(`upload_filename_${flightTestId}`) || 'Uploaded data';
+      const storedDate = localStorage.getItem(`upload_date_${flightTestId}`) || new Date().toISOString();
       return [
         {
           id: flightTestId,
           flight_test_id: flightTestId,
-          filename: 'Uploaded data',
+          filename: storedFilename,
           file_type: 'csv',
-          row_count: totalPoints,
+          row_count: csvRowCount,
           status: 'success',
           error_message: null,
           uploaded_by_id: 0,
-          created_at: new Date().toISOString(),
+          created_at: storedDate,
         },
       ];
     } catch {

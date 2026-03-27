@@ -48,6 +48,8 @@ export default function Parameters() {
   // Correlation axis selections
   const [corrX, setCorrX] = useState('');
   const [corrY, setCorrY] = useState('');
+  const [corrSeriesData, setCorrSeriesData] = useState<ParameterSeries[]>([]);
+  const [loadingCorr, setLoadingCorr] = useState(false);
 
   // Load flight tests
   useEffect(() => {
@@ -118,14 +120,29 @@ export default function Parameters() {
     });
   };
 
-  // Correlation: x and y series from loaded data
+  // Fetch correlation data independently when X or Y axis selection changes
+  useEffect(() => {
+    if (!selectedTestId || !corrX || !corrY) {
+      setCorrSeriesData([]);
+      return;
+    }
+    // Avoid duplicate fetch if both are the same
+    const toFetch = corrX === corrY ? [corrX] : [corrX, corrY];
+    setLoadingCorr(true);
+    ApiService.getParameterData(Number(selectedTestId), toFetch)
+      .then(setCorrSeriesData)
+      .catch(() => setCorrSeriesData([]))
+      .finally(() => setLoadingCorr(false));
+  }, [selectedTestId, corrX, corrY]);
+
+  // Correlation: x and y series from independently-fetched data
   const corrXSeries = useMemo(
-    () => seriesData.find((s) => s.parameter_name === corrX),
-    [seriesData, corrX]
+    () => corrSeriesData.find((s) => s.parameter_name === corrX),
+    [corrSeriesData, corrX]
   );
   const corrYSeries = useMemo(
-    () => seriesData.find((s) => s.parameter_name === corrY),
-    [seriesData, corrY]
+    () => corrSeriesData.find((s) => s.parameter_name === corrY),
+    [corrSeriesData, corrY]
   );
 
   // Stats for selected parameters
@@ -347,14 +364,14 @@ export default function Parameters() {
                           </label>
                           <select
                             value={corrX}
-                            onChange={(e) => setCorrX(e.target.value)}
+                            onChange={(e) => { setCorrX(e.target.value); setCorrY(''); }}
                             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm
                                        focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">— Select parameter —</option>
-                            {seriesData.map((s) => (
-                              <option key={s.parameter_name} value={s.parameter_name}>
-                                {s.parameter_name}
+                            {parameters.map((p) => (
+                              <option key={p.name} value={p.name}>
+                                {p.name}{p.unit ? ` (${p.unit})` : ''}
                               </option>
                             ))}
                           </select>
@@ -366,26 +383,37 @@ export default function Parameters() {
                           <select
                             value={corrY}
                             onChange={(e) => setCorrY(e.target.value)}
+                            disabled={!corrX}
                             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm
-                                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500
+                                       disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <option value="">— Select parameter —</option>
-                            {seriesData.map((s) => (
-                              <option key={s.parameter_name} value={s.parameter_name}>
-                                {s.parameter_name}
-                              </option>
-                            ))}
+                            {parameters
+                              .filter((p) => p.name !== corrX)
+                              .map((p) => (
+                                <option key={p.name} value={p.name}>
+                                  {p.name}{p.unit ? ` (${p.unit})` : ''}
+                                </option>
+                              ))}
                           </select>
                         </div>
                       </div>
 
-                      {corrXSeries && corrYSeries ? (
+                      {loadingCorr && (
+                        <div className="flex items-center justify-center h-48 gap-3 text-gray-400">
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                          <span className="text-sm">Loading correlation data…</span>
+                        </div>
+                      )}
+
+                      {!loadingCorr && corrXSeries && corrYSeries ? (
                         <CorrelationChart
                           xSeries={corrXSeries}
                           ySeries={corrYSeries}
                           height={300}
                         />
-                      ) : (
+                      ) : !loadingCorr && (
                         <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
                           Select parameters for both axes to display the scatter plot.
                         </div>

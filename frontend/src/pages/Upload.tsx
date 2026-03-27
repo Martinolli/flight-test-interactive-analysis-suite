@@ -67,8 +67,14 @@ export default function Upload() {
       setUploadStatus('success');
       const rowCount = result.rows_processed ?? result.row_count ?? 0;
       setLastRowCount(rowCount);
+      // Persist filename and upload timestamp for the history display
+      localStorage.setItem(`upload_filename_${selectedTestId}`, selectedFile.name);
+      localStorage.setItem(`upload_date_${selectedTestId}`, new Date().toISOString());
       setSelectedFile(null);
-      toast.success('Upload complete', `${rowCount} rows imported from "${selectedFile.name}".`);
+      const deletedMsg = result.previous_data_points_deleted
+        ? ` (replaced ${result.previous_data_points_deleted.toLocaleString()} previous data points)`
+        : '';
+      toast.success('Upload complete', `${rowCount.toLocaleString()} rows imported from "${result.filename ?? selectedFile.name}"${deletedMsg}.`);
 
       // Refresh history
       const updated = await ApiService.getUploadHistory(Number(selectedTestId)).catch(() => []);
