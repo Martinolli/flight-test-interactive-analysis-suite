@@ -1,5 +1,5 @@
 import {
-  LineChart,
+  ComposedChart,
   Line,
   XAxis,
   YAxis,
@@ -35,9 +35,45 @@ interface MergedPoint {
 }
 
 /**
- * Merges multiple ParameterSeries arrays into a single array of objects
- * keyed by ISO timestamp, suitable for Recharts multi-line rendering.
+ * Groups series by unit so we can assign them to left or right Y-axis.
+ *
+ * Rules:
+ *  - First distinct unit group  → left  axis  (yAxisId="left")
+ *  - Second distinct unit group → right axis  (yAxisId="right")
+ *  - If all series share the same unit, only the left axis is rendered.
+ *  - Beyond two distinct unit groups we still render correctly — the third+
+ *    group falls back to the right axis (same scale grouping as group 2).
  */
+function groupByUnit(series: ParameterSeries[]): {
+  leftSeries: ParameterSeries[];
+  rightSeries: ParameterSeries[];
+  leftUnit: string;
+  rightUnit: string;
+} {
+  const unitOrder: string[] = [];
+  const unitMap = new Map<string, ParameterSeries[]>();
+
+  series.forEach((s) => {
+    const unit = s.unit ?? 'value';
+    if (!unitMap.has(unit)) {
+      unitOrder.push(unit);
+      unitMap.set(unit, []);
+    }
+    unitMap.get(unit)!.push(s);
+  });
+
+  const leftUnit = unitOrder[0] ?? 'value';
+  const rightUnit = unitOrder[1] ?? '';
+
+  const leftSeries = unitMap.get(leftUnit) ?? [];
+  // All remaining unit groups go to the right axis
+  const rightSeries = unitOrder
+    .slice(1)
+    .flatMap((u) => unitMap.get(u) ?? []);
+
+  return { leftSeries, rightSeries, leftUnit, rightUnit };
+}
+
 function mergeSeries(series: ParameterSeries[]): MergedPoint[] {
   const map = new Map<string, MergedPoint>();
 
@@ -49,121 +85,315 @@ function mergeSeries(series: ParameterSeries[]): MergedPoint[] {
     });
   });
 
-  return Array.from(map.values()).sort((a, b) =>
-    new Date(a.time).getTime() - new Date(b.time).getTime()
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
   );
 }
 
 function formatTimestamp(ts: string): string {
   const d = new Date(ts);
-  // If the date is valid, show HH:MM:SS; otherwise show raw string
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleTimeString('en-US', { hour12: false });
 }
 
+// ── Custom Tooltip ──────────────────────────────────────────────────────────
 function CustomTooltip({
   active,
   payload,
   label,
+  seriesMeta,
 }: {
   active?: boolean;
-  payload?: { name: string; value: number; color: string; unit?: string }[];
+  payload?: { name: string; value: number; color: string }[];
   label?: string;
+  seriesMeta: Map<string, { unit: string; axis: 'left' | 'right' }>;
 }) {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm min-w-[160px]">
-      <p className="text-gray-500 text-xs mb-2">{label ? formatTimestamp(label) : ''}</p>
-      {payload.map((entry) => (
-        <div key={entry.name} className="flex items-center justify-between gap-4 py-0.5">
-          <span className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-gray-700 truncate max-w-[100px]">{entry.name}</span>
-          </span>
-          <span className="font-semibold text-gray-900">
-            {typeof entry.value === 'number'
-              ? entry.value.toLocaleString(undefined, { maximumFractionDigits: 4 })
-              : entry.value}
-          </span>
-        </div>
-      ))}
+    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm min-w-[180px]">
+      <p className="text-gray-500 text-xs mb-2 font-medium">
+        {label ? formatTimestamp(label) : ''}
+      </p>
+      {payload.map((entry) => {
+        const meta = seriesMeta.get(entry.name);
+        return (
+          <div
+            key={entry.name}
+            className="flex items-center justify-between gap-4 py-0.5"
+          >
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-gray-700 truncate max-w-[120px]">
+                {entry.name}
+              </span>
+            </span>
+            <span className="font-semibold text-gray-900 shrink-0">
+              {typeof entry.value === 'number'
+                ? entry.value.toLocaleString(undefined, {
+                    maximumFractionDigits: 4,
+                  })
+                : entry.value}
+              {meta?.unit ? (
+                <span className="text-gray-400 font-normal ml-1 text-xs">
+                  {meta.unit}
+                </span>
+              ) : null}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
+// ── Custom Legend ────────────────────────────────────────────────────────────
+function CustomLegend({
+  payload,
+  seriesMeta,
+}: {
+  payload?: { value: string; color: string }[];
+  seriesMeta: Map<string, { unit: string; axis: 'left' | 'right' }>;
+}) {
+  if (!payload?.length) return null;
+  return (
+    <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 pt-2">
+      {payload.map((entry) => {
+        const meta = seriesMeta.get(entry.value);
+        return (
+          <span
+            key={entry.value}
+            className="flex items-center gap-1.5 text-xs text-gray-600"
+          >
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: entry.color }}
+            />
+            {entry.value}
+            {meta?.unit ? (
+              <span className="text-gray-400">({meta.unit})</span>
+            ) : null}
+            {meta?.axis === 'right' ? (
+              <span className="text-gray-400 italic text-[10px]">→ right</span>
+            ) : null}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Y-Axis label component ───────────────────────────────────────────────────
+function AxisLabel({
+  value,
+  angle,
+  x,
+  y,
+  fill,
+}: {
+  value: string;
+  angle: number;
+  x: number;
+  y: number;
+  fill: string;
+}) {
+  return (
+    <text
+      x={x}
+      y={y}
+      fill={fill}
+      textAnchor="middle"
+      dominantBaseline="central"
+      transform={`rotate(${angle}, ${x}, ${y})`}
+      fontSize={11}
+    >
+      {value}
+    </text>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 export default function TimeSeriesChart({
   series,
-  height = 320,
+  height = 340,
   showReferenceMean = false,
 }: TimeSeriesChartProps) {
   if (!series.length) return null;
 
+  const { leftSeries, rightSeries, leftUnit, rightUnit } = groupByUnit(series);
+  const hasDualAxis = rightSeries.length > 0;
   const data = mergeSeries(series);
 
+  // Build a lookup map for tooltip / legend enrichment
+  const seriesMeta = new Map<string, { unit: string; axis: 'left' | 'right' }>();
+  leftSeries.forEach((s) =>
+    seriesMeta.set(s.parameter_name, { unit: s.unit ?? '', axis: 'left' })
+  );
+  rightSeries.forEach((s) =>
+    seriesMeta.set(s.parameter_name, { unit: s.unit ?? '', axis: 'right' })
+  );
+
+  // Global color index so colors are consistent regardless of axis assignment
+  const colorIndex = new Map<string, number>();
+  series.forEach((s, i) => colorIndex.set(s.parameter_name, i));
+
+  const rightMargin = hasDualAxis ? 64 : 16;
+
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis
-          dataKey="time"
-          tickFormatter={formatTimestamp}
-          tick={{ fontSize: 11, fill: '#9ca3af' }}
-          axisLine={{ stroke: '#e5e7eb' }}
-          tickLine={false}
-          minTickGap={60}
-        />
-        <YAxis
-          tick={{ fontSize: 11, fill: '#9ca3af' }}
-          axisLine={false}
-          tickLine={false}
-          width={52}
-          tickFormatter={(v: number) =>
-            v.toLocaleString(undefined, { maximumFractionDigits: 2 })
-          }
-        />
-        <Tooltip content={<CustomTooltip />} />
-        {series.length > 1 && (
+    <div>
+      {hasDualAxis && (
+        <div className="flex items-center justify-end gap-6 mb-1 pr-2 text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-0.5 bg-gray-400" />
+            Left axis:{' '}
+            <strong className="text-gray-700 ml-1">{leftUnit}</strong>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-0.5 bg-gray-400" />
+            Right axis:{' '}
+            <strong className="text-gray-700 ml-1">{rightUnit}</strong>
+          </span>
+        </div>
+      )}
+
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart
+          data={data}
+          margin={{ top: 8, right: rightMargin, left: 0, bottom: 8 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+
+          <XAxis
+            dataKey="time"
+            tickFormatter={formatTimestamp}
+            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            axisLine={{ stroke: '#e5e7eb' }}
+            tickLine={false}
+            minTickGap={60}
+          />
+
+          {/* Left Y-axis */}
+          <YAxis
+            yAxisId="left"
+            orientation="left"
+            tick={{ fontSize: 11, fill: '#6b7280' }}
+            axisLine={false}
+            tickLine={false}
+            width={58}
+            tickFormatter={(v: number) =>
+              v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+            }
+            label={
+              leftUnit
+                ? ({
+                    value: leftUnit,
+                    angle: -90,
+                    position: 'insideLeft',
+                    offset: 10,
+                    style: { fontSize: 11, fill: '#9ca3af' },
+                  } as object)
+                : undefined
+            }
+          />
+
+          {/* Right Y-axis — only rendered when there are series on it */}
+          {hasDualAxis && (
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 11, fill: '#6b7280' }}
+              axisLine={false}
+              tickLine={false}
+              width={58}
+              tickFormatter={(v: number) =>
+                v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+              }
+              label={
+                rightUnit
+                  ? ({
+                      value: rightUnit,
+                      angle: 90,
+                      position: 'insideRight',
+                      offset: 10,
+                      style: { fontSize: 11, fill: '#9ca3af' },
+                    } as object)
+                  : undefined
+              }
+            />
+          )}
+
+          <Tooltip
+            content={
+              <CustomTooltip seriesMeta={seriesMeta} />
+            }
+          />
+
           <Legend
-            wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-            iconType="circle"
-            iconSize={8}
+            content={<CustomLegend seriesMeta={seriesMeta} />}
           />
-        )}
 
-        {series.map((s, i) => (
-          <Line
-            key={s.parameter_name}
-            type="monotone"
-            dataKey={s.parameter_name}
-            stroke={COLORS[i % COLORS.length]}
-            strokeWidth={2}
-            dot={data.length <= 100}
-            activeDot={{ r: 4 }}
-            connectNulls
-          />
-        ))}
-
-        {showReferenceMean &&
-          series.map((s, i) => (
-            <ReferenceLine
-              key={`mean-${s.parameter_name}`}
-              y={s.statistics.mean}
-              stroke={COLORS[i % COLORS.length]}
-              strokeDasharray="6 3"
-              strokeOpacity={0.5}
-              label={{
-                value: `μ ${s.statistics.mean.toFixed(2)}`,
-                position: 'insideTopRight',
-                fontSize: 10,
-                fill: COLORS[i % COLORS.length],
-              }}
+          {/* Lines for left axis */}
+          {leftSeries.map((s) => (
+            <Line
+              key={s.parameter_name}
+              yAxisId="left"
+              type="monotone"
+              dataKey={s.parameter_name}
+              stroke={COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]}
+              strokeWidth={2}
+              dot={data.length <= 100}
+              activeDot={{ r: 4 }}
+              connectNulls
             />
           ))}
-      </LineChart>
-    </ResponsiveContainer>
+
+          {/* Lines for right axis */}
+          {rightSeries.map((s) => (
+            <Line
+              key={s.parameter_name}
+              yAxisId="right"
+              type="monotone"
+              dataKey={s.parameter_name}
+              stroke={COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]}
+              strokeWidth={2}
+              strokeDasharray="5 3"
+              dot={data.length <= 100}
+              activeDot={{ r: 4 }}
+              connectNulls
+            />
+          ))}
+
+          {/* Mean reference lines */}
+          {showReferenceMean &&
+            series.map((s) => {
+              const axis =
+                seriesMeta.get(s.parameter_name)?.axis ?? 'left';
+              return (
+                <ReferenceLine
+                  key={`mean-${s.parameter_name}`}
+                  yAxisId={axis}
+                  y={s.statistics.mean}
+                  stroke={
+                    COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]
+                  }
+                  strokeDasharray="6 3"
+                  strokeOpacity={0.5}
+                  label={{
+                    value: `μ ${s.statistics.mean.toFixed(2)}`,
+                    position: 'insideTopRight',
+                    fontSize: 10,
+                    fill: COLORS[
+                      colorIndex.get(s.parameter_name)! % COLORS.length
+                    ],
+                  }}
+                />
+              );
+            })}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

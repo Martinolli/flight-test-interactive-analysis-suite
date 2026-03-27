@@ -45,6 +45,13 @@
 - [x] Upload history shows one inflated synthetic record — now shows actual CSV row count + real filename from localStorage
 - [x] Correlation chart Y-axis only shows same parameter as X-axis — dropdowns now use full parameters list; Y excludes X selection
 - [x] Parameters from different uploads mixed together — resolved by the replace-on-upload fix above
+- [x] Time-series chart: dual Y-axes for parameters with different units/scales
+  - Left axis: first unit group; Right axis: all other unit groups
+  - Right-axis lines rendered with dashed stroke to distinguish visually
+  - Tooltip shows value + unit for each series
+  - Legend shows axis assignment ("→ right") for right-axis series
+  - Axis labels show unit names on both sides
+  - Mean reference lines respect correct axis
 
 ## Phase 4: Advanced Features
 - [x] Date-range filter on Dashboard
