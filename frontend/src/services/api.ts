@@ -14,11 +14,18 @@ export interface FlightTest {
   updated_at: string | null;
 }
 
+export interface CreateFlightTestData {
+  test_name: string;
+  aircraft_type: string;
+  test_date: string;
+  description?: string;
+}
+
 export class ApiService {
   private static async request<T>(
     endpoint: string,
     options: RequestInit = {}
-   ): Promise<T> {
+  ): Promise<T> {
     const token = AuthService.getAccessToken();
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -35,8 +42,15 @@ export class ApiService {
       throw new Error(error.detail || `Request failed with status ${response.status}`);
     }
 
+    // Handle 204 No Content (DELETE responses)
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
     return response.json();
   }
+
+  // ─── Flight Tests ────────────────────────────────────────────────────────────
 
   static async getFlightTests(): Promise<FlightTest[]> {
     return this.request<FlightTest[]>('/api/flight-tests');
@@ -46,12 +60,7 @@ export class ApiService {
     return this.request<FlightTest>(`/api/flight-tests/${id}`);
   }
 
-  static async createFlightTest(data: {
-    test_name: string;
-    aircraft_type: string;
-    test_date: string;
-    description?: string;
-  }): Promise<FlightTest> {
+  static async createFlightTest(data: CreateFlightTestData): Promise<FlightTest> {
     return this.request<FlightTest>('/api/flight-tests', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -60,7 +69,7 @@ export class ApiService {
 
   static async updateFlightTest(
     id: number,
-    data: Partial<FlightTest>
+    data: Partial<CreateFlightTestData>
   ): Promise<FlightTest> {
     return this.request<FlightTest>(`/api/flight-tests/${id}`, {
       method: 'PUT',

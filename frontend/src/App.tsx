@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import FlightTestDetail from './pages/FlightTestDetail';
 import Upload from './pages/Upload';
 import Parameters from './pages/Parameters';
 import Profile from './pages/Profile';
@@ -12,11 +13,19 @@ function App() {
   return (
     <AuthProvider>
       <Switch>
+        {/* Public */}
         <Route path="/login" component={Login} />
 
+        {/* Protected */}
         <Route path="/">
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/flight-tests/:id">
+          <ProtectedRoute>
+            <FlightTestDetail />
           </ProtectedRoute>
         </Route>
 
@@ -44,11 +53,15 @@ function App() {
           </ProtectedRoute>
         </Route>
 
+        {/* 404 */}
         <Route>
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <div className="text-center">
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
-              <p className="text-gray-600">Page not found</p>
+              <h1 className="text-6xl font-bold text-gray-200 mb-4">404</h1>
+              <p className="text-gray-600 mb-6">Page not found</p>
+              <a href="/" className="text-blue-600 hover:underline text-sm">
+                Return to Dashboard
+              </a>
             </div>
           </div>
         </Route>
