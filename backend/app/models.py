@@ -3,7 +3,14 @@ FTIAS Backend - Database Models
 SQLAlchemy ORM models
 """
 
-from pgvector.sqlalchemy import Vector
+try:
+    from pgvector.sqlalchemy import Vector
+    _PGVECTOR_AVAILABLE = True
+except ImportError:
+    # pgvector not installed — Vector columns will use Text as a fallback
+    # so the backend starts cleanly; RAG features are disabled until installed.
+    from sqlalchemy import Text as Vector  # type: ignore[assignment]
+    _PGVECTOR_AVAILABLE = False
 from sqlalchemy import (
     Boolean,
     Column,

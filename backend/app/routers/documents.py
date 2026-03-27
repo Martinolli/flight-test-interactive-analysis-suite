@@ -11,8 +11,21 @@ import tempfile
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from openai import OpenAI
 from pydantic import BaseModel
+
+try:
+    from openai import OpenAI as _OpenAI
+    _OPENAI_AVAILABLE = True
+except ImportError:
+    _OpenAI = None  # type: ignore[assignment,misc]
+    _OPENAI_AVAILABLE = False
+
+try:
+    from docling.document_converter import DocumentConverter as _DocumentConverter
+    _DOCLING_AVAILABLE = True
+except ImportError:
+    _DocumentConverter = None  # type: ignore[assignment,misc]
+    _DOCLING_AVAILABLE = False
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
@@ -27,11 +40,29 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # OpenAI client (reads OPENAI_API_KEY from environment)
 # ---------------------------------------------------------------------------
-_openai_client: Optional[OpenAI] = None
+_openai_client = None
 
 
-def get_openai_client() -> OpenAI:
+def _require_ai_packages():
+    """Raise a clear 503 if optional AI packages are not installed."""
+    if not _OPENAI_AVAILABLE or not _DOCLING_AVAILABLE:
+        missing = []
+        if not _OPENAI_AVAILABLE:
+            missing.append("openai")
+        if not _DOCLING_AVAILABLE:
+            missing.append("docling")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"AI packages not installed: {', '.join(missing)}. "
+                "Run: pip install openai docling sentence-transformers pgvector"
+            ),
+        )
+
+
+def get_openai_client():
     global _openai_client
+    _require_ai_packages()
     if _openai_client is None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -40,7 +71,7 @@ def get_openai_client() -> OpenAI:
                 detail="OPENAI_API_KEY is not configured. "
                        "Add it to your .env file to enable AI features.",
             )
-        _openai_client = OpenAI(api_key=api_key)
+        _openai_client = _OpenAI(api_key=api_key)
     return _openai_client
 
 
@@ -176,6 +207,7 @@ async def upload_document(
     Docling parses it, HybridChunker splits it, OpenAI embeds each chunk,
     and the embeddings are stored in pgvector for semantic search.
     """
+    _require_ai_packages()
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
@@ -305,6 +337,7 @@ def query_documents(
     2. Find the top-k most similar chunks via pgvector cosine distance.
     3. Pass the chunks as context to the LLM and return its answer.
     """
+    _require_ai_packages()
     # Embed the question
     try:
         query_embedding = embed_text(request.question)
@@ -424,6 +457,7 @@ def ai_analysis(
     retrieves the most relevant document chunks from the library as context,
     and asks the LLM to produce a structured analysis report.
     """
+    _require_ai_packages()
     # Fetch the flight test
     ft = db.query(FlightTest).filter(FlightTest.id == flight_test_id).first()
     if not ft:
