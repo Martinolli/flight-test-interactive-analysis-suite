@@ -15,13 +15,13 @@
 - [ ] Pagination for large datasets on Dashboard
 
 ## Phase 2: File Upload & Data Import
-- [ ] Drag-and-drop upload zone component
-- [ ] File type validation (CSV, Excel)
-- [ ] File size validation
-- [ ] Upload progress indicator
-- [ ] Connect to backend upload endpoint
-- [ ] CSV column mapping UI
-- [ ] Upload history list
+- [x] Drag-and-drop upload zone component
+- [x] File type validation (CSV, Excel)
+- [x] File size validation
+- [x] Upload progress indicator
+- [x] Connect to backend upload endpoint (XHR with progress tracking)
+- [ ] CSV column mapping UI (post-upload preview)
+- [x] Upload history list per flight test
 
 ## Phase 3: Parameter Visualization
 - [ ] Install chart library (Recharts)
