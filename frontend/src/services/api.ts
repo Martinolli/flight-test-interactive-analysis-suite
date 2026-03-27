@@ -44,6 +44,34 @@ export interface UploadResponse {
   message: string;
 }
 
+export interface ParameterInfo {
+  name: string;
+  unit: string | null;
+  data_type: string;
+  sample_count: number;
+  min_value: number | null;
+  max_value: number | null;
+  mean_value: number | null;
+}
+
+export interface ParameterDataPoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface ParameterSeries {
+  parameter_name: string;
+  unit: string | null;
+  data: ParameterDataPoint[];
+  statistics: {
+    min: number;
+    max: number;
+    mean: number;
+    std_dev: number;
+    count: number;
+  };
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export class ApiService {
@@ -67,7 +95,6 @@ export class ApiService {
       throw new Error(error.detail || `Request failed with status ${response.status}`);
     }
 
-    // Handle 204 No Content (DELETE responses)
     if (response.status === 204) {
       return undefined as T;
     }
@@ -110,10 +137,6 @@ export class ApiService {
 
   // ─── File Upload ───────────────────────────────────────────────────────────
 
-  /**
-   * Upload a CSV or Excel file for a specific flight test.
-   * Uses XMLHttpRequest so we can track upload progress.
-   */
   static uploadFile(
     flightTestId: number,
     file: File,
@@ -161,17 +184,34 @@ export class ApiService {
     });
   }
 
-  /**
-   * Get upload history for a specific flight test.
-   */
   static async getUploadHistory(flightTestId: number): Promise<UploadRecord[]> {
     return this.request<UploadRecord[]>(`/api/flight-tests/${flightTestId}/uploads`);
   }
 
-  /**
-   * Get all uploads across all flight tests (for the Upload page overview).
-   */
   static async getAllUploads(): Promise<UploadRecord[]> {
     return this.request<UploadRecord[]>('/api/uploads');
+  }
+
+  // ─── Parameters ────────────────────────────────────────────────────────────
+
+  /**
+   * List all available parameters for a given flight test.
+   */
+  static async getParameters(flightTestId: number): Promise<ParameterInfo[]> {
+    return this.request<ParameterInfo[]>(`/api/flight-tests/${flightTestId}/parameters`);
+  }
+
+  /**
+   * Fetch time-series data for one or more parameters.
+   * paramNames is a comma-separated list, e.g. "altitude,airspeed"
+   */
+  static async getParameterData(
+    flightTestId: number,
+    paramNames: string[]
+  ): Promise<ParameterSeries[]> {
+    const query = paramNames.map((n) => `parameters=${encodeURIComponent(n)}`).join('&');
+    return this.request<ParameterSeries[]>(
+      `/api/flight-tests/${flightTestId}/parameters/data?${query}`
+    );
   }
 }

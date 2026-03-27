@@ -24,13 +24,13 @@
 - [x] Upload history list per flight test
 
 ## Phase 3: Parameter Visualization
-- [ ] Install chart library (Recharts)
-- [ ] Parameter list page — fetch from backend
-- [ ] Line chart component for time-series data
-- [ ] Scatter plot for correlations
-- [ ] Multi-parameter overlay chart
+- [x] Install chart library (Recharts)
+- [x] Parameter list page — fetch from backend
+- [x] Line chart component for time-series data
+- [x] Scatter plot for correlations
+- [x] Multi-parameter overlay chart (up to 8 series)
 - [ ] Zoom / pan controls
-- [ ] Statistical summary panel (min, max, avg, std dev)
+- [x] Statistical summary panel (min, max, avg, std dev)
 - [ ] Export chart as PNG
 
 ## Phase 4: Advanced Features
