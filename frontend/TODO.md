@@ -1,6 +1,7 @@
 # FTIAS Frontend — TODO
 
 ## Phase 1: Core CRUD Operations
+
 - [x] Dialog UI component
 - [x] Textarea UI component
 - [x] Toast notification system
@@ -15,6 +16,7 @@
 - [ ] Pagination for large datasets on Dashboard
 
 ## Phase 2: File Upload & Data Import
+
 - [x] Drag-and-drop upload zone component
 - [x] File type validation (CSV, Excel)
 - [x] File size validation
@@ -24,6 +26,7 @@
 - [x] Upload history list per flight test
 
 ## Phase 3: Parameter Visualization
+
 - [x] Install chart library (Recharts)
 - [x] Parameter list page — fetch from backend
 - [x] Line chart component for time-series data
@@ -34,6 +37,7 @@
 - [ ] Export chart as PNG
 
 ## Bug Fixes
+
 - [x] Upload: 404 Not Found — wrong URL /upload → /upload-csv
 - [x] Profile: 405 Method Not Allowed — added PATCH /api/auth/me to backend
 - [x] Upload history: graceful empty array when backend endpoint not yet implemented
@@ -54,6 +58,7 @@
   - Mean reference lines respect correct axis
 
 ## Phase 4: Advanced Features
+
 - [x] Date-range filter on Dashboard
 - [x] Aircraft-type filter on Dashboard
 - [ ] Dark mode toggle
@@ -63,6 +68,7 @@
 - [x] Settings page (date format, chart defaults, notifications, about)
 
 ## Phase 5: LLM Integration
+
 - [x] AI Analysis button on FlightTestDetail
 - [x] Analysis result display (structured text rendering)
 - [ ] Natural language search
@@ -70,6 +76,7 @@
 - [ ] Anomaly detection panel
 
 ## Phase 6: LLM / RAG Integration
+
 - [x] Migrate PostgreSQL Docker image from postgres:15-alpine to pgvector/pgvector:pg15
 - [x] Enable pgvector extension in database
 - [x] Install backend Python deps: docling, openai, pgvector, sentence-transformers
@@ -87,6 +94,7 @@
 - [x] Project_Documents/40_RAG_System_Implementation_Phase6.md created
 
 ## Phase 5: Performance & Polish
+
 - [ ] React Query data caching
 - [ ] Lazy-loaded routes
 - [ ] Global error boundary
@@ -96,6 +104,7 @@
 - [ ] E2E tests for critical flows
 
 ## Phase 7: Deployment
+
 - [ ] Production build configuration
 - [ ] Environment variable setup
 - [ ] CI/CD pipeline
