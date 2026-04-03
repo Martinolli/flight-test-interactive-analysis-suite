@@ -41,6 +41,8 @@ services:
       APP_ENV: ${APP_ENV:-development}
       DEBUG: ${DEBUG:-true}
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      # AI / OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:

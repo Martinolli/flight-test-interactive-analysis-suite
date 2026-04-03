@@ -15,12 +15,14 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  BarChart3,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import FlightTestModal from '../components/FlightTestModal';
+import TimeSeriesChart from '../components/TimeSeriesChart';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ToastContainer, useToast } from '../components/ui/toast';
-import { ApiService, FlightTest, AIAnalysisResponse } from '../services/api';
+import { ApiService, FlightTest, AIAnalysisResponse, ParameterInfo, ParameterSeries } from '../services/api';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -51,6 +53,117 @@ function formatDuration(seconds: number | null): string {
   if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+}
+
+// ─── Parameters & Data Panel ─────────────────────────────────────────────────
+
+function ParametersPanel({ flightTestId }: { flightTestId: number }) {
+  const [parameters, setParameters] = useState<ParameterInfo[]>([]);
+  const [selectedParams, setSelectedParams] = useState<Set<string>>(new Set());
+  const [seriesData, setSeriesData] = useState<ParameterSeries[]>([]);
+  const [loadingParams, setLoadingParams] = useState(true);
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [paramsError, setParamsError] = useState('');
+
+  useEffect(() => {
+    setLoadingParams(true);
+    setParamsError('');
+    ApiService.getParameters(flightTestId)
+      .then((params) => {
+        setParameters(params);
+        if (params.length > 0) {
+          setSelectedParams(new Set([params[0].name]));
+        }
+      })
+      .catch((err) => setParamsError(err instanceof Error ? err.message : 'Failed to load parameters'))
+      .finally(() => setLoadingParams(false));
+  }, [flightTestId]);
+
+  useEffect(() => {
+    if (selectedParams.size === 0) { setSeriesData([]); return; }
+    setLoadingChart(true);
+    ApiService.getParameterData(flightTestId, Array.from(selectedParams))
+      .then(setSeriesData)
+      .catch(() => setSeriesData([]))
+      .finally(() => setLoadingChart(false));
+  }, [flightTestId, selectedParams]);
+
+  function toggleParam(name: string) {
+    setSelectedParams((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) { next.delete(name); } else { next.add(name); }
+      return next;
+    });
+  }
+
+  if (loadingParams) {
+    return (
+      <div className="flex items-center justify-center py-10 gap-2 text-gray-400">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        <span className="text-sm">Loading parameters…</span>
+      </div>
+    );
+  }
+
+  if (paramsError) {
+    return (
+      <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+        {paramsError}
+      </div>
+    );
+  }
+
+  if (parameters.length === 0) {
+    return (
+      <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+        <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-400 text-sm font-medium">No data uploaded yet</p>
+        <p className="text-gray-400 text-xs mt-1">
+          Upload a CSV or Excel file from the <strong>Upload Data</strong> page to see parameters here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+        {parameters.length} parameter{parameters.length !== 1 ? 's' : ''} available — select to plot
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {parameters.map((p) => (
+          <button
+            key={p.name}
+            onClick={() => toggleParam(p.name)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              selectedParams.has(p.name)
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+            }`}
+          >
+            {p.name}{p.unit ? ` (${p.unit})` : ''}
+          </button>
+        ))}
+      </div>
+      {selectedParams.size > 0 && (
+        <div className="relative min-h-[280px]">
+          {loadingChart ? (
+            <div className="flex items-center justify-center py-10 gap-2 text-gray-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm">Loading chart data…</span>
+            </div>
+          ) : seriesData.length > 0 ? (
+            <TimeSeriesChart data={seriesData} showMean={false} height={280} />
+          ) : (
+            <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
+              No data points available for selected parameters.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── AI Analysis Panel ────────────────────────────────────────────────────────
@@ -381,17 +494,16 @@ export default function FlightTestDetail() {
               </CardContent>
             </Card>
 
-            {/* Parameters placeholder */}
+            {/* Parameters & Data */}
             <Card className="mt-4">
               <CardHeader>
-                <CardTitle className="text-base">Parameters & Data</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BarChart3 className="w-4 h-4 text-blue-500" />
+                  Parameters & Data
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
-                  <p className="text-gray-400 text-sm">
-                    Parameter visualization will appear here once data is uploaded.
-                  </p>
-                </div>
+                <ParametersPanel flightTestId={flightTest.id} />
               </CardContent>
             </Card>
 
