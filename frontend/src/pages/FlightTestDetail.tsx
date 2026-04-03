@@ -154,7 +154,7 @@ function ParametersPanel({ flightTestId }: { flightTestId: number }) {
               <span className="text-sm">Loading chart data…</span>
             </div>
           ) : seriesData.length > 0 ? (
-            <TimeSeriesChart data={seriesData} showMean={false} height={280} />
+            <TimeSeriesChart series={seriesData} showReferenceMean={false} height={280} />
           ) : (
             <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
               No data points available for selected parameters.

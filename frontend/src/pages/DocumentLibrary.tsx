@@ -160,9 +160,8 @@ export default function DocumentLibrary() {
         title="Remove Document"
         description={`Remove "${deleteTarget?.title || deleteTarget?.filename}" from the library? All associated chunks and embeddings will be deleted permanently.`}
         confirmLabel="Remove"
-        variant="destructive"
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onClose={() => setDeleteTarget(null)}
       />
 
       {/* Hidden file input */}
