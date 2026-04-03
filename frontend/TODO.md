@@ -71,9 +71,9 @@
 
 - [x] AI Analysis button on FlightTestDetail
 - [x] Analysis result display (structured text rendering)
-- [ ] Natural language search
-- [ ] Automated report generation (PDF)
-- [ ] Anomaly detection panel
+- [x] Natural language search (AI Standards Query page)
+- [ ] Automated report generation (PDF) — Session 6
+- [ ] Anomaly detection panel — future
 
 ## Phase 6: LLM / RAG Integration
 
@@ -92,6 +92,27 @@
 - [x] Frontend: Sidebar navigation — grouped with 'AI & Documents' section
 - [x] Update docker-compose.yml and all project MD docs
 - [x] Project_Documents/40_RAG_System_Implementation_Phase6.md created
+
+## Session 5: Bug Fixes and Full Verification (April 3, 2026)
+
+- [x] Fix useToast API mismatch in DocumentLibrary.tsx (showToast/ToastContainer → toasts/dismiss/success/error)
+- [x] Fix ConfirmDialog prop mismatch in DocumentLibrary.tsx (onCancel → onClose; remove variant prop)
+- [x] Fix TimeSeriesChart prop names in FlightTestDetail.tsx (data→series, showMean→showReferenceMean)
+- [x] Replace placeholder ParametersPanel with real component fetching live API data
+- [x] Add OPENAI_API_KEY to docker-compose.yml environment pass-through
+- [x] Install libxcb1 and GL libraries in Docker container for Docling PDF rendering
+- [x] Add system libraries to docker/backend.Dockerfile for future image rebuilds
+- [x] Full end-to-end verification: all pages and features confirmed working
+- [x] Project_Documents/41_Next_Steps_Roadmap_Session5.md created
+
+## Session 6: Planned (Next Session)
+
+- [ ] Rebuild Docker image (docker compose build --no-cache backend) to make libxcb1 persistent
+- [ ] Replace Docling with pymupdf4llm for faster PDF parsing (seconds vs minutes)
+- [ ] Implement background task queue for PDF uploads (FastAPI BackgroundTasks)
+- [ ] User management panel (admin UI: create user, reset password, assign role)
+- [ ] Automated PDF report export from AI Analysis panel (reportlab or weasyprint)
+- [ ] Unit tests for documents router (backend/tests/test_documents.py)
 
 ## Phase 5: Performance & Polish
 

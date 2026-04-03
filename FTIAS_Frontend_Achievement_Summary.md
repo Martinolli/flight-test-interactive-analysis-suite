@@ -1,14 +1,14 @@
 # FTIAS Frontend — Project Achievement Summary
 
-**Last Updated:** March 27, 2026
-**Version:** 4.0
-**Status:** Phase 6 Complete — RAG System Integrated, Application Fully Operational
+**Last Updated:** April 3, 2026
+**Version:** 5.0
+**Status:** Session 5 Complete — All Pages Operational, RAG Pipeline Verified
 
 ---
 
 ## Overview
 
-The Flight Test Interactive Analysis Suite (FTIAS) frontend is a standalone React + TypeScript + Vite application that connects directly to the existing FastAPI backend using JWT authentication and REST API calls. It replaces the original Manus OAuth/tRPC template with a simpler, fully maintainable architecture. As of this session, the application includes a complete RAG (Retrieval-Augmented Generation) pipeline for AI-powered document querying and flight test analysis.
+The Flight Test Interactive Analysis Suite (FTIAS) frontend is a standalone React + TypeScript + Vite application that connects directly to the existing FastAPI backend using JWT authentication and REST API calls. It replaces the original Manus OAuth/tRPC template with a simpler, fully maintainable architecture. As of this session, the application is **fully operational** — all pages load correctly, the RAG pipeline is functional, and PDF document ingestion is confirmed working.
 
 ---
 
@@ -41,8 +41,8 @@ frontend/src/
 ├── services/       API service classes (auth.ts, api.ts)
 ├── contexts/       React context providers (AuthContext)
 ├── components/
-│   ├── ui/         Reusable primitives (Button, Card, Input, etc.)
-│   └── *.tsx       Feature components (Sidebar, FlightTestModal, etc.)
+│   ├── ui/         Reusable primitives (Button, Card, Input, Dialog, Toast, etc.)
+│   └── *.tsx       Feature components (Sidebar, FlightTestModal, TimeSeriesChart, etc.)
 └── pages/          Route-level page components
 ```
 
@@ -72,7 +72,7 @@ This session implemented full Create, Read, Update, and Delete operations for fl
 
 **Phase 2 — File Upload & Data Import:** Drag-and-drop CSV/Excel upload zone on the `Upload` page, column mapping UI, upload progress indicator, upload history list, and connection to the backend `/api/flight-tests/{id}/upload` endpoint.
 
-**Phase 3 — Parameter Visualization:** Recharts integration on the `FlightTestDetail` page with time-series line charts, scatter plots, multi-parameter overlay, zoom/pan controls, and a statistical summary panel (min, max, mean, std dev per parameter).
+**Phase 3 — Parameter Visualization:** Recharts integration with time-series line charts, multi-parameter overlay, zoom/pan controls, and a statistical summary panel (min, max, mean, std dev per parameter).
 
 **Phase 4 — Advanced Features:** Date-range and aircraft-type filters on the Dashboard, dark mode toggle, user profile editing on the Profile page, and data export to CSV/Excel from the detail view.
 
@@ -80,32 +80,62 @@ This session implemented full Create, Read, Update, and Delete operations for fl
 
 This session implemented the full Retrieval-Augmented Generation pipeline, enabling AI-powered querying of uploaded standards and handbooks, and AI-generated analysis reports for individual flight tests.
 
-**Backend changes (verified and committed):**
+**Backend changes:**
 
 | File | Change |
 | --- | --- |
 | `backend/app/models.py` | Added `Document` and `DocumentChunk` models with `Vector(1536)` pgvector column; imports made optional for graceful degradation |
-| `backend/app/routers/documents.py` | Full RAG router: upload (Docling parse + chunk + embed), list, delete, semantic query, AI analysis; all AI endpoints return `503` with clear message if packages not installed |
+| `backend/app/routers/documents.py` | Full RAG router: upload (Docling parse + chunk + embed), list, delete, semantic query, AI analysis |
 | `backend/app/main.py` | Documents router registered at `/api/documents` |
 | `backend/requirements.txt` | Added `docling`, `openai`, `pgvector`, `sentence-transformers`; fixed `pydantic-settings` version conflict |
 | `backend/reset_password.py` | Utility script to reset `testuser` password safely inside the Docker container |
 | `docker/backend.Dockerfile` | Rebuilt with full AI package set; image now ~4 GB |
-| `docker-compose.yml` | PostgreSQL image updated from `postgres:15-alpine` to `pgvector/pgvector:pg15` |
+| `docker-compose.yml` | PostgreSQL image updated to `pgvector/pgvector:pg15`; `OPENAI_API_KEY` pass-through added |
 
 **Frontend changes:**
 
 | File | Change |
 | --- | --- |
 | `src/services/api.ts` | Added `Document`, `QueryResponse`, `AIAnalysisResponse` types and four new API methods |
-| `src/pages/DocumentLibrary.tsx` | Upload PDFs with drag-and-drop, view processing status (processing / ready / error), delete documents |
+| `src/pages/DocumentLibrary.tsx` | Upload PDFs with drag-and-drop, view processing status, delete documents |
 | `src/pages/AIQuery.tsx` | Chat-style semantic search with collapsible source citations |
-| `src/pages/FlightTestDetail.tsx` | Added `AIAnalysisPanel` — click "Analyse with AI" to get a structured engineering report |
+| `src/pages/FlightTestDetail.tsx` | Added `AIAnalysisPanel` — structured engineering report from flight data |
 | `src/components/Sidebar.tsx` | Grouped navigation: **Flight Tests** / **AI & Documents** / **Account** |
 | `src/App.tsx` | Routes `/documents` and `/ai-query` registered |
 
-**Infrastructure fixes applied this session:**
+### Session 5 — Bug Fixes and Full System Verification (April 3, 2026)
 
-The Docker backend image was rebuilt from scratch to include all AI packages. The `pgvector`, `openai`, and `docling` imports were made optional in the backend source so the server starts cleanly even if packages are not yet installed, returning a `503` with a clear message for AI-specific endpoints. A password reset script (`reset_password.py`) was created to safely update the `testuser` password inside the container, bypassing PowerShell `$` escaping issues.
+This session resolved all remaining frontend crashes and infrastructure issues, bringing the entire application to a fully verified operational state.
+
+**Frontend bug fixes:**
+
+| File | Bug | Fix Applied |
+| --- | --- | --- |
+| `src/pages/DocumentLibrary.tsx` | `useToast()` destructured as `{ showToast, ToastContainer }` — hook does not export those names | Corrected to `{ toasts, dismiss, success, error, warning }`; all 8 call sites updated |
+| `src/pages/DocumentLibrary.tsx` | `ConfirmDialog` passed `onCancel` and `variant="destructive"` — unsupported props | Fixed to `onClose`; removed `variant` |
+| `src/pages/FlightTestDetail.tsx` | `TimeSeriesChart` called with `data={seriesData}` and `showMean={false}` — wrong prop names | Corrected to `series={seriesData}` and `showReferenceMean={false}` |
+| `src/pages/FlightTestDetail.tsx` | Parameters & Data panel was a hardcoded placeholder with no API connection | Replaced with real `ParametersPanel` component — fetches parameters, renders interactive chart |
+
+**Infrastructure fixes:**
+
+| Issue | Root Cause | Fix Applied |
+| --- | --- | --- |
+| `OPENAI_API_KEY` not reaching Docker container | `docker-compose.yml` did not pass the key to the backend service | Added `OPENAI_API_KEY: ${OPENAI_API_KEY}` to backend `environment:` section |
+| PDF parsing fails with `libxcb.so.1: cannot open shared object file` | `python:3.12-slim` base image lacks X11 display libraries required by `pypdfium2` (Docling's PDF renderer) | Installed `libxcb1`, `libglib2.0-0`, `libgl1`, `libgomp1` into running container; added to `docker/backend.Dockerfile` |
+
+**Verification results:**
+
+All pages and features confirmed working end-to-end:
+- Login / logout
+- Dashboard with flight test cards and CRUD
+- Upload Data with drag-and-drop and upload history
+- Parameters page with interactive charts
+- Flight Test Detail with Parameters & Data panel and AI Analysis panel
+- Document Library — upload, status tracking, delete
+- AI Standards Query — semantic search with source citations
+- AI Analysis — structured report from flight data statistics
+
+**Known performance issue:** Docling PDF parsing is very slow (several minutes per document). Two documents were uploaded in testing; one completed (status: Ready), one is still processing. This is a known Docling limitation. Evaluation of alternative parsers (LlamaParse, pymupdf4llm) is planned for the next session.
 
 ---
 
@@ -142,6 +172,8 @@ If login fails after a Docker rebuild, run: `docker exec ftias-backend python /a
 | PUT | `/api/flight-tests/{id}` | Update existing flight test |
 | DELETE | `/api/flight-tests/{id}` | Delete flight test |
 | POST | `/api/flight-tests/{id}/upload` | Upload CSV/Excel data file |
+| GET | `/api/flight-tests/{id}/parameters` | List parameters for a flight test |
+| GET | `/api/flight-tests/{id}/parameter-data` | Fetch time-series data for selected parameters |
 | GET | `/api/documents` | List all documents in RAG library |
 | POST | `/api/documents/upload` | Upload PDF, parse, chunk, embed |
 | DELETE | `/api/documents/{id}` | Delete document and all chunks |
@@ -150,60 +182,63 @@ If login fails after a Docker rebuild, run: `docker exec ftias-backend python /a
 
 ---
 
-## Known Issues
+## Known Issues and Limitations
 
-| Issue | Status | Notes |
+| Issue | Severity | Status |
 | --- | --- | --- |
-| Document Library page (`/documents`) appears empty | **Open** | The page renders but the document list does not load. Likely a CORS issue or the API call is hitting the wrong URL. To investigate next session. |
-| AI features require OpenAI API key | By design | Add `OPENAI_API_KEY` to `backend/.env` to enable document upload, AI query, and AI analysis |
-| Node.js version warning | Minor | Vite 7 requires Node 20.19+ or 22.12+; current version is 20.18.1. Upgrade recommended but not blocking |
+| Docling PDF parsing is very slow (minutes per document) | Medium | Evaluating LlamaParse and pymupdf4llm as replacements — see Next Steps |
+| `libxcb1` installed in container but not persistent across `docker compose down/up` | Low | Dockerfile updated; rebuild required (10–20 min) |
+| No background task queue — upload endpoint blocks until parsing completes | Medium | Planned for next session |
+| No user management UI (create users, reset passwords) | Low | Planned |
+| `testuser` password reset required after each Docker image rebuild | Low | `reset_password.py` script available |
+| Node.js 20.18.1 — Vite 7 requires 20.19+ or 22.x | Minor | Cosmetic warning only; does not affect functionality |
 
 ---
 
 ## Next Steps (Priority Order for Next Session)
 
-### 1. Fix Document Library Empty Page (High Priority)
+See `Project_Documents/41_Next_Steps_Roadmap_Session5.md` for full details.
 
-The `/documents` page renders but shows no content. The likely causes are:
+### 1. Rebuild Docker Image (Immediate — Before Next Session)
+Run these three commands from the project root after the current document finishes processing:
+```powershell
+docker compose down
+docker compose build --no-cache backend
+docker compose up -d
+```
+This makes `libxcb1` persistent and ensures the image is up to date.
 
-- The frontend `api.ts` is calling the wrong base URL or missing the auth token on the documents endpoints.
-- A CORS preflight failure that silently swallows the response.
-- The `DocumentLibrary.tsx` component has a state initialisation issue.
+### 2. Evaluate and Replace Docling PDF Parser (High Priority)
+Docling is accurate but extremely slow for large documents. Evaluate:
+- **pymupdf4llm** — fast, open-source, no API cost, good Markdown extraction
+- **LlamaParse** — cloud API, very accurate, requires API key
 
-**Approach:** Open the browser DevTools Network tab, navigate to `/documents`, and inspect the actual HTTP request and response. Fix the API call or CORS configuration accordingly.
+The replacement should be a drop-in swap in `backend/app/routers/documents.py` in the `parse_document()` function.
 
-### 2. Add OpenAI API Key and Test Full RAG Pipeline (High Priority)
+### 3. Background Task Queue for PDF Uploads (High Priority)
+The upload endpoint currently blocks until parsing is complete. Implement using FastAPI `BackgroundTasks` (no extra dependencies) so the endpoint returns immediately with `status: processing` and the parsing runs in the background. The frontend already polls the document status, so no frontend changes are needed.
 
-Once the Document Library page is fixed, the full AI pipeline can be tested end-to-end:
+### 4. User Management Panel (Medium Priority)
+Add an admin UI for creating new users, resetting passwords, and assigning roles. The `User` model already has `is_superuser` and `role` fields.
 
-1. Add `OPENAI_API_KEY=sk-...` to `backend/.env`
-2. Restart the backend container: `docker compose restart backend`
-3. Upload a PDF (e.g., a FAR Part 25 excerpt) via the Document Library page
-4. Wait for status to change from **Processing** → **Ready**
-5. Navigate to **AI Standards Query** and ask a question
-6. Open a flight test with CSV data and click **Analyse with AI**
+### 5. Automated Report Generation (Medium Priority)
+Export the AI Analysis result as a formatted PDF report using `reportlab` or `weasyprint`.
 
-### 3. Upgrade Node.js (Low Priority)
-
-Upgrade from Node.js 20.18.1 to 20.19+ or 22.x to eliminate the Vite version warning. This is cosmetic and does not affect functionality.
-
-### 4. Phase 7 — Background Task Queue (Medium Priority)
-
-Large PDF uploads (100+ pages) block the HTTP request for 1–3 minutes. Implement a background task queue using FastAPI's `BackgroundTasks` or Celery so the upload endpoint returns immediately with a `processing` status, and the parsing/embedding runs asynchronously. The frontend already polls the document status, so no frontend changes are needed.
-
-### 5. Phase 8 — User Management (Medium Priority)
-
-Add an admin panel for creating new users, resetting passwords, and assigning roles. This was deferred from earlier phases. The `User` model already has `is_superuser` and `role` fields.
+### 6. Unit Tests for Documents Router (Medium Priority)
+Add pytest tests for the upload, query, and delete endpoints in `backend/tests/test_documents.py`.
 
 ---
 
-## Git Commit History (This Session)
+## Git Commit History
 
 | Commit | Description |
 | --- | --- |
 | `67b0d6c` | feat: Phase 6 RAG — Document Library, AI Query, AI Analysis panel |
 | `70ea940` | fix: import get_current_user from app.auth not app.routers.auth |
 | `75105e1` | fix: make pgvector/openai/docling imports optional; add reset_password.py |
+| `719eaab` | fix: JSX syntax errors in DocumentLibrary.tsx (missing closing angle brackets) |
+| `db0da01` | fix: useToast API mismatch in DocumentLibrary; OPENAI_API_KEY in docker-compose; ParametersPanel added to FlightTestDetail |
+| `d97bb1f` | fix: TimeSeriesChart prop names; ConfirmDialog onCancel→onClose; libxcb1 in Dockerfile |
 
 ---
 
@@ -214,6 +249,7 @@ Add an admin panel for creating new users, resetting passwords, and assigning ro
 | `README.md` | Project overview and quick-start guide |
 | `FTIAS_Frontend_Achievement_Summary.md` | This file — session-by-session achievement log |
 | `Project_Documents/40_RAG_System_Implementation_Phase6.md` | Technical deep-dive on the RAG pipeline |
+| `Project_Documents/41_Next_Steps_Roadmap_Session5.md` | Detailed next steps and parser evaluation notes |
 | `frontend/TODO.md` | Feature tracking checklist |
 
 ---
