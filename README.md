@@ -69,24 +69,24 @@ IT administrators.
     Data Table View    Preview raw/filtered data, synchronized with chart    Should    Data table shows only selected time window
     Session Save/Load    Save/load chart configs, selected parameters, and filters    Should    Load previous session, restore all state
     Export Data/Charts    Export selected chart as PNG, HTML, CSV    Should    Exported files open correctly
-    
+
     3.2. Security & Corporate Features
     Feature    Description    Priority    Review Point
     User Authentication    SSO/LDAP or JWT login, role-based access    Must    Demo login flow, test with test users
     Audit Logging    Log file uploads, session activity, chart generation    Should    Audit log exports show all key activities
     Data Privacy    Ensure sensitive data is only visible to authorized users    Must    Test with multiple users and permissions
-    
+
     3.3. Future Feature Phases
     A. LLM Agent Integration
     Feature    Description    Priority    Review Point
     LLM Chat Panel    Users can ask questions, request summaries, or get chart suggestions    Could    Demo basic LLM integration with OpenAI (test queries)
     Report Generation    LLM can generate flight summaries, charts, and insight commentary    Could    LLM produces summary on real data
-    
+
     B. Geospatial/Google Earth Integration
     Feature    Description    Priority    Review Point
     KML/KMZ Export    Export trajectory (lat/lon/alt) as Google Earth file    Should    KML opened in Google Earth, flight path matches
     In-App Map Viewer    (Optional) CesiumJS/Kepler.gl for flight path playback    Could    Display and animate flight on map in-app
-    
+
     C. Engineering Utilities
     Feature    Description    Priority    Review Point
     Derived Parameters    User-defined formulas (e.g., TAS - GS, or altitude difference)    Could    User defines, plots new parameter
@@ -130,7 +130,7 @@ IT administrators.
 ### Completed Phases
 
 | Phase | Feature | Status |
-|---|---|---|
+| --- | --- | --- |
 | Sprint 1 | Docker environment, CI/CD pipeline | ✅ Complete |
 | Sprint 2 | FastAPI backend, PostgreSQL, JWT auth | ✅ Complete |
 | Sprint 2 | Flight test CRUD, CSV upload, parameter management | ✅ Complete |
@@ -148,9 +148,10 @@ The following features are now implemented:
 ### Configuration Required for AI Features
 
 Add to `backend/.env`:
-```
-OPENAI_API_KEY=sk-...
-```
+
+    ```bash
+    OPENAI_API_KEY=sk-...
+    ```
 
 ### Next Phase (Phase 7)
 
