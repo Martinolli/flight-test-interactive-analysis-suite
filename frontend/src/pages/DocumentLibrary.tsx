@@ -168,6 +168,15 @@ export default function DocumentLibrary() {
         onCancel={() => setDeleteTarget(null)}
       />
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
       <div className="p-8 max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -204,40 +213,40 @@ export default function DocumentLibrary() {
           <Card className="mb-6 border-blue-200 bg-blue-50">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Upload New Document</CardTitle>
-                <button onClick={resetUploadForm} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-blue-600" />
+                  Upload Document
+                </CardTitle>
+                <button
+                  onClick={resetUploadForm}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Drop zone */}
+              {/* File drop zone */}
               <div
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                   dragging ? 'border-blue-500 bg-blue-100' : 'border-gray-300 hover:border-blue-400'
-                }`}
+                } ${uploadFile ? 'bg-green-50 border-green-400' : ''}`}
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
                 {uploadFile ? (
-                  <div className="flex items-center justify-center gap-2 text-blue-700">
-                    <FileText className="w-5 h-5" />
-                    <span className="font-medium">{uploadFile.name}</span>
-                    <span className="text-gray-500">({formatBytes(uploadFile.size)})</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText className="w-5 h-5 text-green-600" />
+                    <span className="font-medium text-green-700">{uploadFile.name}</span>
+                    <span className="text-gray-500 text-sm">({formatBytes(uploadFile.size)})</span>
                   </div>
                 ) : (
                   <>
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 text-sm">Drop a PDF here or click to browse</p>
+                    <p className="text-gray-600 font-medium">Drop a PDF here or click to browse</p>
+                    <p className="text-gray-400 text-sm mt-1">PDF files only, up to 50 MB</p>
                   </>
                 )}
               </div>
@@ -267,6 +276,7 @@ export default function DocumentLibrary() {
                   </select>
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
                 <textarea
