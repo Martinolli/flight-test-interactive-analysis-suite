@@ -3,7 +3,7 @@ import Sidebar from '../components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { ApiService, Document } from '../services/api';
-import { useToast } from '../components/ui/toast';
+import { useToast, ToastContainer } from '../components/ui/toast';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import {
   BookOpen,
@@ -66,7 +66,7 @@ export default function DocumentLibrary() {
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { showToast, ToastContainer } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadDocuments();
@@ -78,7 +78,7 @@ export default function DocumentLibrary() {
       const docs = await ApiService.getDocuments();
       setDocuments(docs);
     } catch (err) {
-      showToast((err as Error).message || 'Failed to load documents', 'error');
+      toast.error('Load failed', (err as Error).message || 'Failed to load documents');
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export default function DocumentLibrary() {
       if (!uploadTitle) setUploadTitle(file.name.replace(/\.pdf$/i, ''));
       setShowUploadPanel(true);
     } else {
-      showToast('Only PDF files are supported for the document library.', 'error');
+      toast.error('Invalid file', 'Only PDF files are supported for the document library.');
     }
   }
 
@@ -116,14 +116,11 @@ export default function DocumentLibrary() {
         { title: uploadTitle || undefined, doc_type: uploadDocType, description: uploadDescription || undefined },
         setUploadProgress
       );
-      showToast(
-        `"${doc.title || doc.filename}" uploaded. Processing ${doc.total_pages ?? '?'} pages…`,
-        'success'
-      );
+      toast.success('Upload started', `"${doc.title || doc.filename}" uploaded. Processing ${doc.total_pages ?? '?'} pages…`);
       setDocuments((prev) => [doc, ...prev]);
       resetUploadForm();
     } catch (err) {
-      showToast((err as Error).message || 'Upload failed', 'error');
+      toast.error('Upload failed', (err as Error).message || 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -144,9 +141,9 @@ export default function DocumentLibrary() {
     try {
       await ApiService.deleteDocument(deleteTarget.id);
       setDocuments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
-      showToast(`"${deleteTarget.title || deleteTarget.filename}" removed from library.`, 'success');
+      toast.success('Document removed', `"${deleteTarget.title || deleteTarget.filename}" removed from library.`);
     } catch (err) {
-      showToast((err as Error).message || 'Delete failed', 'error');
+      toast.error('Delete failed', (err as Error).message || 'Delete failed');
     } finally {
       setDeleteTarget(null);
     }
@@ -157,7 +154,7 @@ export default function DocumentLibrary() {
 
   return (
     <Sidebar>
-      <ToastContainer />
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
       <ConfirmDialog
         open={!!deleteTarget}
         title="Remove Document"
