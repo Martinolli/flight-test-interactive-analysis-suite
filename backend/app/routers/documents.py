@@ -196,8 +196,11 @@ def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
         result = converter.convert(pdf_path)
         doc = result.document
 
-        # Use tiktoken cl100k_base tokenizer — no model download required at runtime
-        chunker = HybridChunker(tokenizer="cl100k_base", max_tokens=512)
+        # Use default HybridChunker tokenizer (sentence-transformers/all-MiniLM-L6-v2)
+        # This is downloaded once and cached in ~/.cache/huggingface inside the container.
+        # It is 80 MB and significantly smaller than BAAI/bge-small-en-v1.5 (130 MB).
+        # To pre-warm the cache, run: docker exec ftias-backend python /app/prewarm_docling.py
+        chunker = HybridChunker(max_tokens=512)
         chunks_iter = chunker.chunk(doc)
 
         chunks = []
