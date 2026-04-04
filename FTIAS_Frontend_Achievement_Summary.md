@@ -126,6 +126,7 @@ This session resolved all remaining frontend crashes and infrastructure issues, 
 **Verification results:**
 
 All pages and features confirmed working end-to-end:
+
 - Login / logout
 - Dashboard with flight test cards and CRUD
 - Upload Data with drag-and-drop and upload history
@@ -200,31 +201,40 @@ If login fails after a Docker rebuild, run: `docker exec ftias-backend python /a
 See `Project_Documents/41_Next_Steps_Roadmap_Session5.md` for full details.
 
 ### 1. Rebuild Docker Image (Immediate — Before Next Session)
+
 Run these three commands from the project root after the current document finishes processing:
+
 ```powershell
 docker compose down
 docker compose build --no-cache backend
 docker compose up -d
 ```
+
 This makes `libxcb1` persistent and ensures the image is up to date.
 
 ### 2. Evaluate and Replace Docling PDF Parser (High Priority)
+
 Docling is accurate but extremely slow for large documents. Evaluate:
+
 - **pymupdf4llm** — fast, open-source, no API cost, good Markdown extraction
 - **LlamaParse** — cloud API, very accurate, requires API key
 
 The replacement should be a drop-in swap in `backend/app/routers/documents.py` in the `parse_document()` function.
 
 ### 3. Background Task Queue for PDF Uploads (High Priority)
+
 The upload endpoint currently blocks until parsing is complete. Implement using FastAPI `BackgroundTasks` (no extra dependencies) so the endpoint returns immediately with `status: processing` and the parsing runs in the background. The frontend already polls the document status, so no frontend changes are needed.
 
 ### 4. User Management Panel (Medium Priority)
+
 Add an admin UI for creating new users, resetting passwords, and assigning roles. The `User` model already has `is_superuser` and `role` fields.
 
 ### 5. Automated Report Generation (Medium Priority)
+
 Export the AI Analysis result as a formatted PDF report using `reportlab` or `weasyprint`.
 
 ### 6. Unit Tests for Documents Router (Medium Priority)
+
 Add pytest tests for the upload, query, and delete endpoints in `backend/tests/test_documents.py`.
 
 ---
