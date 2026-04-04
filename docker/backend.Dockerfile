@@ -13,14 +13,17 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install system dependencies
-# libxcb1 and libglib2.0-0 are required by pypdfium2 (used by Docling for PDF rendering)
+# libxcb1, libgl1, libxrender1, libxext6 are required by pypdfium2 (used by Docling for PDF rendering)
+# Note: libgl1-mesa-glx was renamed to libgl1 in Debian 12+ (Bookworm)
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     libxcb1 \
     libglib2.0-0 \
-    libgl1-mesa-glx \
+    libgl1 \
     libgomp1 \
+    libxrender1 \
+    libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
