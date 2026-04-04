@@ -138,16 +138,66 @@ def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
 
     Docling's HybridChunker respects section boundaries and keeps
     tables intact as single chunks — critical for standards/handbooks.
+
+    Performance tuning applied (see Project_Documents/42_Docling_Performance_Analysis.md):
+    - do_ocr=False  : aviation standards are text-based PDFs (not scanned images)
+                      OCR is the single biggest bottleneck (~70% of processing time)
+    - do_table_structure=True : preserve tables — critical for performance data tables
+    - do_picture_classification/description=False : not needed for text RAG
+    - generate_page/picture_images=False : no image output needed
+    - AcceleratorOptions(num_threads=4) : use all available CPU cores in the container
+    - HybridChunker with tiktoken cl100k_base : avoids downloading BAAI model at runtime
     """
     try:
-        from docling.document_converter import DocumentConverter
+        from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions, TableStructureOptions
+        from docling.document_converter import DocumentConverter, PdfFormatOption
         from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 
-        converter = DocumentConverter()
+        # ----------------------------------------------------------------
+        # Pipeline options: optimised for text-based aviation PDFs
+        # ----------------------------------------------------------------
+        pipeline_options = PdfPipelineOptions()
+
+        # OCR: disable for native-text PDFs (FAR, CS-25, RTCA DO-xxx, etc.)
+        # Enable only if you are ingesting scanned/image-only documents.
+        pipeline_options.do_ocr = False
+
+        # Table structure: keep enabled — performance tables are essential
+        pipeline_options.do_table_structure = True
+        pipeline_options.table_structure_options = TableStructureOptions(
+            do_cell_matching=True
+        )
+
+        # Enrichments: disable all — not needed for text-based RAG
+        pipeline_options.do_picture_classification = False
+        pipeline_options.do_picture_description = False
+        pipeline_options.do_code_enrichment = False
+        pipeline_options.do_formula_enrichment = False
+
+        # Image generation: disable — we only need text output
+        pipeline_options.generate_page_images = False
+        pipeline_options.generate_picture_images = False
+        pipeline_options.generate_parsed_pages = False
+
+        # CPU acceleration: use 4 threads (safe default for Docker containers)
+        pipeline_options.accelerator_options = AcceleratorOptions(
+            num_threads=4,
+            device=AcceleratorDevice.CPU,
+        )
+
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+        )
+
         result = converter.convert(pdf_path)
         doc = result.document
 
-        chunker = HybridChunker(tokenizer="BAAI/bge-small-en-v1.5", max_tokens=512)
+        # Use tiktoken cl100k_base tokenizer — no model download required at runtime
+        chunker = HybridChunker(tokenizer="cl100k_base", max_tokens=512)
         chunks_iter = chunker.chunk(doc)
 
         chunks = []
