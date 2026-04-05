@@ -129,6 +129,14 @@ export interface AdminUserUpdate {
   new_password?: string;
 }
 
+export interface AdminUserCreate {
+  username: string;
+  email: string;
+  password: string;
+  full_name?: string;
+  is_superuser?: boolean;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export class ApiService {
@@ -411,6 +419,13 @@ export class ApiService {
     return this.request<AdminUser>(`/api/admin/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(update),
+    });
+  }
+
+  static async adminCreateUser(data: AdminUserCreate): Promise<AdminUser> {
+    return this.request<AdminUser>('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

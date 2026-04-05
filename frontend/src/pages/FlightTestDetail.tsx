@@ -213,15 +213,22 @@ function AIAnalysisPanel({
       const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis);
       const url = URL.createObjectURL(blob);
       const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
+      iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:none;';
       iframe.src = url;
       document.body.appendChild(iframe);
       iframe.onload = () => {
-        iframe.contentWindow?.print();
-        setTimeout(() => {
+        // Wait for the print dialog to open, then clean up only after it closes
+        const cleanup = () => {
           document.body.removeChild(iframe);
           URL.revokeObjectURL(url);
-        }, 2000);
+          iframe.contentWindow?.removeEventListener('afterprint', cleanup);
+        };
+        // afterprint fires when the user dismisses the print dialog
+        iframe.contentWindow?.addEventListener('afterprint', cleanup);
+        // Fallback: if afterprint never fires (some browsers), clean up after 60s
+        setTimeout(cleanup, 60_000);
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
       };
     } catch (err) {
       toast.error((err as Error).message || 'Print failed.');

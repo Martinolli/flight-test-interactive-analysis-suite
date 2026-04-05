@@ -44,6 +44,15 @@ interface MergedPoint {
  *  - Beyond two distinct unit groups we still render correctly — the third+
  *    group falls back to the right axis (same scale grouping as group 2).
  */
+/**
+ * Detect if a series is a binary (0/1) signal — all values are 0 or 1.
+ * These need special Y-axis treatment so zeros are visible.
+ */
+function isBinarySeries(s: ParameterSeries): boolean {
+  if (!s.data.length) return false;
+  return s.data.every((pt) => pt.value === 0 || pt.value === 1);
+}
+
 function groupByUnit(series: ParameterSeries[]): {
   leftSeries: ParameterSeries[];
   rightSeries: ParameterSeries[];
@@ -240,6 +249,11 @@ export default function TimeSeriesChart({
   const colorIndex = new Map<string, number>();
   series.forEach((s, i) => colorIndex.set(s.parameter_name, i));
 
+  // Binary series detection — used to adjust Y-axis domain and line type
+  const binaryNames = new Set(series.filter(isBinarySeries).map((s) => s.parameter_name));
+  const leftHasBinary = leftSeries.some((s) => binaryNames.has(s.parameter_name));
+  const rightHasBinary = rightSeries.some((s) => binaryNames.has(s.parameter_name));
+
   const rightMargin = hasDualAxis ? 64 : 16;
 
   return (
@@ -283,6 +297,7 @@ export default function TimeSeriesChart({
             axisLine={false}
             tickLine={false}
             width={58}
+            domain={leftHasBinary ? [-0.2, 1.5] : ['auto', 'auto']}
             tickFormatter={(v: number) =>
               v.toLocaleString(undefined, { maximumFractionDigits: 2 })
             }
@@ -308,6 +323,7 @@ export default function TimeSeriesChart({
               axisLine={false}
               tickLine={false}
               width={58}
+              domain={rightHasBinary ? [-0.2, 1.5] : ['auto', 'auto']}
               tickFormatter={(v: number) =>
                 v.toLocaleString(undefined, { maximumFractionDigits: 2 })
               }
@@ -340,11 +356,11 @@ export default function TimeSeriesChart({
             <Line
               key={s.parameter_name}
               yAxisId="left"
-              type="monotone"
+              type={binaryNames.has(s.parameter_name) ? 'stepAfter' : 'monotone'}
               dataKey={s.parameter_name}
               stroke={COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]}
-              strokeWidth={2}
-              dot={data.length <= 100}
+              strokeWidth={binaryNames.has(s.parameter_name) ? 2.5 : 2}
+              dot={false}
               activeDot={{ r: 4 }}
               connectNulls
             />
@@ -355,12 +371,12 @@ export default function TimeSeriesChart({
             <Line
               key={s.parameter_name}
               yAxisId="right"
-              type="monotone"
+              type={binaryNames.has(s.parameter_name) ? 'stepAfter' : 'monotone'}
               dataKey={s.parameter_name}
               stroke={COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]}
-              strokeWidth={2}
-              strokeDasharray="5 3"
-              dot={data.length <= 100}
+              strokeWidth={binaryNames.has(s.parameter_name) ? 2.5 : 2}
+              strokeDasharray={binaryNames.has(s.parameter_name) ? undefined : '5 3'}
+              dot={false}
               activeDot={{ r: 4 }}
               connectNulls
             />

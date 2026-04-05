@@ -11,6 +11,7 @@ import {
   Search,
   RefreshCw,
   Users,
+  UserPlus,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
@@ -18,8 +19,144 @@ import { ToastContainer, useToast } from '../components/ui/toast';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { ApiService, AdminUser, AdminUserUpdate } from '../services/api';
+import { ApiService, AdminUser, AdminUserUpdate, AdminUserCreate } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+
+// ─── Create User Modal ───────────────────────────────────────────────────────
+
+function CreateUserModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (user: AdminUser) => void;
+}) {
+  const [form, setForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    full_name: '',
+    is_superuser: false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  function update(field: string, value: string | boolean) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleCreate() {
+    if (!form.username.trim()) { setError('Username is required.'); return; }
+    if (!form.email.trim()) { setError('Email is required.'); return; }
+    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const payload: AdminUserCreate = {
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        full_name: form.full_name.trim() || undefined,
+        is_superuser: form.is_superuser,
+      };
+      const created = await ApiService.adminCreateUser(payload);
+      onCreated(created);
+      onClose();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to create user.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Create New User</h2>
+        <p className="text-sm text-gray-500 mb-4">Add a new account to the system.</p>
+
+        {error && (
+          <div className="flex items-start gap-2 p-3 mb-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Username <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={form.username}
+                onChange={(e) => update('username', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. jsmith"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <input
+                type="text"
+                value={form.full_name}
+                onChange={(e) => update('full_name', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="John Smith"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => update('email', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="user@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-red-500">*</span></label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => update('password', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Min. 8 characters"
+            />
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="is_superuser"
+              checked={form.is_superuser}
+              onChange={(e) => update('is_superuser', e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="is_superuser" className="text-sm text-gray-700">
+              Grant admin privileges
+            </label>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleCreate}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserCheck className="w-4 h-4 mr-1" />}
+            Create User
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Reset Password Modal ─────────────────────────────────────────────────────
 
@@ -248,6 +385,7 @@ export default function AdminUsers() {
   const [search, setSearch] = useState('');
 
   // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -332,6 +470,17 @@ export default function AdminUsers() {
   return (
     <Sidebar>
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
+
+      {/* Create user modal */}
+      {showCreateModal && (
+        <CreateUserModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={(newUser) => {
+            setUsers((prev) => [newUser, ...prev]);
+            toast.success(`User "${newUser.username}" created successfully.`);
+          }}
+        />
+      )}
 
       {/* Reset password modal */}
       {resetTarget && (
@@ -418,6 +567,14 @@ export default function AdminUsers() {
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateModal(true)}
+                  className="gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Add User
                 </Button>
               </div>
             </div>

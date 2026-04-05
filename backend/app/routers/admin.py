@@ -53,6 +53,50 @@ class AdminUserUpdate(BaseModel):
     new_password: Optional[str] = None  # plain-text; will be hashed server-side
 
 
+class AdminUserCreate(BaseModel):
+    """Fields required to create a new user account."""
+    username: str
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+    is_superuser: bool = False
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/users  — create a new user
+# ---------------------------------------------------------------------------
+
+@router.post("/users", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: AdminUserCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_superuser),
+):
+    """Create a new user account (admin only)."""
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+
+    if db.query(User).filter(User.username == payload.username).first():
+        raise HTTPException(status_code=400, detail="Username already taken.")
+
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Email already in use.")
+
+    new_user = User(
+        username=payload.username,
+        email=payload.email,
+        hashed_password=get_password_hash(payload.password),
+        full_name=payload.full_name,
+        is_active=True,
+        is_superuser=payload.is_superuser,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    logger.info("Admin %s created user %s", _admin.username, new_user.username)
+    return _user_to_out(new_user)
+
+
 # ---------------------------------------------------------------------------
 # GET /api/admin/users  — list all users
 # ---------------------------------------------------------------------------
