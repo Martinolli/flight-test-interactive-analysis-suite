@@ -45,6 +45,7 @@ mypy>=1.8.0
 
 # Documentation
 pydantic[email]>=2.5.3
+email-validator>=2.2.0
 
 # AI / RAG Pipeline
 docling>=2.82.0

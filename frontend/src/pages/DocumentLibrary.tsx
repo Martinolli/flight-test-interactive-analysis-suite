@@ -72,15 +72,29 @@ export default function DocumentLibrary() {
     loadDocuments();
   }, []);
 
-  async function loadDocuments() {
-    setLoading(true);
+  const processingCount = documents.filter((d) => d.status === 'processing').length;
+
+  useEffect(() => {
+    if (processingCount === 0) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      loadDocuments(false);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [processingCount]);
+
+  async function loadDocuments(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     try {
       const docs = await ApiService.getDocuments();
       setDocuments(docs);
     } catch (err) {
-      toast.error('Load failed', (err as Error).message || 'Failed to load documents');
+      if (showSpinner) {
+        toast.error('Load failed', (err as Error).message || 'Failed to load documents');
+      }
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }
 
@@ -116,7 +130,7 @@ export default function DocumentLibrary() {
         { title: uploadTitle || undefined, doc_type: uploadDocType, description: uploadDescription || undefined },
         setUploadProgress
       );
-      toast.success('Upload started', `"${doc.title || doc.filename}" uploaded. Processing ${doc.total_pages ?? '?'} pages…`);
+      toast.success('Upload started', `"${doc.title || doc.filename}" uploaded and queued for background indexing.`);
       setDocuments((prev) => [doc, ...prev]);
       resetUploadForm();
     } catch (err) {
@@ -150,7 +164,6 @@ export default function DocumentLibrary() {
   }
 
   const readyCount = documents.filter((d) => d.status === 'ready').length;
-  const processingCount = documents.filter((d) => d.status === 'processing').length;
 
   return (
     <Sidebar>
@@ -322,8 +335,9 @@ export default function DocumentLibrary() {
           <p>
             Documents are parsed with <strong>Docling</strong> (IBM), which preserves tables,
             section numbering, and cross-references. Large documents (200+ pages) may take 1–3 minutes
-            to process. Once status shows <strong>Ready</strong>, they are available for AI queries
-            and flight test analysis.
+            to process. Indexing runs in the background and this table auto-refreshes while status is
+            <strong> Processing</strong>. Once status shows <strong>Ready</strong>, documents are
+            available for AI queries and flight test analysis.
           </p>
         </div>
 

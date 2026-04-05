@@ -8,9 +8,10 @@ and answer questions with the built-in LLM.
 import logging
 import os
 import tempfile
-from typing import List, Optional
+import time
+from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 try:
@@ -30,7 +31,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models import DataPoint, Document, DocumentChunk, FlightTest, TestParameter, User
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,18 @@ router = APIRouter()
 # OpenAI client (reads OPENAI_API_KEY from environment)
 # ---------------------------------------------------------------------------
 _openai_client = None
+EMBEDDING_BATCH_SIZE = max(1, int(os.getenv("EMBEDDING_BATCH_SIZE", "32")))
+DOCLING_NUM_THREADS = max(1, int(os.getenv("DOCLING_NUM_THREADS", "4")))
+DOCLING_FAST_THRESHOLD_MB = max(1, int(os.getenv("DOCLING_FAST_THRESHOLD_MB", "25")))
+DOCLING_MAX_CHUNK_CHARS = max(0, int(os.getenv("DOCLING_MAX_CHUNK_CHARS", "5000")))
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    return normalized in {"1", "true", "yes", "on"}
 
 
 def _require_ai_packages():
@@ -127,11 +140,59 @@ def embed_text(text_content: str) -> List[float]:
     return response.data[0].embedding
 
 
+def embed_texts(texts: List[str]) -> List[List[float]]:
+    """Return embeddings for multiple strings in one API request."""
+    if not texts:
+        return []
+    client = get_openai_client()
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=texts,
+    )
+    return [item.embedding for item in response.data]
+
+
 # ---------------------------------------------------------------------------
 # Helper: parse and chunk a PDF with Docling
 # ---------------------------------------------------------------------------
 
-def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
+def _split_long_text(text_content: str, max_chars: int) -> List[str]:
+    """Split oversized chunks into smaller pieces to avoid tokenizer slow paths."""
+    if max_chars <= 0 or len(text_content) <= max_chars:
+        return [text_content]
+
+    pieces: List[str] = []
+    current = ""
+    for paragraph in text_content.split("\n\n"):
+        if len(paragraph) > max_chars:
+            if current:
+                pieces.append(current.strip())
+                current = ""
+            for i in range(0, len(paragraph), max_chars):
+                part = paragraph[i : i + max_chars].strip()
+                if part:
+                    pieces.append(part)
+            continue
+
+        candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                pieces.append(current.strip())
+            current = paragraph
+
+    if current:
+        pieces.append(current.strip())
+
+    return pieces or [text_content]
+
+
+def parse_and_chunk_pdf(
+    pdf_path: str,
+    file_size_bytes: Optional[int] = None,
+    doc_id: Optional[int] = None,
+) -> Tuple[List[dict], Optional[int]]:
     """
     Use Docling to parse a PDF and return a list of chunk dicts:
       { text, page_numbers, section_title }
@@ -164,11 +225,27 @@ def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
         # Enable only if you are ingesting scanned/image-only documents.
         pipeline_options.do_ocr = False
 
-        # Table structure: keep enabled — performance tables are essential
-        pipeline_options.do_table_structure = True
-        pipeline_options.table_structure_options = TableStructureOptions(
-            do_cell_matching=True
+        force_fast_mode = _env_flag("DOCLING_FAST_MODE", False)
+        auto_fast_for_large = _env_flag("DOCLING_AUTO_FAST_FOR_LARGE_FILES", True)
+        table_structure_enabled = _env_flag("DOCLING_TABLE_STRUCTURE", True)
+
+        file_size_mb = (
+            (file_size_bytes / (1024 * 1024))
+            if file_size_bytes is not None
+            else None
         )
+        is_large_file = (
+            file_size_mb is not None and file_size_mb >= DOCLING_FAST_THRESHOLD_MB
+        )
+        use_fast_mode = force_fast_mode or (auto_fast_for_large and is_large_file)
+
+        # Table extraction is accurate but expensive. In fast mode we disable it.
+        use_table_structure = table_structure_enabled and not use_fast_mode
+        pipeline_options.do_table_structure = use_table_structure
+        if use_table_structure:
+            pipeline_options.table_structure_options = TableStructureOptions(
+                do_cell_matching=True
+            )
 
         # Enrichments: disable all — not needed for text-based RAG
         pipeline_options.do_picture_classification = False
@@ -181,10 +258,21 @@ def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
         pipeline_options.generate_picture_images = False
         pipeline_options.generate_parsed_pages = False
 
-        # CPU acceleration: use 4 threads (safe default for Docker containers)
+        # CPU acceleration: configurable thread count for container tuning
         pipeline_options.accelerator_options = AcceleratorOptions(
-            num_threads=4,
+            num_threads=DOCLING_NUM_THREADS,
             device=AcceleratorDevice.CPU,
+        )
+
+        logger.info(
+            "Document %s parse config: fast_mode=%s auto_fast=%s file_size_mb=%s "
+            "table_structure=%s threads=%d",
+            doc_id if doc_id is not None else "?",
+            force_fast_mode,
+            auto_fast_for_large,
+            round(file_size_mb, 2) if file_size_mb is not None else "unknown",
+            use_table_structure,
+            DOCLING_NUM_THREADS,
         )
 
         converter = DocumentConverter(
@@ -225,21 +313,156 @@ def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
             if not text_content:
                 continue
 
-            chunks.append(
-                {
-                    "text": text_content,
-                    "page_numbers": (
-                        "-".join(str(p) for p in sorted(pages)) if pages else None
-                    ),
-                    "section_title": section_title,
-                }
-            )
+            for text_piece in _split_long_text(text_content, DOCLING_MAX_CHUNK_CHARS):
+                chunks.append(
+                    {
+                        "text": text_piece,
+                        "page_numbers": (
+                            "-".join(str(p) for p in sorted(pages)) if pages else None
+                        ),
+                        "section_title": section_title,
+                    }
+                )
 
-        return chunks
+        total_pages = None
+        pages_obj = getattr(doc, "pages", None)
+        if pages_obj is not None:
+            try:
+                total_pages = len(pages_obj)
+            except TypeError:
+                total_pages = None
+
+        return chunks, total_pages
 
     except Exception as exc:
         logger.error("Docling parsing failed: %s", exc)
         raise RuntimeError(f"PDF parsing failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Background processing
+# ---------------------------------------------------------------------------
+
+def _process_document_upload(doc_id: int, pdf_path: str):
+    """
+    Parse, chunk, embed and persist a document in a background worker.
+    This keeps the upload HTTP request fast and avoids client-side timeouts.
+    """
+    started = time.monotonic()
+    db = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == doc_id).first()
+        if not doc:
+            logger.error("Document %d not found for background processing", doc_id)
+            return
+
+        chunks_data, total_pages = parse_and_chunk_pdf(
+            pdf_path=pdf_path,
+            file_size_bytes=doc.file_size_bytes,
+            doc_id=doc_id,
+        )
+        logger.info(
+            "Document %d chunking complete: pages=%s chunks=%d",
+            doc_id,
+            total_pages,
+            len(chunks_data),
+        )
+
+        embeddings: List[Optional[List[float]]] = [None] * len(chunks_data)
+        chunk_texts = [chunk["text"] for chunk in chunks_data]
+
+        total_batches = (
+            (len(chunk_texts) + EMBEDDING_BATCH_SIZE - 1) // EMBEDDING_BATCH_SIZE
+            if chunk_texts
+            else 0
+        )
+        for batch_num, start in enumerate(
+            range(0, len(chunk_texts), EMBEDDING_BATCH_SIZE),
+            start=1,
+        ):
+            batch = chunk_texts[start : start + EMBEDDING_BATCH_SIZE]
+            if batch_num == 1 or batch_num == total_batches or batch_num % 10 == 0:
+                logger.info(
+                    "Document %d embedding progress: batch %d/%d",
+                    doc_id,
+                    batch_num,
+                    total_batches,
+                )
+            try:
+                batch_embeddings = embed_texts(batch)
+                for idx, embedding in enumerate(batch_embeddings):
+                    embeddings[start + idx] = embedding
+            except Exception as batch_exc:
+                logger.warning(
+                    "Batch embedding failed for doc %d chunks %d-%d: %s",
+                    doc_id,
+                    start,
+                    min(start + EMBEDDING_BATCH_SIZE - 1, len(chunk_texts) - 1),
+                    batch_exc,
+                )
+                # Fallback to single-chunk calls so one transient error does not
+                # fail the entire document.
+                for idx, text_content in enumerate(batch):
+                    absolute_idx = start + idx
+                    try:
+                        embeddings[absolute_idx] = embed_text(text_content)
+                    except Exception as emb_exc:
+                        logger.warning(
+                            "Embedding failed for doc %d chunk %d: %s",
+                            doc_id,
+                            absolute_idx,
+                            emb_exc,
+                        )
+
+        chunk_objects = []
+        for idx, chunk_info in enumerate(chunks_data):
+            chunk_objects.append(
+                DocumentChunk(
+                    document_id=doc_id,
+                    chunk_index=idx,
+                    text=chunk_info["text"],
+                    page_numbers=chunk_info.get("page_numbers"),
+                    section_title=chunk_info.get("section_title"),
+                    embedding=embeddings[idx],
+                )
+            )
+
+        batch_size = 100
+        for i in range(0, len(chunk_objects), batch_size):
+            db.bulk_save_objects(chunk_objects[i : i + batch_size])
+            db.commit()
+
+        doc.total_pages = total_pages
+        doc.total_chunks = len(chunk_objects)
+        doc.status = "ready"
+        doc.error_message = None
+        db.commit()
+
+        elapsed = time.monotonic() - started
+        logger.info(
+            "Document %d indexed: pages=%s chunks=%d duration=%.1fs",
+            doc_id,
+            total_pages,
+            len(chunk_objects),
+            elapsed,
+        )
+
+    except Exception as exc:
+        logger.exception("Document processing failed for doc %d: %s", doc_id, exc)
+        try:
+            doc = db.query(Document).filter(Document.id == doc_id).first()
+            if doc:
+                doc.status = "error"
+                doc.error_message = str(exc)
+                db.commit()
+        except Exception:
+            logger.exception("Failed to mark document %d as error", doc_id)
+    finally:
+        db.close()
+        try:
+            os.unlink(pdf_path)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +471,7 @@ def parse_and_chunk_pdf(pdf_path: str) -> List[dict]:
 
 @router.post("/upload", response_model=DocumentOut)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     doc_type: Optional[str] = Form(None),
@@ -261,11 +485,33 @@ async def upload_document(
     and the embeddings are stored in pgvector for semantic search.
     """
     _require_ai_packages()
+    # Validate API key up-front so we fail fast instead of creating a stuck
+    # "processing" record that will error in the background worker.
+    get_openai_client()
+
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    content = await file.read()
-    file_size = len(content)
+    tmp_path = ""
+    file_size = 0
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = tmp.name
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                file_size += len(chunk)
+                tmp.write(chunk)
+    except Exception as exc:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {exc}")
+    finally:
+        await file.close()
 
     # Create the Document record immediately so the frontend can poll status
     doc = Document(
@@ -281,62 +527,7 @@ async def upload_document(
     db.commit()
     db.refresh(doc)
 
-    # Write to a temp file for Docling
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-
-        # Parse with Docling
-        chunks_data = parse_and_chunk_pdf(tmp_path)
-
-        # Embed and persist each chunk
-        chunk_objects = []
-        for idx, chunk_info in enumerate(chunks_data):
-            try:
-                embedding = embed_text(chunk_info["text"])
-            except Exception as emb_exc:
-                logger.warning("Embedding failed for chunk %d: %s", idx, emb_exc)
-                embedding = None
-
-            chunk_objects.append(
-                DocumentChunk(
-                    document_id=doc.id,
-                    chunk_index=idx,
-                    text=chunk_info["text"],
-                    page_numbers=chunk_info.get("page_numbers"),
-                    section_title=chunk_info.get("section_title"),
-                    embedding=embedding,
-                )
-            )
-
-        # Batch insert chunks
-        BATCH = 100
-        for i in range(0, len(chunk_objects), BATCH):
-            db.bulk_save_objects(chunk_objects[i : i + BATCH])
-            db.commit()
-
-        # Update document metadata
-        doc.total_chunks = len(chunk_objects)
-        doc.status = "ready"
-        db.commit()
-        db.refresh(doc)
-
-    except Exception as exc:
-        logger.error("Document processing failed for doc %d: %s", doc.id, exc)
-        doc.status = "error"
-        doc.error_message = str(exc)
-        db.commit()
-        db.refresh(doc)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Document processing failed: {exc}",
-        )
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+    background_tasks.add_task(_process_document_upload, doc.id, tmp_path)
 
     return _doc_to_out(doc)
 

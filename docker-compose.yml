@@ -43,6 +43,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       # AI / OpenAI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      DOCLING_NUM_THREADS: ${DOCLING_NUM_THREADS:-4}
+      DOCLING_FAST_MODE: ${DOCLING_FAST_MODE:-false}
+      DOCLING_AUTO_FAST_FOR_LARGE_FILES: ${DOCLING_AUTO_FAST_FOR_LARGE_FILES:-true}
+      DOCLING_FAST_THRESHOLD_MB: ${DOCLING_FAST_THRESHOLD_MB:-25}
+      DOCLING_TABLE_STRUCTURE: ${DOCLING_TABLE_STRUCTURE:-true}
+      DOCLING_MAX_CHUNK_CHARS: ${DOCLING_MAX_CHUNK_CHARS:-5000}
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
@@ -55,7 +62,7 @@ services:
         condition: service_healthy
     networks:
       - ftias-network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   # Frontend (React + Vite)
   frontend:

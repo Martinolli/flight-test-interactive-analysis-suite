@@ -1,0 +1,33 @@
+.git
+.gitignore
+.github
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+
+# Node
+**/node_modules/
+**/.pnpm-store/
+**/.npm/
+**/dist/
+**/.vite/
+**/*.tsbuildinfo
+
+# IDE / OS
+.vscode/
+.idea/
+**/.DS_Store
+**/Thumbs.db
+
+# Local env and reports
+.env
+.coverage
+coverage.xml
+htmlcov/
+
