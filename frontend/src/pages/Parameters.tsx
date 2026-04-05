@@ -331,9 +331,10 @@ export default function Parameters() {
 
                   {/* Loading chart */}
                   {loadingChart && selectedParams.size > 0 && (
-                    <div className="flex items-center justify-center h-64 gap-3 text-gray-400">
+                    <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
                       <RefreshCw className="w-5 h-5 animate-spin" />
                       <span className="text-sm">Loading chart data…</span>
+                      <span className="text-xs text-gray-300">Large datasets may take a few seconds</span>
                     </div>
                   )}
 

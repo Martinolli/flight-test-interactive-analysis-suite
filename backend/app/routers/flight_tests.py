@@ -160,7 +160,8 @@ async def delete_flight_test(
     current_user: User = Depends(auth.get_current_active_user),
 ):
     """
-    Delete a flight test and all associated data points
+    Delete a flight test and all associated data points.
+    Uses a direct bulk DELETE to avoid loading millions of ORM objects into memory.
     """
     flight_test = (
         db.query(FlightTest)
@@ -175,6 +176,10 @@ async def delete_flight_test(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
+    # Bulk-delete data points directly in SQL — avoids ORM loading millions of rows
+    db.query(DataPoint).filter(DataPoint.flight_test_id == test_id).delete(
+        synchronize_session=False
+    )
     db.delete(flight_test)
     db.commit()
 
@@ -476,7 +481,7 @@ async def get_flight_test_parameters(
 async def get_flight_test_parameter_data(
     test_id: int,
     parameters: Optional[List[str]] = Query(default=None),
-    limit: int = 5000,
+    limit: int = 50000,
     db: Session = Depends(get_db),
     current_user: User = Depends(auth.get_current_active_user),
 ):
@@ -484,7 +489,10 @@ async def get_flight_test_parameter_data(
     Return time-series data for one or more named parameters of a flight test.
     Query: ?parameters=altitude&parameters=airspeed
     Each series includes timestamps, values, and statistics.
+    If the total number of points exceeds MAX_CHART_POINTS, the series is
+    downsampled using min-max bucket decimation so peaks and valleys are preserved.
     """
+    MAX_CHART_POINTS = 5000  # max points sent to the frontend per series
 
     flight_test = (
         db.query(FlightTest)
@@ -527,13 +535,43 @@ async def get_flight_test_parameter_data(
         variance = sum((v - mean) ** 2 for v in values) / n
         std_dev = variance ** 0.5
 
+        # ── Min-max bucket downsampling ───────────────────────────────────────
+        # Preserves peaks and valleys so the chart shows the true signal shape
+        # even when the raw series has tens of thousands of points.
+        if n > MAX_CHART_POINTS:
+            bucket_size = n / MAX_CHART_POINTS
+            sampled = []
+            i = 0
+            while i < n:
+                end = min(int(i + bucket_size), n)
+                bucket = points[i:end]
+                # Always keep the min and max of each bucket
+                min_pt = min(bucket, key=lambda p: p.value)
+                max_pt = max(bucket, key=lambda p: p.value)
+                # Add in chronological order
+                if min_pt.timestamp <= max_pt.timestamp:
+                    sampled.append(min_pt)
+                    if min_pt is not max_pt:
+                        sampled.append(max_pt)
+                else:
+                    sampled.append(max_pt)
+                    if min_pt is not max_pt:
+                        sampled.append(min_pt)
+                i = end
+            chart_data = [
+                {"timestamp": p.timestamp.isoformat(), "value": p.value}
+                for p in sampled
+            ]
+        else:
+            chart_data = [
+                {"timestamp": p.timestamp.isoformat(), "value": p.value}
+                for p in points
+            ]
+
         result.append({
             "parameter_name": param.name,
             "unit": param.unit,
-            "data": [
-                {"timestamp": p.timestamp.isoformat(), "value": p.value}
-                for p in points
-            ],
+            "data": chart_data,
             "statistics": {
                 "min": min(values),
                 "max": max(values),
