@@ -8,6 +8,7 @@ import {
   Plane,
   BookOpen,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,6 +46,16 @@ export default function Sidebar({ children }: SidebarProps) {
         { name: 'Settings', href: '/settings', icon: Settings },
       ],
     },
+    ...(user?.is_superuser
+      ? [
+          {
+            label: 'Administration',
+            items: [
+              { name: 'User Management', href: '/admin/users', icon: ShieldCheck },
+            ],
+          },
+        ]
+      : []),
   ];
 
   const handleLogout = async () => {

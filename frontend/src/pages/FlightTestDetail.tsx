@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import {
   ArrowLeft,
@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart3,
+  FileDown,
+  Printer,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import FlightTestModal from '../components/FlightTestModal';
@@ -26,6 +28,7 @@ import { ApiService, FlightTest, AIAnalysisResponse, ParameterInfo, ParameterSer
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { useAuth } from '../contexts/AuthContext';
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -168,11 +171,64 @@ function ParametersPanel({ flightTestId }: { flightTestId: number }) {
 
 // ─── AI Analysis Panel ────────────────────────────────────────────────────────
 
-function AIAnalysisPanel({ flightTestId }: { flightTestId: number }) {
+function AIAnalysisPanel({
+  flightTestId,
+  toast,
+}: {
+  flightTestId: number;
+  toast: ReturnType<typeof useToast>;
+}) {
   const [result, setResult] = useState<AIAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const { user } = useAuth();
+
+  async function handleExportPDF() {
+    if (!result) return;
+    setExportingPdf(true);
+    try {
+      const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FTIAS_Report_${result.flight_test_name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('PDF report downloaded.');
+    } catch (err) {
+      toast.error((err as Error).message || 'PDF export failed.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handlePrintPDF() {
+    if (!result) return;
+    setExportingPdf(true);
+    try {
+      const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis);
+      const url = URL.createObjectURL(blob);
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
+        }, 2000);
+      };
+    } catch (err) {
+      toast.error((err as Error).message || 'Print failed.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
 
   async function runAnalysis() {
     setLoading(true);
@@ -267,7 +323,7 @@ function AIAnalysisPanel({ flightTestId }: { flightTestId: number }) {
               </pre>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -277,6 +333,34 @@ function AIAnalysisPanel({ flightTestId }: { flightTestId: number }) {
                 <Sparkles className="w-3 h-3 mr-1" />
                 Re-run Analysis
               </Button>
+              {user?.is_superuser && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportPDF}
+                    disabled={exportingPdf}
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  >
+                    {exportingPdf ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <FileDown className="w-3 h-3 mr-1" />
+                    )}
+                    Download PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrintPDF}
+                    disabled={exportingPdf}
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <Printer className="w-3 h-3 mr-1" />
+                    Print
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -508,7 +592,7 @@ export default function FlightTestDetail() {
             </Card>
 
             {/* AI Analysis panel */}
-            <AIAnalysisPanel flightTestId={flightTest.id} />
+            <AIAnalysisPanel flightTestId={flightTest.id} toast={toast} />
           </>
         )}
       </div>

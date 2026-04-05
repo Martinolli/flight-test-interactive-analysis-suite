@@ -108,6 +108,27 @@ export interface AIAnalysisResponse {
   parameters_analysed: number;
 }
 
+// ─── Admin Types ──────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  is_superuser: boolean;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface AdminUserUpdate {
+  full_name?: string | null;
+  email?: string;
+  is_active?: boolean;
+  is_superuser?: boolean;
+  new_password?: string;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export class ApiService {
@@ -350,5 +371,50 @@ export class ApiService {
       `/api/documents/flight-tests/${flightTestId}/ai-analysis`,
       { method: 'POST' }
     );
+  }
+
+  // ─── PDF Export ───────────────────────────────────────────────────────────
+
+  static async exportAnalysisPDF(
+    flightTestId: number,
+    analysisText: string
+  ): Promise<Blob> {
+    const token = AuthService.getAccessToken();
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/flight-tests/${flightTestId}/report.pdf`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ analysis_text: analysisText }),
+      }
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'PDF export failed' }));
+      throw new Error(err.detail || `PDF export failed with status ${response.status}`);
+    }
+    return response.blob();
+  }
+
+  // ─── Admin: User Management ───────────────────────────────────────────────
+
+  static async adminListUsers(): Promise<AdminUser[]> {
+    return this.request<AdminUser[]>('/api/admin/users');
+  }
+
+  static async adminUpdateUser(
+    userId: number,
+    update: AdminUserUpdate
+  ): Promise<AdminUser> {
+    return this.request<AdminUser>(`/api/admin/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(update),
+    });
+  }
+
+  static async adminDeleteUser(userId: number): Promise<void> {
+    return this.request<void>(`/api/admin/users/${userId}`, { method: 'DELETE' });
   }
 }

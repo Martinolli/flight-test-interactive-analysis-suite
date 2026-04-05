@@ -10,6 +10,7 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import DocumentLibrary from './pages/DocumentLibrary';
 import AIQuery from './pages/AIQuery';
+import AdminUsers from './pages/AdminUsers';
 
 function App() {
   return (
@@ -64,6 +65,12 @@ function App() {
         <Route path="/ai-query">
           <ProtectedRoute>
             <AIQuery />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/admin/users">
+          <ProtectedRoute>
+            <AdminUsers />
           </ProtectedRoute>
         </Route>
 

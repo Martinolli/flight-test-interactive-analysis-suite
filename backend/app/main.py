@@ -13,7 +13,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, documents, flight_tests, health, parameters, users
+from app.routers import admin, auth, documents, flight_tests, health, parameters, users
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -85,6 +85,9 @@ app.include_router(
 )
 app.include_router(
     documents.router, prefix="/api/documents", tags=["Documents"]
+)
+app.include_router(
+    admin.router, prefix="/api/admin", tags=["Admin"]
 )
 
 
