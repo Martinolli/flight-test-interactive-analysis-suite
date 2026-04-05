@@ -11,7 +11,7 @@ All changes from this session are committed to `main` under commit `fc3d99b` (an
 ## Problems Resolved
 
 | # | Problem | Root Cause | Fix |
-|---|---------|-----------|-----|
+| --- | --------- | ----------- | ----- |
 | 1 | Upload appeared to hang | Full PDF parse + embed ran synchronously inside the HTTP request | Moved to FastAPI `BackgroundTasks` |
 | 2 | Many OpenAI API round-trips | Embeddings generated one chunk at a time | Batched embedding with `embed_texts()` |
 | 3 | No visibility into processing state | Frontend did not poll for status changes | 5-second polling loop while `processing` count > 0 |
@@ -26,7 +26,7 @@ All changes from this session are committed to `main` under commit `fc3d99b` (an
 
 ### Before
 
-```
+```bash
 POST /api/documents/upload
   ├─ save file to disk
   ├─ Docling parse (30–300 s)
@@ -38,7 +38,7 @@ POST /api/documents/upload
 
 ### After
 
-```
+```bash
 POST /api/documents/upload
   ├─ save file to temp path
   ├─ INSERT document row (status="processing")
@@ -61,7 +61,7 @@ BackgroundTask (runs concurrently)
 All Docling tuning parameters are now environment-variable-driven, making them adjustable without a code change or container rebuild.
 
 | Environment Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `DOCLING_NUM_THREADS` | `4` | CPU threads for Docling's accelerator |
 | `DOCLING_FAST_MODE` | `false` | Disable table structure extraction globally |
 | `DOCLING_AUTO_FAST_FOR_LARGE_FILES` | `true` | Auto-enable fast mode above size threshold |
@@ -93,7 +93,7 @@ DOCLING_FAST_MODE=true
 ## Files Changed
 
 | File | Change Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `backend/app/routers/documents.py` | Major refactor | Background task, batch embeddings, Docling env flags, oversized-chunk guard, progress logging |
 | `frontend/src/pages/DocumentLibrary.tsx` | Enhancement | 5-second polling while processing; updated upload toast message |
 | `backend/app/config.py` | Bug fix | `DEBUG` field validator accepts `release`/`production`/`dev` aliases |
@@ -109,7 +109,7 @@ DOCLING_FAST_MODE=true
 ## Git Commits This Session
 
 | Commit | Message |
-|---|---|
+| --- | --- |
 | `fc3d99b` | feat: document ingestion stability & performance overhaul (2026-04-04) |
 | `2c6d0c3` | fix: use default HybridChunker tokenizer instead of invalid cl100k_base |
 
@@ -127,7 +127,7 @@ DOCLING_FAST_MODE=true
 ## Current Feature Status
 
 | Feature | Status |
-|---|---|
+| --- | --- |
 | User authentication (JWT) | Complete |
 | Flight test CRUD | Complete |
 | CSV data upload & parameter parsing | Complete |
@@ -158,6 +158,7 @@ docker compose exec backend python /app/prewarm_docling.py
 An admin panel for viewing registered users, resetting passwords, and managing roles. This is the most-requested operational feature.
 
 **Scope:**
+
 - `GET /api/admin/users` — list all users with role and last-login
 - `PATCH /api/admin/users/{id}` — update role or reset password
 - Frontend: admin-only route in the sidebar
@@ -167,6 +168,7 @@ An admin panel for viewing registered users, resetting passwords, and managing r
 Allow users to download the AI Analysis report as a formatted PDF.
 
 **Scope:**
+
 - Backend: `GET /api/flight-tests/{id}/ai-analysis/export` — generate PDF via `reportlab` or `weasyprint`
 - Frontend: "Export PDF" button in the AI Analysis panel
 
