@@ -184,6 +184,33 @@ def _extract_inline_source_ids(answer: str) -> List[str]:
     return sorted(ids, key=lambda x: int(x[1:]) if x[1:].isdigit() else 10_000)
 
 
+def _extract_standards_cross_check_section(text_content: str) -> str:
+    """Extract Standards Cross-Check section body for citation-density validation."""
+    pattern = re.compile(
+        r"(?is)"
+        r"(?:^\s*\(?2\)?\s*[).:-]?\s*Standards Cross-Check\s*$|^\s*Standards Cross-Check\s*$)"
+        r"(.*?)"
+        r"(?=^\s*\(?3\)?\s*[).:-]?\s*Risks/Assumptions\s*$|^\s*Risks/Assumptions\s*$|\Z)",
+        flags=re.MULTILINE,
+    )
+    match = pattern.search(text_content or "")
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def _citation_density(text_content: str) -> float:
+    """Return fraction of substantive sentences containing at least one [Sx] citation."""
+    if not text_content:
+        return 1.0
+    raw_sentences = re.split(r"(?<=[.!?])\s+", text_content)
+    sentences = [s.strip() for s in raw_sentences if len(s.strip()) >= 25]
+    if not sentences:
+        return 1.0
+    cited = sum(1 for s in sentences if re.search(r"\[S\d+\]", s))
+    return cited / len(sentences)
+
+
 def _build_source_label(row: Any) -> str:
     return (
         f"{row.title or row.filename}"
@@ -1213,7 +1240,8 @@ def ai_analysis(
         "- Do not recompute or alter deterministic values.\n"
         "- Write sections: (1) Executive Summary, (2) Standards Cross-Check, "
         "(3) Risks/Assumptions, (4) Recommendations.\n"
-        "- Ensure every standards claim is cited with [Sx].\n"
+        "- In section (2) Standards Cross-Check, each substantive sentence must include at least one inline [Sx] citation.\n"
+        "- If section (4) Recommendations references standards/procedures, include [Sx] there as well.\n"
         "- If standards evidence is missing, state that explicitly.\n"
     )
 
@@ -1243,6 +1271,53 @@ def ai_analysis(
         )
 
     analysis_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", analysis_text).strip()
+
+    # Optional strict citation-density repair for Standards Cross-Check section.
+    min_citation_density = max(
+        0.0, min(1.0, float(os.getenv("ANALYSIS_MIN_CITATION_DENSITY", "0.75")))
+    )
+    standards_section = _extract_standards_cross_check_section(analysis_text)
+    standards_density = _citation_density(standards_section)
+    if sources and standards_section and standards_density < min_citation_density:
+        source_lines: List[str] = []
+        for s in sources:
+            ref_label = (
+                f"{s.get('title') or s.get('filename')}"
+                + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
+                + (f" — {s.get('section_title')}" if s.get("section_title") else "")
+            )
+            source_lines.append(f"- {s.get('source_id')}: {ref_label}")
+        source_legend = "\n".join(source_lines)
+        repair_system_prompt = (
+            "You are a technical editor. Revise the analysis to improve citation coverage only. "
+            "Preserve structure, numbers, and conclusions. "
+            "For Standards Cross-Check statements, ensure each substantive sentence has an inline [Sx] citation "
+            "using only source IDs from the provided legend. "
+            "Do not add a references section. Do not emit USED_SOURCES."
+        )
+        repair_user_prompt = (
+            "Source ID legend:\n"
+            f"{source_legend}\n\n"
+            "Revise the analysis below for citation density compliance:\n\n"
+            f"{analysis_text}"
+        )
+        try:
+            repaired = client.chat.completions.create(
+                model=analysis_model,
+                messages=[
+                    {"role": "system", "content": repair_system_prompt},
+                    {"role": "user", "content": repair_user_prompt},
+                ],
+                temperature=0.0,
+                max_tokens=analysis_max_tokens,
+            )
+            repaired_text = (repaired.choices[0].message.content or "").strip()
+            repaired_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", repaired_text).strip()
+            if repaired_text:
+                analysis_text = repaired_text
+        except Exception as repair_exc:
+            logger.warning("Citation density repair skipped due to LLM error: %s", repair_exc)
+
     inline_source_ids = _extract_inline_source_ids(analysis_text)
     if inline_source_ids and sources:
         cited_sources = [s for s in sources if s.get("source_id") in set(inline_source_ids)]

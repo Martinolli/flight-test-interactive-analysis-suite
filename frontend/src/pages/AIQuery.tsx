@@ -40,16 +40,16 @@ function SourceCard({ source }: { source: QueryResponse['sources'][0] }) {
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <BookOpen className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <BookOpen className="w-3.5 h-3.5 text-gray-400 shrink-0" />
           <span className="text-xs font-medium text-gray-700 truncate">
             {source.source_id ? `${source.source_id} · ` : ''}
             {source.title || source.filename}
           </span>
           {source.page_numbers && (
-            <span className="text-xs text-gray-400 flex-shrink-0">p. {source.page_numbers}</span>
+            <span className="text-xs text-gray-400 shrink-0">p. {source.page_numbers}</span>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        <div className="flex items-center gap-2 shrink-0 ml-2">
           <span className="text-xs text-gray-400">
             {(source.similarity * 100).toFixed(0)}% match
           </span>
@@ -169,7 +169,7 @@ export default function AIQuery() {
     }
   }
 
-  function useExample(q: string) {
+  function applyExampleQuestion(q: string) {
     setQuestion(q);
     textareaRef.current?.focus();
   }
@@ -178,7 +178,7 @@ export default function AIQuery() {
     <Sidebar>
       <div className="flex flex-col h-screen max-h-screen p-8 max-w-4xl">
         {/* Header */}
-        <div className="mb-6 flex-shrink-0">
+        <div className="mb-6 shrink-0">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
             <Sparkles className="w-7 h-7 text-purple-500" />
             AI Standards Query
@@ -208,10 +208,10 @@ export default function AIQuery() {
                 {EXAMPLE_QUESTIONS.map((q) => (
                   <button
                     key={q}
-                    onClick={() => useExample(q)}
+                    onClick={() => applyExampleQuestion(q)}
                     className="w-full text-left text-sm text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 transition-colors flex items-center gap-2"
                   >
-                    <ExternalLink className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                     {q}
                   </button>
                 ))}
@@ -236,7 +236,7 @@ export default function AIQuery() {
 
           {error && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -245,7 +245,7 @@ export default function AIQuery() {
         </div>
 
         {/* Input bar */}
-        <Card className="flex-shrink-0 border-gray-200 shadow-sm">
+        <Card className="shrink-0 border-gray-200 shadow-sm">
           <CardContent className="p-3">
             <div className="flex items-end gap-2">
               <textarea
@@ -260,7 +260,7 @@ export default function AIQuery() {
               <Button
                 onClick={handleSubmit}
                 disabled={!question.trim() || loading}
-                className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0 h-9 w-9 p-0"
+                className="bg-purple-600 hover:bg-purple-700 text-white shrink-0 h-9 w-9 p-0"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

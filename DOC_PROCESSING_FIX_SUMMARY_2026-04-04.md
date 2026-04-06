@@ -259,6 +259,11 @@ docker compose logs -f backend | Select-String "parse config|chunking complete|e
 - LLM output requires inline `[Sx]` citations for standards claims.
 - References list is built from actually cited source IDs.
 - Fallback note is added when no inline standards citations are produced.
+- Added Standards Cross-Check citation-density gate:
+  - Extracts section (2) text and measures sentence-level `[Sx]` citation coverage.
+  - If density is below configured threshold, a second LLM editorial pass rewrites for citation compliance.
+- New env control:
+  - `ANALYSIS_MIN_CITATION_DENSITY=0.75`
 
 4. Query response quality controls:
 - Configurable query model/temperature/max tokens/top-k via env.
@@ -304,6 +309,7 @@ QUERY_TEMPERATURE=0.1
 ANALYSIS_LLM_MODEL=gpt-4o-mini
 ANALYSIS_MAX_TOKENS=2600
 ANALYSIS_TEMPERATURE=0.2
+ANALYSIS_MIN_CITATION_DENSITY=0.75
 ```
 
 ## Restart / Run Commands (Exact + Folder)
