@@ -1,64 +1,66 @@
-# FTIAS — Development TODO
-**Last updated:** 2026-04-05
+# FTIAS — Unified TODO (Root Plan)
 
-This file tracks all features, fixes, and tasks. Completed items are kept as history.
-
----
-
-## Completed
-
-- [x] Project scaffolding (FastAPI + PostgreSQL + React + Docker)
-- [x] User registration and JWT authentication
-- [x] Flight test creation and management (CRUD)
-- [x] CSV upload with batched background processing
-- [x] Parameter time-series charts (full dataset, min-max downsampling)
-- [x] Binary/step charts for discrete sensors (Weight-on-Wheels)
-- [x] Correlation chart (X vs Y scatter)
-- [x] RAG pipeline — document ingestion with Docling + pgvector
-- [x] Document library UI with polling status updates
-- [x] AI Analysis with RAG (document-grounded, per flight test)
-- [x] PDF Report Export (download + browser print)
-- [x] Admin User Management panel (create, activate, deactivate, delete)
-- [x] Fast bulk delete for large flight test datasets
-- [x] DEBUG env var parser fix (string → bool)
-- [x] Docker image rebuilt — all system libs baked in (libxcb1, libgl1)
-- [x] reportlab baked into Docker image
-- [x] Chart Y-axis fix for binary/zero-value parameters
-- [x] PDF print dialog fix (afterprint cleanup)
-- [x] Create User button in Admin panel
+**Last updated:** 2026-04-06  
+**Scope:** Backend + Frontend + LLM/RAG + Reporting  
+**Source of truth:** aligned with `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` (Improvement Backlog section)
 
 ---
 
-## Phase A — Quick Wins
+## Current Priority Plan
 
-- [x] A1: Chart PNG download button (TimeSeriesChart, CorrelationChart)
-- [x] A2: Contextual AI prompt box with quick-prompt chips (Takeoff, Landing, Climb, Vibration, General)
+### P0 — Immediate (Security, Correctness, Build Stability)
+
+- [ ] Lock down user-management routes
+  - Restrict `/api/users/*` to admin or remove in favor of `/api/admin/users/*`.
+- [ ] Enforce document tenancy
+  - Scope document list/delete/query by `uploaded_by_id == current_user.id`.
+- [ ] Enforce strict timestamp validation on ingestion
+  - Reject invalid/missing timestamps with row-level errors.
+- [ ] Make frontend production build fully green
+  - Resolve TS/type/lint blockers and enforce in CI.
+- [ ] Add ingestion observability baseline
+  - Log and track parse/chunk/embed stage durations per document.
+
+### P1 — Next (UX/Data Model Alignment for Mixed Flight-Test Domains)
+
+- [ ] Align upload UX and backend capability
+  - Either support true Excel ingestion backend-side or constrain UI to CSV-only.
+- [ ] Replace synthetic upload history with persisted ingestion sessions
+  - Add backend model/API for filename, row count, status, errors, timestamps.
+- [ ] Scale parameter exploration UX
+  - Searchable parameter tree, subsystem grouping, favorites, saved views.
+- [ ] Upgrade chart analysis workflow
+  - Linked crosshair, event markers, threshold bands, compare-runs mode.
+- [ ] Improve report visual quality
+  - Better formula rendering, chart snapshots, clearer source references.
+
+### P2 — After P1 (LLM/RAG Domainization and Provenance)
+
+- [ ] Add `analysis_mode` pipeline
+  - Modes: `takeoff`, `landing`, `electrical`, `vibration`, `general`.
+- [ ] Add retrieval metadata model
+  - Authority/revision/domain/system tags and retrieval pre-filters.
+- [ ] Persist immutable analysis jobs
+  - Save prompt/model/sources/output hash; report generation by `analysis_job_id`.
+- [ ] Introduce confidence and coverage indicators
+  - Structured output quality metadata per answer/report.
 
 ---
 
-## Phase B — Core Analysis Features
+## Recently Completed (Relevant to Current Roadmap)
 
-- [ ] B1: 3D Trajectory tab (Lat/Long/Alt) with Plotly.js, colour-coded by user-selected variable
-- [ ] B2: Flight Test Comparison page — overlay same parameter across multiple flight tests
-
----
-
-## Phase C — Data Export & Enhanced Reporting
-
-- [ ] C1: Export parameter data to CSV (client-side) and Excel (backend openpyxl)
-- [ ] C2: Enhanced PDF report — embed trajectory screenshot and parameter chart images
+- [x] Upload indexing moved to background task (no long blocking HTTP upload call)
+- [x] Batched embeddings with env-configurable batch size
+- [x] Docling fast-mode and chunk controls added via env
+- [x] Hybrid retrieval + citation-density gate for analysis quality
+- [x] Deterministic takeoff section with explicit WOW transition logic
+- [x] AI response markdown/table rendering improvements in frontend
+- [x] Docker frontend healthcheck fix (`127.0.0.1` for container health probe)
 
 ---
 
-## Phase D — Operations & Infrastructure
+## Deferred / Later Candidates
 
-- [ ] D1: Email notifications (new user registered, document processing complete)
-- [ ] D2: Unit tests for documents router (pytest, mock Docling + OpenAI)
-- [ ] D3: Celery/Redis task queue *(defer — not needed for single-worker setup)*
-
-## Bug Fixes — Session 9 (2026-04-06)
-
-- [x] Fix Time Series chart PNG download (html2canvas hangs on Recharts SVG)
-- [x] AI Analysis panel: add Reset/New Query button to allow re-running with a different prompt
-- [x] AI Analysis panel: fix markdown table rendering on screen (proper table formatting)
-- [x] PDF report: fix table cell overflow for long content (word-wrap, column widths)
+- [ ] 3D trajectory view (Lat/Long/Alt)
+- [ ] Email notifications (registration, processing complete)
+- [ ] Celery/Redis queue migration (if/when single-worker model becomes insufficient)
