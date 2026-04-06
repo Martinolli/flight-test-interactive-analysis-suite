@@ -30,6 +30,8 @@ import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -360,22 +362,45 @@ function AIAnalysisPanel({
               <span>Flight test: {result.flight_test_name}</span>
             </div>
 
-            <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-relaxed">
+            {/* Markdown-rendered analysis */}
+            <div className="
+              prose prose-sm max-w-none
+              prose-headings:font-semibold prose-headings:text-gray-800
+              prose-p:text-gray-700 prose-p:leading-relaxed
+              prose-strong:text-gray-900
+              prose-table:text-xs prose-table:w-full
+              prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-gray-700 prose-th:border prose-th:border-gray-200
+              prose-td:px-3 prose-td:py-1.5 prose-td:border prose-td:border-gray-200 prose-td:text-gray-700 prose-td:align-top
+              prose-tr:even:bg-gray-50
+              prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-xs
+              prose-blockquote:border-l-purple-300 prose-blockquote:text-gray-600
+            ">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {result.analysis}
-              </pre>
+              </ReactMarkdown>
             </div>
 
             <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={runAnalysis}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
-              >
-                <Sparkles className="w-3 h-3 mr-1" />
-                Re-run Analysis
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runAnalysis}
+                  disabled={loading}
+                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Re-run
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setResult(null); setError(''); setUserPrompt(''); }}
+                  className="text-gray-500 border-gray-200 hover:bg-gray-50"
+                >
+                  New Query
+                </Button>
+              </div>
               {user?.is_superuser && (
                 <div className="flex items-center gap-2">
                   <Button

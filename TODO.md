@@ -55,3 +55,10 @@ This file tracks all features, fixes, and tasks. Completed items are kept as his
 - [ ] D1: Email notifications (new user registered, document processing complete)
 - [ ] D2: Unit tests for documents router (pytest, mock Docling + OpenAI)
 - [ ] D3: Celery/Redis task queue *(defer — not needed for single-worker setup)*
+
+## Bug Fixes — Session 9 (2026-04-06)
+
+- [x] Fix Time Series chart PNG download (html2canvas hangs on Recharts SVG)
+- [x] AI Analysis panel: add Reset/New Query button to allow re-running with a different prompt
+- [x] AI Analysis panel: fix markdown table rendering on screen (proper table formatting)
+- [x] PDF report: fix table cell overflow for long content (word-wrap, column widths)

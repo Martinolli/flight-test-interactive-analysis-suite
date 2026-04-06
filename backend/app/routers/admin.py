@@ -448,11 +448,17 @@ def _build_pdf(
     story.append(Paragraph("AI Analysis", section_title_style))
 
     if analysis_text:
-        # Split into paragraphs and render each
-        for para in _strip_markdown(analysis_text).split("\n\n"):
-            para = para.strip()
-            if para:
-                story.append(Paragraph(para, body_style))
+        # Parse and render the analysis text, handling markdown tables inline
+        for block in _parse_markdown_blocks(analysis_text):
+            if block["type"] == "table":
+                tbl = _build_markdown_table(block["rows"], styles)
+                if tbl:
+                    story.append(tbl)
+                    story.append(Spacer(1, 0.3 * cm))
+            elif block["type"] == "heading":
+                story.append(Paragraph(block["text"], section_title_style))
+            elif block["type"] == "text" and block["text"]:
+                story.append(Paragraph(block["text"], body_style))
     else:
         story.append(Paragraph(
             "No analysis text provided. Generate an AI Analysis from the Flight Test Detail page first.",
@@ -476,8 +482,43 @@ def _build_pdf(
                 str(row.sample_count),
             ])
 
-        col_widths = [5.5 * cm, 2 * cm, 2.2 * cm, 2.2 * cm, 2.2 * cm, 2.2 * cm, 1.7 * cm]
-        stats_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        # Use Paragraph cells so long parameter names wrap instead of overflow
+        para_style_cell = ParagraphStyle(
+            "TableCell",
+            parent=styles["Normal"],
+            fontSize=8,
+            leading=10,
+            fontName="Helvetica",
+            wordWrap="CJK",
+        )
+        para_style_hdr = ParagraphStyle(
+            "TableHdr",
+            parent=styles["Normal"],
+            fontSize=8,
+            leading=10,
+            fontName="Helvetica-Bold",
+            textColor=colors.white,
+            wordWrap="CJK",
+        )
+        # Wrap all cells in Paragraph for word-wrap support
+        wrapped_data = []
+        for i, row in enumerate(table_data):
+            if i == 0:
+                wrapped_data.append([Paragraph(str(c), para_style_hdr) for c in row])
+            else:
+                wrapped_data.append([
+                    Paragraph(str(row[0]), para_style_cell),  # Parameter name — wraps
+                    Paragraph(str(row[1]), para_style_cell),  # Unit
+                    Paragraph(str(row[2]), para_style_cell),  # Min
+                    Paragraph(str(row[3]), para_style_cell),  # Max
+                    Paragraph(str(row[4]), para_style_cell),  # Mean
+                    Paragraph(str(row[5]), para_style_cell),  # Std Dev
+                    Paragraph(str(row[6]), para_style_cell),  # Samples
+                ])
+
+        # Page width = A4 (21cm) - left(2cm) - right(2cm) = 17cm usable
+        col_widths = [5.5 * cm, 1.8 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 1.7 * cm]
+        stats_table = Table(wrapped_data, colWidths=col_widths, repeatRows=1)
         stats_table.setStyle(TableStyle([
             # Header row
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
@@ -490,6 +531,7 @@ def _build_pdf(
             ("FONTSIZE", (0, 1), (-1, -1), 8),
             ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
             ("ALIGN", (0, 1), (0, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c8d6e5")),
             ("PADDING", (0, 0), (-1, -1), 5),
@@ -536,12 +578,137 @@ def _strip_markdown(text: str) -> str:
     # Remove horizontal rules
     text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
     # Remove bullet list markers (- item or * item)
-    text = re.sub(r"^\s*[-*+]\s+", "• ", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "\u2022 ", text, flags=re.MULTILINE)
     # Remove numbered list markers (1. item)
     text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
     # Collapse multiple blank lines
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
+
+def _parse_markdown_blocks(text: str) -> list:
+    """
+    Parse markdown text into a list of typed blocks:
+      {"type": "heading", "text": "..."}  — ## headings
+      {"type": "table",   "rows": [[...], ...]}  — GFM pipe tables
+      {"type": "text",    "text": "..."}  — everything else (paragraphs)
+    """
+    import re
+    blocks = []
+    lines = text.split("\n")
+    i = 0
+    current_text_lines: list[str] = []
+
+    def flush_text():
+        chunk = "\n".join(current_text_lines).strip()
+        if chunk:
+            # Apply inline markdown stripping before adding
+            chunk = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", chunk)
+            chunk = re.sub(r"`(.+?)`", r"\1", chunk)
+            chunk = re.sub(r"^\s*[-*+]\s+", "\u2022 ", chunk, flags=re.MULTILINE)
+            chunk = re.sub(r"^\s*\d+\.\s+", "", chunk, flags=re.MULTILINE)
+            for para in re.split(r"\n{2,}", chunk):
+                para = para.strip()
+                if para:
+                    blocks.append({"type": "text", "text": para})
+        current_text_lines.clear()
+
+    while i < len(lines):
+        line = lines[i]
+
+        # Detect heading
+        heading_match = re.match(r"^(#{1,6})\s+(.*)", line)
+        if heading_match:
+            flush_text()
+            blocks.append({"type": "heading", "text": heading_match.group(2).strip()})
+            i += 1
+            continue
+
+        # Detect start of a pipe table (line contains | and next line is separator)
+        if "|" in line and i + 1 < len(lines) and re.match(r"^[|\s:|-]+$", lines[i + 1]):
+            flush_text()
+            table_lines = [line]
+            i += 1  # skip separator row
+            i += 1
+            while i < len(lines) and "|" in lines[i]:
+                table_lines.append(lines[i])
+                i += 1
+            # Parse rows
+            rows = []
+            for tl in table_lines:
+                cells = [c.strip() for c in tl.strip().strip("|").split("|")]
+                rows.append(cells)
+            if rows:
+                blocks.append({"type": "table", "rows": rows})
+            continue
+
+        current_text_lines.append(line)
+        i += 1
+
+    flush_text()
+    return blocks
+
+
+def _build_markdown_table(rows: list, styles) -> object | None:
+    """
+    Build a reportlab Table from parsed markdown table rows.
+    The first row is treated as the header.
+    Column widths are distributed evenly across the 17cm usable page width.
+    """
+    if not rows:
+        return None
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, Table, TableStyle
+    except ImportError:
+        return None
+
+    n_cols = max(len(r) for r in rows)
+    usable_width = 17 * cm
+    col_w = usable_width / n_cols
+
+    cell_style = ParagraphStyle(
+        "MdTableCell",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=10,
+        fontName="Helvetica",
+        wordWrap="CJK",
+    )
+    hdr_style = ParagraphStyle(
+        "MdTableHdr",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=10,
+        fontName="Helvetica-Bold",
+        textColor=colors.white,
+        wordWrap="CJK",
+    )
+
+    table_data = []
+    for r_idx, row in enumerate(rows):
+        # Pad short rows
+        padded = row + [""] * (n_cols - len(row))
+        style = hdr_style if r_idx == 0 else cell_style
+        table_data.append([Paragraph(str(c), style) for c in padded])
+
+    tbl = Table(table_data, colWidths=[col_w] * n_cols, repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c8d6e5")),
+        ("PADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+    ]))
+    return tbl
 
 
 # ---------------------------------------------------------------------------
