@@ -33,6 +33,8 @@
   - Linked crosshair, event markers, threshold bands, compare-runs mode.
 - [ ] Improve report visual quality
   - Better formula rendering, chart snapshots, clearer source references.
+- [ ] Add Flight Test Risk Assessment module (FRAT)
+  - Implement versioned risk templates, deterministic scoring, hard-stop checks, approval routing, and PDF export tied to each flight test.
 
 ### P2 — After P1 (LLM/RAG Domainization and Provenance)
 
@@ -44,6 +46,8 @@
   - Save prompt/model/sources/output hash; report generation by `analysis_job_id`.
 - [ ] Introduce confidence and coverage indicators
   - Structured output quality metadata per answer/report.
+- [ ] Add AI-assisted mitigation authoring for FRAT
+  - Keep risk scoring deterministic; use LLM only to draft mitigation text and rationale with explicit user review.
 
 ---
 

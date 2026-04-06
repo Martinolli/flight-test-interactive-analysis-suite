@@ -33,6 +33,8 @@
   - Compare mode between multiple flight tests.
 - [ ] Report UX upgrades
   - Better chart-to-report selection and preview before generating PDF.
+- [ ] Add `Risk Assessment (FRAT)` workspace in Flight Test Detail
+  - Category checklist UI, live score/disposition badge, hard-stop alert banner, and approval/signature section.
 
 ## P2 — Frontend Support for LLM/RAG Domainization
 
@@ -42,6 +44,8 @@
   - Job history list, job detail view, immutable source/provenance panel.
 - [ ] Add confidence and coverage indicators in responses/reports
   - Visual badges and warning states for low confidence/coverage.
+- [ ] Add AI-assisted mitigation drafting in FRAT UI
+  - Suggest mitigation text from selected risk factors, but require explicit human acceptance before saving.
 
 ---
 

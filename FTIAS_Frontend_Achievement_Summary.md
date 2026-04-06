@@ -200,6 +200,17 @@ If login fails after a Docker rebuild, run: `docker exec ftias-backend python /a
 
 See `Project_Documents/41_Next_Steps_Roadmap_Session5.md` for full details.
 
+### 0. Add Flight Test Risk Assessment (FRAT) Module (New Planning Addendum — April 6, 2026)
+
+Build an in-app FRAT workflow so mission risk evaluation is no longer managed only in external spreadsheets.  
+Implementation direction:
+
+- Add a dedicated FRAT tab/workspace inside Flight Test Detail.
+- Keep scoring deterministic (category subtotals, hard-stop override, final disposition thresholds).
+- Persist assessments by template version to maintain audit traceability.
+- Add approval/signature flow and PDF export from persisted assessment snapshots.
+- Use AI only to draft mitigation wording, not to compute scores or go/no-go disposition.
+
 ### 1. Rebuild Docker Image (Immediate — Before Next Session)
 
 Run these three commands from the project root after the current document finishes processing:

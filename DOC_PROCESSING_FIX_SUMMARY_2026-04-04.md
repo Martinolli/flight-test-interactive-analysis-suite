@@ -453,6 +453,17 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Action:
   - Add synchronized multi-panel timeline, event markers, threshold bands, and compare-flight overlay mode.
 
+1. Add Flight Test Risk Assessment (FRAT) workflow
+
+- Gap: mission-go/no-go risk assessment currently lives outside the app in spreadsheets.
+- Files:
+  - `backend/app/models.py`
+  - `backend/app/routers/flight_tests.py` (or dedicated `risk_assessment.py`)
+  - `frontend/src/pages/FlightTestDetail.tsx`
+  - new frontend FRAT component(s) under `frontend/src/components/`
+- Action:
+  - Implement deterministic FRAT scoring with hard-stop override, per-flight-test saved assessments, approval signatures, and PDF export.
+
 ### P2 — LLM/RAG Domainization & Report Provenance
 
 1. Move from single analysis path to domain modes
@@ -507,3 +518,36 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 
 - Response:
   - PDF generated from persisted job data (no raw analysis body required).
+
+## Proposed API Contracts (Risk Assessment / FRAT Targets)
+
+1. `POST /api/flight-tests/{id}/risk-assessments`
+
+- Request:
+  - `template_version` (for example `frat_v2`)
+  - `selected_factor_ids` (list)
+  - `selected_hard_stop_ids` (list)
+  - `mitigations` (text)
+- Response:
+  - `assessment_id`, `total_score`, `hard_stop_count`, `disposition`, `created_at`
+
+1. `GET /api/flight-tests/{id}/risk-assessments/{assessment_id}`
+
+- Response:
+  - selected factors/hard-stops
+  - category subtotals
+  - total score + final disposition
+  - approval status/signatures
+  - template version metadata
+
+1. `POST /api/flight-tests/{id}/risk-assessments/{assessment_id}/finalize`
+
+- Request:
+  - `approver_name`, `approver_role`, `approval_notes`
+- Response:
+  - immutable finalized snapshot for report/audit
+
+1. `POST /api/admin/risk-assessments/{assessment_id}/report.pdf`
+
+- Response:
+  - FRAT PDF generated from persisted assessment snapshot.
