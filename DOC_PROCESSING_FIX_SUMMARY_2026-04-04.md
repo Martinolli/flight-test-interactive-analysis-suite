@@ -147,12 +147,14 @@ You should see document processing/indexing messages and final status transition
 ### Additional changes applied
 
 **Files:**
+
 - `backend/app/routers/documents.py`
 - `docker-compose.yml`
 - `docker-compose.backend-only.yml`
 - `.env.example`
 
 **What changed:**
+
 - Added configurable Docling performance flags:
   - `DOCLING_FAST_MODE`
   - `DOCLING_AUTO_FAST_FOR_LARGE_FILES`
@@ -173,6 +175,7 @@ You should see document processing/indexing messages and final status transition
 ## Clear Command List
 
 ### 1) Update `.env` in repo root
+
 Use these baseline values:
 
 ```env
@@ -233,6 +236,7 @@ docker compose logs -f backend | Select-String "parse config|chunking complete|e
 ### Changes Implemented
 
 **Files:**
+
 - `backend/app/routers/documents.py`
 - `backend/app/routers/admin.py`
 - `frontend/src/pages/AIQuery.tsx`
@@ -243,10 +247,12 @@ docker compose logs -f backend | Select-String "parse config|chunking complete|e
 - `docker/frontend.Dockerfile`
 
 1. Hybrid retrieval added (vector + lexical + reciprocal-rank fusion):
+
 - Better coverage of relevant chunks for standards-heavy questions.
 - More stable source selection before LLM generation.
 
-2. Deterministic takeoff calculation section injected into AI analysis:
+1. Deterministic takeoff calculation section injected into AI analysis:
+
 - Backend now computes takeoff metrics directly from flight-test time series.
 - LLM is instructed to interpret/cross-check only, not recompute deterministic values.
 - Reduces incorrect arithmetic in narrative output.
@@ -255,7 +261,8 @@ docker compose logs -f backend | Select-String "parse config|chunking complete|e
   - airborne: mean WOW < 0.5 (approx WOW=0)
   - includes detected start/liftoff timestamps and WOW values used for distance segment.
 
-3. Citation tightening:
+1. Citation tightening:
+
 - LLM output requires inline `[Sx]` citations for standards claims.
 - References list is built from actually cited source IDs.
 - Fallback note is added when no inline standards citations are produced.
@@ -265,20 +272,23 @@ docker compose logs -f backend | Select-String "parse config|chunking complete|e
 - New env control:
   - `ANALYSIS_MIN_CITATION_DENSITY=0.75`
 
-4. Query response quality controls:
+1. Query response quality controls:
+
 - Configurable query model/temperature/max tokens/top-k via env.
 - Source text is not returned in API response payload (metadata only).
 - Frontend query UI now renders markdown/GFM response formatting.
 - Source cards show stable source IDs (`S1`, `S2`, ...) aligned with inline citations.
 
-5. PDF sanitization improvements:
+1. PDF sanitization improvements:
+
 - Converts common LaTeX fragments to plain text for export stability.
 - Removes problematic control characters.
 - Normalizes list bullets and table/heading/body text before rendering.
 - Adjusted deterministic equation text to use `x` multiplication symbol in report text
   to avoid markdown `*...*` stripping artifacts in PDF output.
 
-6. Docker runtime consistency:
+1. Docker runtime consistency:
+
 - Added pass-through env vars in Compose for `QUERY_*` and `ANALYSIS_*` so `.env` tuning is applied in containerized backend runs.
 - Fixed frontend Docker healthcheck endpoint from `localhost` (IPv6 resolution issue in container) to `127.0.0.1`, removing false `unhealthy` status.
 
@@ -366,6 +376,7 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 ### P0 — Security, Correctness, Build Stability (Immediate)
 
 1. Lock down exposed user endpoints
+
 - Risk: `/api/users/*` currently allows user management without auth guards.
 - Files:
   - `backend/app/routers/users.py`
@@ -373,14 +384,16 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Action:
   - Require admin auth on all `/api/users/*` routes, or remove this router and keep `/api/admin/users/*` as the only management API.
 
-2. Enforce document tenancy isolation
+1. Enforce document tenancy isolation
+
 - Risk: document list/delete/query retrieval can cross user boundaries.
 - Files:
   - `backend/app/routers/documents.py`
 - Action:
   - Add user-scope filters (`uploaded_by_id == current_user.id`) to list/delete/query retrieval SQL.
 
-3. Strict timestamp validation in CSV ingestion
+1. Strict timestamp validation in CSV ingestion
+
 - Risk: fallback timestamp synthesis can silently fabricate timeline data.
 - Files:
   - `backend/app/routers/flight_tests.py`
@@ -389,7 +402,8 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
   - Reject rows/files with missing or invalid timestamp format.
   - Return explicit validation errors with row references.
 
-4. Restore frontend production build to green
+1. Restore frontend production build to green
+
 - Risk: current frontend build has blocking TS/lint/type issues.
 - Files:
   - `frontend/src/components/TimeSeriesChart.tsx`
@@ -402,6 +416,7 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 ### P1 — Data Model & UX Alignment for Mixed Flight-Test Domains
 
 1. Align upload UX and backend capabilities
+
 - Gap: UI allows CSV/XLS/XLSX while backend upload endpoint is CSV-only.
 - Files:
   - `frontend/src/components/DropZone.tsx`
@@ -410,7 +425,8 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Action:
   - Either implement true Excel ingestion in backend or constrain UI to CSV until implemented.
 
-2. Replace synthetic upload history with real upload sessions
+1. Replace synthetic upload history with real upload sessions
+
 - Gap: upload history is currently derived from parameter stats + localStorage.
 - Files:
   - `frontend/src/services/api.ts`
@@ -418,7 +434,8 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Action:
   - Add persistent upload session entity with filename, row count, status, error log, timestamps.
 
-3. Scale parameter exploration for large datasets
+1. Scale parameter exploration for large datasets
+
 - Gap: chip-based selection is not viable for hundreds/thousands of channels.
 - Files:
   - `frontend/src/pages/Parameters.tsx`
@@ -426,7 +443,8 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Action:
   - Add searchable parameter tree, subsystem grouping, favorites, and saved parameter sets.
 
-4. Improve chart architecture for engineer workflows
+1. Improve chart architecture for engineer workflows
+
 - Gap: limited linked analysis (crosshair sync, event overlays, compare runs).
 - Files:
   - `frontend/src/components/TimeSeriesChart.tsx`
@@ -438,13 +456,15 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 ### P2 — LLM/RAG Domainization & Report Provenance
 
 1. Move from single analysis path to domain modes
+
 - Gap: analysis pipeline is tuned to takeoff and not modular for electrical/vibration/propulsion.
 - Files:
   - `backend/app/routers/documents.py`
 - Action:
   - Introduce `analysis_mode` (`takeoff`, `landing`, `electrical`, `vibration`, `general`) and route to dedicated deterministic calculators/prompts.
 
-2. Enrich retrieval metadata and filtering
+1. Enrich retrieval metadata and filtering
+
 - Gap: retrieval depends mainly on chunk text with weak domain constraints.
 - Files:
   - `backend/app/models.py`
@@ -453,7 +473,8 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Action:
   - Add metadata fields (document revision, authority, domain tags, system tags) and pre-filter retrieval by mode/context.
 
-3. Persist analysis jobs and generate reports from immutable artifacts
+1. Persist analysis jobs and generate reports from immutable artifacts
+
 - Gap: PDF generation currently accepts freeform analysis text payload.
 - Files:
   - `backend/app/routers/admin.py`
@@ -465,6 +486,7 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 ## Proposed API Contracts (Implementation Targets)
 
 1. `POST /api/flight-tests/{id}/analysis-jobs`
+
 - Request:
   - `analysis_mode` (`takeoff|landing|electrical|vibration|general`)
   - `user_prompt` (optional)
@@ -472,7 +494,8 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 - Response:
   - `job_id`, `status`, `created_at`
 
-2. `GET /api/flight-tests/{id}/analysis-jobs/{job_id}`
+1. `GET /api/flight-tests/{id}/analysis-jobs/{job_id}`
+
 - Response:
   - deterministic metrics
   - narrative analysis
@@ -480,6 +503,7 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
   - model/prompt metadata
   - confidence/coverage indicators
 
-3. `POST /api/admin/analysis-jobs/{job_id}/report.pdf`
+1. `POST /api/admin/analysis-jobs/{job_id}/report.pdf`
+
 - Response:
   - PDF generated from persisted job data (no raw analysis body required).
