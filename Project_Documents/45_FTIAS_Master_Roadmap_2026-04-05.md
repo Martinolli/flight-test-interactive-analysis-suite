@@ -1,4 +1,5 @@
 # FTIAS — Master Development Roadmap
+
 **Document:** 45 | **Date:** 2026-04-05 | **Status:** Active — Living Document
 
 ---
@@ -12,7 +13,7 @@ The FTIAS application is fully operational as of Session 7 (2026-04-05). All cor
 ## Completed Features
 
 | # | Feature | Session | Commit |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | Project scaffolding (FastAPI + PostgreSQL + React + Docker) | 1–3 | — |
 | 2 | User registration and JWT authentication | 3 | — |
 | 3 | Flight test creation and management (CRUD) | 3–4 | — |
@@ -40,6 +41,7 @@ Items are ordered by value, dependency, and effort. Each phase is self-contained
 ### Phase A — Quick Wins (No new infrastructure required)
 
 #### A1 — Chart PNG Download *(Next)*
+
 Add a **"Download PNG"** button to every time-series and correlation chart panel. The button captures the chart DOM node as a PNG image using `html2canvas` and triggers a browser download. Filename convention: `FTIAS_{ParameterName}_{FlightTestName}_{Date}.png`.
 
 - **Scope:** Frontend only (`TimeSeriesChart.tsx`, `CorrelationChart.tsx`, `Parameters.tsx`)
@@ -47,6 +49,7 @@ Add a **"Download PNG"** button to every time-series and correlation chart panel
 - **Effort:** ~2 hours
 
 #### A2 — Contextual AI Prompt with Quick-Prompt Chips
+
 Replace the fixed "Generate Report" button with a **free-text prompt box**. The user types their analysis goal (e.g., "Analyse takeoff performance and compute ground roll distance"). A row of **quick-prompt chips** pre-fills common requests:
 
 - Takeoff Performance
@@ -66,9 +69,11 @@ The AI uses the user's prompt as the analysis goal, with the selected parameter 
 ### Phase B — Core Analysis Features
 
 #### B1 — 3D Trajectory Tab (Lat / Long / Altitude)
+
 New **"Trajectory"** tab inside the Flight Test Detail page (alongside Dashboard, Upload Data, Parameters). Renders an interactive 3D line chart using **Plotly.js** showing the aircraft's spatial path.
 
 Features:
+
 - Auto-detects `LATITUDE`, `LONGITUDE`, and `ALTITUDE` columns by name pattern
 - Manual override selector for non-standard column names
 - Colour-codes the trajectory by a user-selected variable (e.g., Ground Speed) to show performance at each spatial point
@@ -79,9 +84,11 @@ Features:
 - **Effort:** ~3 hours
 
 #### B2 — Flight Test Comparison View
+
 New **"Compare"** page (accessible from the sidebar) that lets the user select two or more flight tests and overlay the same parameter across all of them on a single chart. Essential for before/after configuration comparisons (e.g., comparing takeoff roll distance between two test days).
 
 Features:
+
 - Multi-test selector (up to 4 flight tests)
 - Parameter selector (one parameter at a time, overlaid across all selected tests)
 - Statistics comparison table (min, max, mean, std dev side-by-side)
@@ -96,6 +103,7 @@ Features:
 ### Phase C — Data Export & Enhanced Reporting
 
 #### C1 — Export Parameter Data to CSV/Excel
+
 **"Download CSV"** and **"Download Excel"** buttons on the Parameters page. Exports the currently selected parameters with full time-series data and a statistics header row.
 
 - CSV: generated client-side (no backend needed)
@@ -106,7 +114,9 @@ Features:
 - **Effort:** ~2 hours
 
 #### C2 — Enhanced PDF Report
+
 Extend the existing PDF export to include:
+
 - The 3D trajectory chart (screenshot via Plotly's built-in export)
 - The parameter time-series charts (screenshots via A1 infrastructure)
 - A "Selected Parameters" section with chart images embedded before the statistics table
@@ -120,7 +130,9 @@ Extend the existing PDF export to include:
 ### Phase D — Operations & Infrastructure
 
 #### D1 — Email Notifications
+
 Alert the admin when:
+
 - A new user registers
 - A document finishes processing (success or error)
 
@@ -131,6 +143,7 @@ Requires SMTP configuration. Recommended approach: use Python's built-in `smtpli
 - **Effort:** ~2 hours
 
 #### D2 — Unit Tests for Documents Router
+
 Add `backend/tests/test_documents.py` with pytest tests covering upload, list, delete, and query endpoints. Mocks the Docling parser and OpenAI embedding calls.
 
 - **Scope:** Backend only
@@ -138,6 +151,7 @@ Add `backend/tests/test_documents.py` with pytest tests covering upload, list, d
 - **Effort:** ~2 hours
 
 #### D3 — Celery/Redis Task Queue *(Defer)*
+
 Only needed if multiple backend workers or job persistence across container restarts is required. FastAPI `BackgroundTasks` is sufficient for the current single-worker setup. Defer until the application scales beyond a single-user deployment.
 
 - **Scope:** Backend + Docker Compose
@@ -149,7 +163,7 @@ Only needed if multiple backend workers or job persistence across container rest
 ## Delivery Sequence
 
 | Order | Item | Phase | Effort | Depends On |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | Chart PNG Download | A1 | ~2 h | — |
 | 2 | Contextual AI Prompt | A2 | ~3 h | — |
 | 3 | 3D Trajectory Tab | B1 | ~3 h | — |
@@ -160,13 +174,13 @@ Only needed if multiple backend workers or job persistence across container rest
 | 8 | Unit Tests (Documents) | D2 | ~2 h | — |
 | 9 | Celery/Redis Queue | D3 | ~1 day | Defer |
 
-**Total estimated remaining effort: ~21 hours across 7–9 sessions**
+- **Total estimated remaining effort: ~21 hours across 7–9 sessions**
 
 ---
 
 ## Architecture Reference
 
-```
+```bash
 ftias-postgres          PostgreSQL 15 + pgvector
 ftias-backend           FastAPI 0.110 / Python 3.11
   ├── /api/auth         JWT authentication
@@ -184,6 +198,7 @@ ftias-frontend          React 18 + Vite + TypeScript
   ├── /documents        Document library
   └── /admin/users      Admin user management
 ```
+
 *Items marked with `*` are planned but not yet implemented.*
 
 ---
