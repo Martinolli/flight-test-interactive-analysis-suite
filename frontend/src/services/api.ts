@@ -90,6 +90,7 @@ export interface Document {
 }
 
 export interface QuerySource {
+  source_id?: string;
   filename: string;
   title: string | null;
   page_numbers: string | null;
@@ -364,7 +365,7 @@ export class ApiService {
 
   static async queryDocuments(
     question: string,
-    topK = 6
+    topK = 8
   ): Promise<QueryResponse> {
     return this.request<QueryResponse>('/api/documents/query', {
       method: 'POST',

@@ -8,6 +8,7 @@ Superuser-only endpoints:
 import io
 import logging
 import os
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -24,6 +25,52 @@ from app.models import DataPoint, Document, FlightTest, TestParameter, User
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _latex_to_plain(text: str) -> str:
+    """Best-effort conversion of common LaTeX fragments to plain text."""
+    if not text:
+        return text
+
+    # Block and inline math wrappers
+    text = re.sub(r"\\\[(.*?)\\\]", r"\1", text, flags=re.DOTALL)
+    text = re.sub(r"\\\((.*?)\\\)", r"\1", text, flags=re.DOTALL)
+
+    # Convert \frac{a}{b} iteratively
+    for _ in range(6):
+        new_text = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", text)
+        if new_text == text:
+            break
+        text = new_text
+
+    text = text.replace(r"\cdot", " * ")
+    text = text.replace(r"\times", " x ")
+    text = text.replace(r"\approx", " ≈ ")
+    text = text.replace(r"\mathrm", "")
+    text = text.replace(r"\text", "")
+    text = re.sub(r"\\[a-zA-Z]+", "", text)  # remove remaining latex commands
+    text = text.replace("{", "").replace("}", "")
+    return text
+
+
+def _sanitize_pdf_text(text: str) -> str:
+    """Normalize text for stable PDF rendering and extraction."""
+    if not text:
+        return ""
+
+    text = _latex_to_plain(text)
+
+    # Normalize bullets to ASCII dash to avoid odd glyph mapping in PDF extraction
+    text = text.replace("\u2022", "- ")
+    text = text.replace("\uf0b7", "- ")
+
+    # Remove non-printable control chars (keep newline/tab)
+    text = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text)
+
+    # Collapse noisy whitespace
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -448,6 +495,7 @@ def _build_pdf(
     story.append(Paragraph("AI Analysis", section_title_style))
 
     if analysis_text:
+        analysis_text = _sanitize_pdf_text(analysis_text)
         # Parse and render the analysis text, handling markdown tables inline
         for block in _parse_markdown_blocks(analysis_text):
             if block["type"] == "table":
@@ -456,9 +504,9 @@ def _build_pdf(
                     story.append(tbl)
                     story.append(Spacer(1, 0.3 * cm))
             elif block["type"] == "heading":
-                story.append(Paragraph(block["text"], section_title_style))
+                story.append(Paragraph(_sanitize_pdf_text(block["text"]), section_title_style))
             elif block["type"] == "text" and block["text"]:
-                story.append(Paragraph(block["text"], body_style))
+                story.append(Paragraph(_sanitize_pdf_text(block["text"]), body_style))
     else:
         story.append(Paragraph(
             "No analysis text provided. Generate an AI Analysis from the Flight Test Detail page first.",
@@ -473,8 +521,8 @@ def _build_pdf(
         table_data = [["Parameter", "Unit", "Min", "Max", "Mean", "Std Dev", "Samples"]]
         for row in stats_rows:
             table_data.append([
-                row.name,
-                row.unit or "—",
+                _sanitize_pdf_text(row.name),
+                _sanitize_pdf_text(row.unit or "—"),
                 f"{row.min_val:.3f}",
                 f"{row.max_val:.3f}",
                 f"{row.avg_val:.3f}",
@@ -504,16 +552,16 @@ def _build_pdf(
         wrapped_data = []
         for i, row in enumerate(table_data):
             if i == 0:
-                wrapped_data.append([Paragraph(str(c), para_style_hdr) for c in row])
+                wrapped_data.append([Paragraph(_sanitize_pdf_text(str(c)), para_style_hdr) for c in row])
             else:
                 wrapped_data.append([
-                    Paragraph(str(row[0]), para_style_cell),  # Parameter name — wraps
-                    Paragraph(str(row[1]), para_style_cell),  # Unit
-                    Paragraph(str(row[2]), para_style_cell),  # Min
-                    Paragraph(str(row[3]), para_style_cell),  # Max
-                    Paragraph(str(row[4]), para_style_cell),  # Mean
-                    Paragraph(str(row[5]), para_style_cell),  # Std Dev
-                    Paragraph(str(row[6]), para_style_cell),  # Samples
+                    Paragraph(_sanitize_pdf_text(str(row[0])), para_style_cell),  # Parameter name — wraps
+                    Paragraph(_sanitize_pdf_text(str(row[1])), para_style_cell),  # Unit
+                    Paragraph(_sanitize_pdf_text(str(row[2])), para_style_cell),  # Min
+                    Paragraph(_sanitize_pdf_text(str(row[3])), para_style_cell),  # Max
+                    Paragraph(_sanitize_pdf_text(str(row[4])), para_style_cell),  # Mean
+                    Paragraph(_sanitize_pdf_text(str(row[5])), para_style_cell),  # Std Dev
+                    Paragraph(_sanitize_pdf_text(str(row[6])), para_style_cell),  # Samples
                 ])
 
         # Page width = A4 (21cm) - left(2cm) - right(2cm) = 17cm usable
@@ -568,7 +616,6 @@ def _strip_markdown(text: str) -> str:
     Very lightweight markdown stripper for PDF rendering.
     Removes common markdown syntax that would look odd in plain PDF text.
     """
-    import re
     # Remove headers (## Title -> Title)
     text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
     # Remove bold/italic (**text** -> text, *text* -> text)
@@ -578,12 +625,12 @@ def _strip_markdown(text: str) -> str:
     # Remove horizontal rules
     text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
     # Remove bullet list markers (- item or * item)
-    text = re.sub(r"^\s*[-*+]\s+", "\u2022 ", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "- ", text, flags=re.MULTILINE)
     # Remove numbered list markers (1. item)
     text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
     # Collapse multiple blank lines
     text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return _sanitize_pdf_text(text)
 
 
 def _parse_markdown_blocks(text: str) -> list:
@@ -593,7 +640,6 @@ def _parse_markdown_blocks(text: str) -> list:
       {"type": "table",   "rows": [[...], ...]}  — GFM pipe tables
       {"type": "text",    "text": "..."}  — everything else (paragraphs)
     """
-    import re
     blocks = []
     lines = text.split("\n")
     i = 0
@@ -605,10 +651,10 @@ def _parse_markdown_blocks(text: str) -> list:
             # Apply inline markdown stripping before adding
             chunk = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", chunk)
             chunk = re.sub(r"`(.+?)`", r"\1", chunk)
-            chunk = re.sub(r"^\s*[-*+]\s+", "\u2022 ", chunk, flags=re.MULTILINE)
+            chunk = re.sub(r"^\s*[-*+]\s+", "- ", chunk, flags=re.MULTILINE)
             chunk = re.sub(r"^\s*\d+\.\s+", "", chunk, flags=re.MULTILINE)
             for para in re.split(r"\n{2,}", chunk):
-                para = para.strip()
+                para = _sanitize_pdf_text(para.strip())
                 if para:
                     blocks.append({"type": "text", "text": para})
         current_text_lines.clear()
@@ -620,7 +666,7 @@ def _parse_markdown_blocks(text: str) -> list:
         heading_match = re.match(r"^(#{1,6})\s+(.*)", line)
         if heading_match:
             flush_text()
-            blocks.append({"type": "heading", "text": heading_match.group(2).strip()})
+            blocks.append({"type": "heading", "text": _sanitize_pdf_text(heading_match.group(2).strip())})
             i += 1
             continue
 
@@ -692,7 +738,7 @@ def _build_markdown_table(rows: list, styles) -> object | None:
         # Pad short rows
         padded = row + [""] * (n_cols - len(row))
         style = hdr_style if r_idx == 0 else cell_style
-        table_data.append([Paragraph(str(c), style) for c in padded])
+        table_data.append([Paragraph(_sanitize_pdf_text(str(c)), style) for c in padded])
 
     tbl = Table(table_data, colWidths=[col_w] * n_cols, repeatRows=1)
     tbl.setStyle(TableStyle([

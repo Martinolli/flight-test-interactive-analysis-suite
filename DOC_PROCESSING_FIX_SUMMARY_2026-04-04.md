@@ -221,3 +221,134 @@ Filtered view (recommended):
 ```powershell
 docker compose logs -f backend | Select-String "parse config|chunking complete|embedding progress|indexed|processing failed|Batch embedding failed|Docling parsing failed"
 ```
+
+## Analysis Quality & References Update (2026-04-06)
+
+### Scope
+
+- Improve AI answer depth for technical queries (including takeoff-distance analysis).
+- Improve source-reference correctness and prevent weak/misaligned citations.
+- Clean PDF-export text rendering for formulas/symbols.
+
+### Changes Implemented
+
+**Files:**
+- `backend/app/routers/documents.py`
+- `backend/app/routers/admin.py`
+- `frontend/src/pages/AIQuery.tsx`
+- `frontend/src/services/api.ts`
+- `.env.example`
+- `docker-compose.yml`
+- `docker-compose.backend-only.yml`
+- `docker/frontend.Dockerfile`
+
+1. Hybrid retrieval added (vector + lexical + reciprocal-rank fusion):
+- Better coverage of relevant chunks for standards-heavy questions.
+- More stable source selection before LLM generation.
+
+2. Deterministic takeoff calculation section injected into AI analysis:
+- Backend now computes takeoff metrics directly from flight-test time series.
+- LLM is instructed to interpret/cross-check only, not recompute deterministic values.
+- Reduces incorrect arithmetic in narrative output.
+- Deterministic section now explicitly documents WOW transition logic used:
+  - on-ground: mean WOW >= 0.5 (approx WOW=1)
+  - airborne: mean WOW < 0.5 (approx WOW=0)
+  - includes detected start/liftoff timestamps and WOW values used for distance segment.
+
+3. Citation tightening:
+- LLM output requires inline `[Sx]` citations for standards claims.
+- References list is built from actually cited source IDs.
+- Fallback note is added when no inline standards citations are produced.
+
+4. Query response quality controls:
+- Configurable query model/temperature/max tokens/top-k via env.
+- Source text is not returned in API response payload (metadata only).
+- Frontend query UI now renders markdown/GFM response formatting.
+- Source cards show stable source IDs (`S1`, `S2`, ...) aligned with inline citations.
+
+5. PDF sanitization improvements:
+- Converts common LaTeX fragments to plain text for export stability.
+- Removes problematic control characters.
+- Normalizes list bullets and table/heading/body text before rendering.
+- Adjusted deterministic equation text to use `x` multiplication symbol in report text
+  to avoid markdown `*...*` stripping artifacts in PDF output.
+
+6. Docker runtime consistency:
+- Added pass-through env vars in Compose for `QUERY_*` and `ANALYSIS_*` so `.env` tuning is applied in containerized backend runs.
+- Fixed frontend Docker healthcheck endpoint from `localhost` (IPv6 resolution issue in container) to `127.0.0.1`, removing false `unhealthy` status.
+
+### Validation Snapshot (Reports v2/v3/v4)
+
+- Deterministic takeoff metrics are now stable and repeatable from backend computation:
+  - distance: `832.2 ft (253.6 m)`
+  - start speed: `4.75 kt`
+  - liftoff speed: `81.5 kt`
+  - runtime: `11.1 s`
+- WOW transition logic is explicitly surfaced in the report:
+  - start sample uses on-ground state (WOW≈1)
+  - liftoff sample uses airborne state (WOW≈0)
+- References section is generated and aligned to inline `[Sx]` citations.
+
+### New/Updated Environment Controls
+
+Set in `.env` (copied from `.env.example` as needed):
+
+```env
+QUERY_LLM_MODEL=gpt-4o-mini
+QUERY_TOP_K_DEFAULT=8
+QUERY_CONTEXT_LIMIT=12
+QUERY_VECTOR_CANDIDATES=30
+QUERY_LEXICAL_CANDIDATES=20
+QUERY_MAX_TOKENS=1800
+QUERY_TEMPERATURE=0.1
+ANALYSIS_LLM_MODEL=gpt-4o-mini
+ANALYSIS_MAX_TOKENS=2600
+ANALYSIS_TEMPERATURE=0.2
+```
+
+## Restart / Run Commands (Exact + Folder)
+
+### Folder
+
+- Run Docker commands from **repo root**:
+  - `flight-test-interactive-analysis-suite`
+
+### Restart backend after code/env changes
+
+From root:
+
+```powershell
+docker compose up -d --build backend
+```
+
+### Ensure full stack is up (Docker frontend mode)
+
+From root:
+
+```powershell
+docker compose up -d postgres backend
+docker compose --profile frontend up -d frontend
+docker compose ps
+```
+
+### Monitor ingestion/analysis logs
+
+From root:
+
+```powershell
+docker compose logs -f backend
+```
+
+### If using local frontend instead of Docker frontend
+
+- Stop Docker frontend from root:
+
+```powershell
+docker compose stop frontend
+```
+
+- Then run local frontend from `frontend/`:
+
+```powershell
+npm run dev
+```

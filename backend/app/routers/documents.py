@@ -7,9 +7,10 @@ and answer questions with the built-in LLM.
 
 import logging
 import os
+import re
 import tempfile
 import time
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -46,6 +47,19 @@ EMBEDDING_BATCH_SIZE = max(1, int(os.getenv("EMBEDDING_BATCH_SIZE", "32")))
 DOCLING_NUM_THREADS = max(1, int(os.getenv("DOCLING_NUM_THREADS", "4")))
 DOCLING_FAST_THRESHOLD_MB = max(1, int(os.getenv("DOCLING_FAST_THRESHOLD_MB", "25")))
 DOCLING_MAX_CHUNK_CHARS = max(0, int(os.getenv("DOCLING_MAX_CHUNK_CHARS", "5000")))
+QUERY_TOP_K_DEFAULT = max(1, min(20, int(os.getenv("QUERY_TOP_K_DEFAULT", "8"))))
+QUERY_VECTOR_CANDIDATES = max(
+    QUERY_TOP_K_DEFAULT, min(80, int(os.getenv("QUERY_VECTOR_CANDIDATES", "30")))
+)
+QUERY_LEXICAL_CANDIDATES = max(
+    QUERY_TOP_K_DEFAULT, min(80, int(os.getenv("QUERY_LEXICAL_CANDIDATES", "20")))
+)
+QUERY_CONTEXT_LIMIT = max(
+    QUERY_TOP_K_DEFAULT, min(20, int(os.getenv("QUERY_CONTEXT_LIMIT", "12")))
+)
+QUERY_MAX_TOKENS = max(512, min(4096, int(os.getenv("QUERY_MAX_TOKENS", "1800"))))
+QUERY_TEMPERATURE = max(0.0, min(1.0, float(os.getenv("QUERY_TEMPERATURE", "0.1"))))
+QUERY_MODEL = os.getenv("QUERY_LLM_MODEL") or os.getenv("LLM_MODEL", "gpt-4o-mini")
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -111,7 +125,7 @@ class DocumentOut(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
-    top_k: int = 6
+    top_k: int = QUERY_TOP_K_DEFAULT
     flight_test_id: Optional[int] = None  # optional context filter
 
 
@@ -150,6 +164,432 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
         input=texts,
     )
     return [item.embedding for item in response.data]
+
+
+def _extract_used_source_ids(answer: str) -> List[str]:
+    """Extract source IDs like S1/S2 from inline citations or USED_SOURCES footer."""
+    inline_ids = set(re.findall(r"\[(S\d+)\]", answer))
+    if inline_ids:
+        return sorted(inline_ids, key=lambda x: int(x[1:]) if x[1:].isdigit() else 10_000)
+    footer_match = re.search(r"(?im)^USED_SOURCES:\s*(.+)$", answer)
+    footer_ids = set()
+    if footer_match:
+        footer_ids.update(re.findall(r"(S\d+)", footer_match.group(1)))
+    return sorted(footer_ids, key=lambda x: int(x[1:]) if x[1:].isdigit() else 10_000)
+
+
+def _extract_inline_source_ids(answer: str) -> List[str]:
+    """Extract source IDs from inline citations only (strict mode)."""
+    ids = set(re.findall(r"\[(S\d+)\]", answer))
+    return sorted(ids, key=lambda x: int(x[1:]) if x[1:].isdigit() else 10_000)
+
+
+def _build_source_label(row: Any) -> str:
+    return (
+        f"{row.title or row.filename}"
+        + (f", p.{row.page_numbers}" if row.page_numbers else "")
+        + (f" — {row.section_title}" if row.section_title else "")
+    )
+
+
+def _retrieve_hybrid_sources(
+    db: Session,
+    question: str,
+    requested_top_k: int,
+) -> tuple[list[dict], str]:
+    """Hybrid retrieval (vector + lexical), returns ranked sources and context text."""
+    try:
+        query_embedding = embed_text(question)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Embedding failed: {exc}")
+
+    embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
+
+    vector_sql = text(
+        """
+        SELECT
+            dc.id,
+            dc.document_id,
+            dc.chunk_index,
+            dc.text,
+            dc.page_numbers,
+            dc.section_title,
+            d.filename,
+            d.title
+        FROM document_chunks dc
+        JOIN documents d ON d.id = dc.document_id
+        WHERE d.status = 'ready'
+          AND dc.embedding IS NOT NULL
+        ORDER BY dc.embedding <=> :embedding ::vector
+        LIMIT :limit_n
+        """
+    )
+    vector_rows = db.execute(
+        vector_sql,
+        {"embedding": embedding_str, "limit_n": QUERY_VECTOR_CANDIDATES},
+    ).fetchall()
+
+    lexical_rows = []
+    lexical_sql = text(
+        """
+        SELECT
+            dc.id,
+            dc.document_id,
+            dc.chunk_index,
+            dc.text,
+            dc.page_numbers,
+            dc.section_title,
+            d.filename,
+            d.title,
+            ts_rank_cd(
+                to_tsvector('english', dc.text),
+                websearch_to_tsquery('english', :question)
+            ) AS lexical_score
+        FROM document_chunks dc
+        JOIN documents d ON d.id = dc.document_id
+        WHERE d.status = 'ready'
+          AND websearch_to_tsquery('english', :question) @@ to_tsvector('english', dc.text)
+        ORDER BY lexical_score DESC
+        LIMIT :limit_n
+        """
+    )
+    try:
+        lexical_rows = db.execute(
+            lexical_sql,
+            {"question": question, "limit_n": QUERY_LEXICAL_CANDIDATES},
+        ).fetchall()
+    except Exception as lex_exc:
+        logger.warning("Lexical retrieval fallback to vector-only: %s", lex_exc)
+        lexical_rows = []
+
+    if not vector_rows and not lexical_rows:
+        return [], ""
+
+    # Reciprocal rank fusion
+    rrf_k = 60
+    rrf_scores: Dict[int, float] = {}
+    row_by_id: Dict[int, Any] = {}
+    for rank, row in enumerate(vector_rows, start=1):
+        row_by_id[row.id] = row
+        rrf_scores[row.id] = rrf_scores.get(row.id, 0.0) + (1.0 / (rrf_k + rank))
+    for rank, row in enumerate(lexical_rows, start=1):
+        row_by_id[row.id] = row
+        rrf_scores[row.id] = rrf_scores.get(row.id, 0.0) + (0.8 / (rrf_k + rank))
+
+    ranked_rows = [row_by_id[row_id] for row_id, _ in sorted(
+        rrf_scores.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )]
+
+    context_limit = min(max(requested_top_k, QUERY_CONTEXT_LIMIT), len(ranked_rows))
+    context_rows = ranked_rows[:context_limit]
+
+    sources: List[dict] = []
+    context_parts: List[str] = []
+    for idx, row in enumerate(context_rows, start=1):
+        source_id = f"S{idx}"
+        source_label = _build_source_label(row)
+        sources.append(
+            {
+                "source_id": source_id,
+                "filename": row.filename,
+                "title": row.title,
+                "page_numbers": row.page_numbers,
+                "section_title": row.section_title,
+                "similarity": round(rrf_scores.get(row.id, 0.0), 4),
+                "text": row.text,
+            }
+        )
+        context_parts.append(f"[{source_id}] {source_label}\n{row.text}")
+
+    return sources, "\n\n---\n\n".join(context_parts)
+
+
+def _choose_param_id(params: List[dict], scorer) -> Optional[int]:
+    best_id = None
+    best_score = float("-inf")
+    for p in params:
+        score = scorer(p["name"], p.get("unit"))
+        if score > best_score:
+            best_score = score
+            best_id = p["id"]
+    return best_id if best_score > 0 else None
+
+
+def _score_ground_speed(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "ground speed" in n or ("ground" in n and "speed" in n):
+        score += 6
+    if "airspeed" in n:
+        score -= 2
+    if re.search(r"\bgs\b", n):
+        score += 2
+    if "speed" in n:
+        score += 1
+    if "kt" in u:
+        score += 2
+    return score
+
+
+def _score_wow(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    score = 0.0
+    if "weight on wheels" in n:
+        score += 8
+    if re.search(r"\bwow\b", n):
+        score += 5
+    if "wheel" in n and "weight" in n:
+        score += 3
+    return score
+
+
+def _score_longitudinal_accel(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "longitudinal" in n and "accel" in n:
+        score += 6
+    if "x accel" in n or "x_accel" in n or "longitudinal x" in n:
+        score += 4
+    if "accel" in n:
+        score += 1
+    if u == "g":
+        score += 1
+    return score
+
+
+def _compute_takeoff_metrics(db: Session, flight_test_id: int) -> dict:
+    """Compute takeoff run metrics from time-series data (deterministic)."""
+    param_rows = (
+        db.query(TestParameter.id, TestParameter.name, TestParameter.unit)
+        .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
+        .filter(DataPoint.flight_test_id == flight_test_id)
+        .distinct()
+        .all()
+    )
+    params = [{"id": r.id, "name": r.name, "unit": r.unit} for r in param_rows]
+    if not params:
+        return {"available": False, "reason": "No parameters found for flight test."}
+
+    ground_speed_id = _choose_param_id(params, _score_ground_speed)
+    wow_ids = [p["id"] for p in params if _score_wow(p["name"], p.get("unit")) > 0]
+    accel_id = _choose_param_id(params, _score_longitudinal_accel)
+
+    if ground_speed_id is None:
+        return {"available": False, "reason": "Ground speed parameter not found."}
+    if not wow_ids:
+        return {"available": False, "reason": "Weight-on-wheels parameter not found."}
+
+    selected_ids = set([ground_speed_id, *wow_ids])
+    if accel_id is not None:
+        selected_ids.add(accel_id)
+
+    rows = (
+        db.query(DataPoint.timestamp, DataPoint.parameter_id, DataPoint.value)
+        .filter(
+            DataPoint.flight_test_id == flight_test_id,
+            DataPoint.parameter_id.in_(selected_ids),
+        )
+        .order_by(DataPoint.timestamp.asc())
+        .all()
+    )
+    if not rows:
+        return {"available": False, "reason": "No datapoints found for required parameters."}
+
+    timeline: Dict[Any, Dict[int, float]] = {}
+    for r in rows:
+        timeline.setdefault(r.timestamp, {})[r.parameter_id] = float(r.value)
+
+    points = []
+    for ts in sorted(timeline.keys()):
+        vals = timeline[ts]
+        gs = vals.get(ground_speed_id)
+        if gs is None:
+            continue
+        wow_values = [vals[w_id] for w_id in wow_ids if w_id in vals]
+        wow_avg = (sum(wow_values) / len(wow_values)) if wow_values else None
+        accel_val = vals.get(accel_id) if accel_id is not None else None
+        points.append({"ts": ts, "gs_kt": gs, "wow": wow_avg, "accel": accel_val})
+
+    if len(points) < 2:
+        return {"available": False, "reason": "Insufficient timeseries points for takeoff calculation."}
+
+    liftoff_idx = None
+    for i in range(1, len(points)):
+        prev_pt = points[i - 1]
+        cur_pt = points[i]
+        if prev_pt["wow"] is None or cur_pt["wow"] is None:
+            continue
+        if prev_pt["wow"] >= 0.5 and cur_pt["wow"] < 0.5 and cur_pt["gs_kt"] >= 30:
+            liftoff_idx = i
+            break
+    if liftoff_idx is None:
+        for i, pt in enumerate(points):
+            if pt["wow"] is not None and pt["wow"] < 0.5 and pt["gs_kt"] >= 30:
+                liftoff_idx = i
+                break
+    if liftoff_idx is None:
+        return {"available": False, "reason": "Could not detect liftoff transition from WOW signals."}
+
+    start_idx = None
+    for i in range(liftoff_idx, -1, -1):
+        pt = points[i]
+        if (pt["wow"] is None or pt["wow"] >= 0.5) and pt["gs_kt"] <= 5:
+            start_idx = i
+            break
+    if start_idx is None:
+        # fallback: earliest on-ground sample before liftoff
+        candidates = [
+            i for i in range(0, liftoff_idx + 1)
+            if points[i]["wow"] is None or points[i]["wow"] >= 0.5
+        ]
+        start_idx = candidates[0] if candidates else 0
+
+    if start_idx >= liftoff_idx:
+        return {"available": False, "reason": "Invalid takeoff segment boundaries."}
+
+    knot_to_fts = 1.687809857
+    distance_ft = 0.0
+    valid_intervals = 0
+    for i in range(start_idx + 1, liftoff_idx + 1):
+        p0 = points[i - 1]
+        p1 = points[i]
+        dt = (p1["ts"] - p0["ts"]).total_seconds()
+        if dt <= 0 or dt > 10:
+            continue
+        v0 = max(p0["gs_kt"], 0.0) * knot_to_fts
+        v1 = max(p1["gs_kt"], 0.0) * knot_to_fts
+        distance_ft += ((v0 + v1) / 2.0) * dt
+        valid_intervals += 1
+
+    if valid_intervals == 0:
+        return {"available": False, "reason": "No valid time intervals for distance integration."}
+
+    start_pt = points[start_idx]
+    liftoff_pt = points[liftoff_idx]
+    duration_s = (liftoff_pt["ts"] - start_pt["ts"]).total_seconds()
+    mean_accel_fts2 = None
+    if duration_s > 0:
+        mean_accel_fts2 = (
+            (liftoff_pt["gs_kt"] - start_pt["gs_kt"]) * knot_to_fts
+        ) / duration_s
+
+    accel_samples = [
+        pt["accel"] for pt in points[start_idx: liftoff_idx + 1]
+        if pt["accel"] is not None
+    ]
+    accel_mean_g = (sum(accel_samples) / len(accel_samples)) if accel_samples else None
+    accel_sensor_fts2 = (accel_mean_g * 32.174) if accel_mean_g is not None else None
+
+    return {
+        "available": True,
+        "distance_ft": round(distance_ft, 1),
+        "distance_m": round(distance_ft * 0.3048, 1),
+        "wow_channels_used": len(wow_ids),
+        "wow_ground_threshold": 0.5,
+        "start_timestamp": start_pt["ts"].isoformat(),
+        "liftoff_timestamp": liftoff_pt["ts"].isoformat(),
+        "start_wow_mean": round(start_pt["wow"], 3) if start_pt["wow"] is not None else None,
+        "liftoff_wow_mean": round(liftoff_pt["wow"], 3) if liftoff_pt["wow"] is not None else None,
+        "start_speed_kt": round(start_pt["gs_kt"], 2),
+        "liftoff_speed_kt": round(liftoff_pt["gs_kt"], 2),
+        "run_time_s": round(duration_s, 2),
+        "mean_accel_fts2": round(mean_accel_fts2, 3) if mean_accel_fts2 is not None else None,
+        "sensor_accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
+        "sensor_accel_mean_fts2": round(accel_sensor_fts2, 3) if accel_sensor_fts2 is not None else None,
+        "sample_intervals_used": valid_intervals,
+    }
+
+
+def _build_deterministic_takeoff_section(metrics: dict) -> str:
+    """Render deterministic takeoff section directly from computed data."""
+    if not metrics.get("available"):
+        return (
+            "## Deterministic Calculation (Flight Data) [DATA]\n"
+            "Deterministic takeoff metrics are unavailable for this dataset.\n\n"
+            f"- Reason: {metrics.get('reason', 'Unknown')}\n"
+        )
+
+    knot_to_fts = 1.687809857
+    vi_kt = float(metrics["start_speed_kt"])
+    vf_kt = float(metrics["liftoff_speed_kt"])
+    t_s = float(metrics["run_time_s"])
+    vi_fts = vi_kt * knot_to_fts
+    vf_fts = vf_kt * knot_to_fts
+    accel_fts2 = metrics.get("mean_accel_fts2")
+    accel_for_eq = float(accel_fts2) if accel_fts2 is not None else None
+    distance_integrated = float(metrics["distance_ft"])
+
+    distance_kinematic = None
+    if accel_for_eq is not None:
+        distance_kinematic = (vi_fts * t_s) + (0.5 * accel_for_eq * (t_s ** 2))
+
+    lines = [
+        "## Deterministic Calculation (Flight Data) [DATA]",
+        "",
+        "### Computed Metrics",
+        f"- Takeoff roll distance (integrated speed trace): **{metrics['distance_ft']} ft ({metrics['distance_m']} m)**",
+        f"- Run time (start-to-liftoff): **{metrics['run_time_s']} s**",
+        f"- Start speed: **{metrics['start_speed_kt']} kt**",
+        f"- Liftoff speed: **{metrics['liftoff_speed_kt']} kt**",
+        f"- Mean acceleration from speed trace: **{metrics.get('mean_accel_fts2', 'n/a')} ft/s^2**",
+        (
+            f"- Mean acceleration from sensor: **{metrics.get('sensor_accel_mean_g', 'n/a')} g "
+            f"({metrics.get('sensor_accel_mean_fts2', 'n/a')} ft/s^2)**"
+        ),
+        f"- Integration intervals used: **{metrics['sample_intervals_used']}**",
+        "",
+        "### WOW-Based Segment Definition",
+        (
+            f"- WOW channels used: **{metrics.get('wow_channels_used', 'n/a')}** "
+            "(LH/RH wheels when available)"
+        ),
+        (
+            f"- On-ground condition: **mean WOW >= {metrics.get('wow_ground_threshold', 0.5)}** "
+            "(approximately WOW=1)"
+        ),
+        (
+            f"- Airborne condition: **mean WOW < {metrics.get('wow_ground_threshold', 0.5)}** "
+            "(approximately WOW=0)"
+        ),
+        (
+            f"- Start sample: **{metrics.get('start_timestamp', 'n/a')}** "
+            f"(WOW={metrics.get('start_wow_mean', 'n/a')}, GS={metrics['start_speed_kt']} kt)"
+        ),
+        (
+            f"- Liftoff sample: **{metrics.get('liftoff_timestamp', 'n/a')}** "
+            f"(WOW={metrics.get('liftoff_wow_mean', 'n/a')}, GS={metrics['liftoff_speed_kt']} kt)"
+        ),
+        "",
+        "### Equations",
+        "- Velocity conversion: V_ft_s = V_kt x 1.687809857",
+        "- Mean acceleration from speed trace: a = (Vf - Vi) / t",
+        "- Kinematic distance check: d = Vi x t + 0.5 x a x t^2",
+        "",
+        "### Substitution (units preserved)",
+        f"- Vi = {vi_kt} kt = {vi_fts:.3f} ft/s",
+        f"- Vf = {vf_kt} kt = {vf_fts:.3f} ft/s",
+        f"- t = {t_s} s",
+    ]
+    if accel_for_eq is not None:
+        lines.append(f"- a = ({vf_fts:.3f} - {vi_fts:.3f}) / {t_s:.2f} = {accel_for_eq:.3f} ft/s^2")
+    if distance_kinematic is not None:
+        lines.append(
+            f"- Kinematic distance check: d ≈ {distance_kinematic:.1f} ft "
+            f"(integrated result: {distance_integrated:.1f} ft)"
+        )
+    lines.extend(
+        [
+            "",
+            "Use the integrated speed-trace distance as the primary deterministic takeoff result [DATA].",
+        ]
+    )
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -582,42 +1022,15 @@ def query_documents(
     3. Pass the chunks as context to the LLM and return its answer.
     """
     _require_ai_packages()
-    # Embed the question
-    try:
-        query_embedding = embed_text(request.question)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Embedding failed: {exc}")
 
-    # Vector similarity search using pgvector <=> operator (cosine distance)
-    embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
+    requested_top_k = max(1, min(20, request.top_k or QUERY_TOP_K_DEFAULT))
 
-    sql = text(
-        """
-        SELECT
-            dc.id,
-            dc.text,
-            dc.page_numbers,
-            dc.section_title,
-            d.filename,
-            d.title,
-            1 - (dc.embedding <=> :embedding ::vector) AS similarity
-        FROM document_chunks dc
-        JOIN documents d ON d.id = dc.document_id
-        WHERE d.status = 'ready'
-          AND dc.embedding IS NOT NULL
-        ORDER BY dc.embedding <=> :embedding ::vector
-        LIMIT :top_k
-        """
+    sources, context = _retrieve_hybrid_sources(
+        db=db,
+        question=request.question,
+        requested_top_k=requested_top_k,
     )
-
-    rows = db.execute(
-        sql,
-        {"embedding": embedding_str, "top_k": request.top_k},
-    ).fetchall()
-
-    if not rows:
+    if not sources:
         return QueryResponse(
             answer=(
                 "No relevant documents found in the library. "
@@ -626,59 +1039,53 @@ def query_documents(
             sources=[],
         )
 
-    # Build context string for the LLM
-    context_parts = []
-    sources = []
-    for row in rows:
-        source_label = (
-            f"{row.title or row.filename}"
-            + (f", p.{row.page_numbers}" if row.page_numbers else "")
-            + (f" — {row.section_title}" if row.section_title else "")
-        )
-        context_parts.append(f"[{source_label}]\n{row.text}")
-        sources.append(
-            {
-                "filename": row.filename,
-                "title": row.title,
-                "page_numbers": row.page_numbers,
-                "section_title": row.section_title,
-                "similarity": round(float(row.similarity), 4),
-            }
-        )
-
-    context = "\n\n---\n\n".join(context_parts)
-
     system_prompt = (
         "You are an expert flight test engineer and technical analyst. "
-        "Answer the user's question using ONLY the provided document excerpts. "
-        "Cite the source document and page number for each key claim. "
-        "If the answer is not in the excerpts, say so clearly."
+        "Use ONLY the provided source excerpts. "
+        "Write a detailed technical answer with explicit assumptions, equations, "
+        "step-by-step method, and units where relevant. "
+        "For every technical claim or calculation step, cite source IDs like [S1]. "
+        "If critical inputs are missing, state exactly what is missing and do not invent values. "
+        "End your response with a single line: USED_SOURCES: S1,S2"
     )
 
     user_prompt = (
         f"Question: {request.question}\n\n"
-        f"Document excerpts:\n\n{context}"
+        "Instructions:\n"
+        "- Be comprehensive and precise.\n"
+        "- Include equations in markdown form when useful.\n"
+        "- Keep citations tightly mapped to claims.\n\n"
+        f"Source excerpts:\n\n{context}"
     )
 
     try:
         client = get_openai_client()
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=QUERY_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.2,
-            max_tokens=1024,
+            temperature=QUERY_TEMPERATURE,
+            max_tokens=QUERY_MAX_TOKENS,
         )
-        answer = completion.choices[0].message.content
+        answer = completion.choices[0].message.content or ""
     except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail=f"LLM call failed: {exc}",
         )
 
-    return QueryResponse(answer=answer, sources=sources)
+    used_source_ids = _extract_used_source_ids(answer)
+    answer = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", answer).strip()
+
+    if used_source_ids:
+        cited = [s for s in sources if s.get("source_id") in set(used_source_ids)]
+        if cited:
+            sources = cited
+
+    response_sources = [{k: v for k, v in s.items() if k != "text"} for s in sources]
+    return QueryResponse(answer=answer, sources=response_sources)
 
 
 # ---------------------------------------------------------------------------
@@ -751,48 +1158,6 @@ def ai_analysis(
         )
     stats_table = "\n".join(stats_lines)
 
-    # Retrieve relevant document context using the flight test name + parameter names
-    context_text = ""
-    try:
-        param_names = [r.name for r in stats_rows[:5]]  # top 5 params for query
-        query_str = (
-            f"flight test analysis {ft.aircraft_type or ''} "
-            + " ".join(param_names)
-        )
-        query_embedding = embed_text(query_str)
-        embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
-
-        sql = text(
-            """
-            SELECT dc.text, d.title, dc.page_numbers, dc.section_title
-            FROM document_chunks dc
-            JOIN documents d ON d.id = dc.document_id
-            WHERE d.status = 'ready' AND dc.embedding IS NOT NULL
-            ORDER BY dc.embedding <=> :embedding ::vector
-            LIMIT 4
-            """
-        )
-        doc_rows = db.execute(sql, {"embedding": embedding_str}).fetchall()
-        if doc_rows:
-            parts = []
-            for r in doc_rows:
-                label = (
-                    f"{r.title or 'Document'}"
-                    + (f", p.{r.page_numbers}" if r.page_numbers else "")
-                )
-                parts.append(f"[{label}]\n{r.text}")
-            context_text = "\n\n---\n\n".join(parts)
-    except Exception as ctx_exc:
-        logger.warning("Could not retrieve document context: %s", ctx_exc)
-
-    # Build the LLM prompt
-    system_prompt = (
-        "You are a senior flight test engineer. "
-        "Analyse the provided flight test statistics and produce a structured report. "
-        "Be concise and technical. Use the document excerpts as reference standards "
-        "where relevant, citing source and page number."
-    )
-
     # If the user supplied a specific analysis goal, use it; otherwise use the default.
     if body.user_prompt and body.user_prompt.strip():
         analysis_goal = body.user_prompt.strip()
@@ -803,38 +1168,109 @@ def ai_analysis(
             "(3) Potential Anomalies or Concerns, (4) Recommendations."
         )
 
+    # Deterministic takeoff metrics from time-series data (authoritative section)
+    takeoff_metrics = _compute_takeoff_metrics(db=db, flight_test_id=flight_test_id)
+    deterministic_section = _build_deterministic_takeoff_section(takeoff_metrics)
+
+    # Hybrid document retrieval with stable source IDs
+    param_names = [r.name for r in stats_rows[:10]]
+    retrieval_focus = (
+        "takeoff distance ground roll liftoff runway acceleration "
+        "weight on wheels procedures certification"
+    )
+    retrieval_question = (
+        f"{analysis_goal}\n"
+        f"Focus terms: {retrieval_focus}\n"
+        f"Aircraft: {ft.aircraft_type or ''}\n"
+        f"Flight test parameter names: {'; '.join(param_names)}"
+    )
+    sources, context_text = _retrieve_hybrid_sources(
+        db=db,
+        question=retrieval_question,
+        requested_top_k=8,
+    )
+
+    # Build the LLM prompt (LLM writes interpretation/cross-check only)
+    system_prompt = (
+        "You are a senior flight test engineer. "
+        "A deterministic takeoff section has already been computed by software and must not be recalculated "
+        "or numerically modified. "
+        "Your task is to produce interpretation and standards cross-check only, using ONLY provided source excerpts. "
+        "Cite standards claims with [Sx]. For deterministic data references, use [DATA]. "
+        "Do not emit USED_SOURCES footer."
+    )
+
     user_prompt = (
         f"Flight Test: {ft.test_name}\n"
         f"Aircraft: {ft.aircraft_type or 'Not specified'}\n"
         f"Test Date: {ft.test_date.strftime('%Y-%m-%d') if ft.test_date else 'Not specified'}\n"
         f"Description: {ft.description or 'None'}\n\n"
         f"Analysis Goal: {analysis_goal}\n\n"
-        f"Parameter Statistics:\n{stats_table}"
+        f"Parameter Statistics:\n{stats_table}\n\n"
+        "Deterministic Section (already computed and authoritative):\n"
+        f"{deterministic_section}\n\n"
+        "Requirements:\n"
+        "- Do not recompute or alter deterministic values.\n"
+        "- Write sections: (1) Executive Summary, (2) Standards Cross-Check, "
+        "(3) Risks/Assumptions, (4) Recommendations.\n"
+        "- Ensure every standards claim is cited with [Sx].\n"
+        "- If standards evidence is missing, state that explicitly.\n"
     )
 
     if context_text:
         user_prompt += f"\n\nReference Document Excerpts:\n\n{context_text}"
 
+    analysis_model = os.getenv("ANALYSIS_LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4o-mini"))
+    analysis_temperature = max(0.0, min(1.0, float(os.getenv("ANALYSIS_TEMPERATURE", "0.2"))))
+    analysis_max_tokens = max(1200, min(4096, int(os.getenv("ANALYSIS_MAX_TOKENS", "2600"))))
+
     try:
         client = get_openai_client()
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=analysis_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.3,
-            max_tokens=2048,
+            temperature=analysis_temperature,
+            max_tokens=analysis_max_tokens,
         )
-        analysis_text = completion.choices[0].message.content
+        analysis_text = completion.choices[0].message.content or ""
     except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail=f"LLM analysis failed: {exc}",
         )
 
+    analysis_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", analysis_text).strip()
+    inline_source_ids = _extract_inline_source_ids(analysis_text)
+    if inline_source_ids and sources:
+        cited_sources = [s for s in sources if s.get("source_id") in set(inline_source_ids)]
+    else:
+        cited_sources = []
+
+    final_analysis = deterministic_section.strip() + "\n\n" + analysis_text.strip()
+
+    if cited_sources:
+        refs_lines = ["", "### References"]
+        for s in cited_sources:
+            ref_label = (
+                f"{s.get('title') or s.get('filename')}"
+                + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
+                + (f" — {s.get('section_title')}" if s.get("section_title") else "")
+            )
+            refs_lines.append(
+                f"- [{s['source_id']}] {ref_label}"
+            )
+        final_analysis = f"{final_analysis}\n" + "\n".join(refs_lines)
+    else:
+        final_analysis = (
+            f"{final_analysis}\n\n### References\n"
+            "- No inline [Sx] citations were produced by the model for standards claims."
+        )
+
     return AIAnalysisResponse(
-        analysis=analysis_text,
+        analysis=final_analysis,
         flight_test_name=ft.test_name,
         parameters_analysed=len(stats_rows),
     )

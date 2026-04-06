@@ -3,6 +3,8 @@ import Sidebar from '../components/Sidebar';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { ApiService, QueryResponse } from '../services/api';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Sparkles,
   Send,
@@ -40,6 +42,7 @@ function SourceCard({ source }: { source: QueryResponse['sources'][0] }) {
         <div className="flex items-center gap-2 min-w-0">
           <BookOpen className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
           <span className="text-xs font-medium text-gray-700 truncate">
+            {source.source_id ? `${source.source_id} · ` : ''}
             {source.title || source.filename}
           </span>
           {source.page_numbers && (
@@ -84,9 +87,24 @@ function AnswerCard({ entry }: { entry: HistoryEntry }) {
               {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-            {entry.response.answer}
-          </p>
+          <div
+            className="
+              prose prose-sm max-w-none
+              prose-headings:font-semibold prose-headings:text-gray-800
+              prose-p:text-gray-800 prose-p:leading-relaxed
+              prose-strong:text-gray-900
+              prose-ul:my-2 prose-ol:my-2
+              prose-table:text-xs prose-table:w-full
+              prose-th:bg-gray-50 prose-th:px-2 prose-th:py-1 prose-th:border prose-th:border-gray-200
+              prose-td:px-2 prose-td:py-1 prose-td:border prose-td:border-gray-200
+              prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-xs
+              prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg prose-pre:p-3
+            "
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {entry.response.answer}
+            </ReactMarkdown>
+          </div>
 
           {entry.response.sources.length > 0 && (
             <div className="mt-3 pt-3 border-t border-gray-100">
@@ -132,7 +150,7 @@ export default function AIQuery() {
     setLoading(true);
     setError('');
     try {
-      const response = await ApiService.queryDocuments(q, 6);
+      const response = await ApiService.queryDocuments(q, 8);
       setHistory((prev) => [
         ...prev,
         { id: Date.now(), question: q, response, timestamp: new Date() },
