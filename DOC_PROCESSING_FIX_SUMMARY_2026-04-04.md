@@ -358,3 +358,128 @@ docker compose stop frontend
 ```powershell
 npm run dev
 ```
+
+## Improvement Backlog (P0/P1/P2) — 2026-04-06
+
+This section captures the priority roadmap focused on gaps and risks, not achievements.
+
+### P0 — Security, Correctness, Build Stability (Immediate)
+
+1. Lock down exposed user endpoints
+- Risk: `/api/users/*` currently allows user management without auth guards.
+- Files:
+  - `backend/app/routers/users.py`
+  - `backend/app/main.py`
+- Action:
+  - Require admin auth on all `/api/users/*` routes, or remove this router and keep `/api/admin/users/*` as the only management API.
+
+2. Enforce document tenancy isolation
+- Risk: document list/delete/query retrieval can cross user boundaries.
+- Files:
+  - `backend/app/routers/documents.py`
+- Action:
+  - Add user-scope filters (`uploaded_by_id == current_user.id`) to list/delete/query retrieval SQL.
+
+3. Strict timestamp validation in CSV ingestion
+- Risk: fallback timestamp synthesis can silently fabricate timeline data.
+- Files:
+  - `backend/app/routers/flight_tests.py`
+  - `backend/tests/test_flight_tests_comprehensive.py`
+- Action:
+  - Reject rows/files with missing or invalid timestamp format.
+  - Return explicit validation errors with row references.
+
+4. Restore frontend production build to green
+- Risk: current frontend build has blocking TS/lint/type issues.
+- Files:
+  - `frontend/src/components/TimeSeriesChart.tsx`
+  - `frontend/src/pages/Settings.tsx`
+  - `frontend/tsconfig.node.json`
+  - dependency/type resolution for `react-markdown`, `remark-gfm`, `html2canvas`
+- Action:
+  - Resolve current compile errors and enforce build in CI.
+
+### P1 — Data Model & UX Alignment for Mixed Flight-Test Domains
+
+1. Align upload UX and backend capabilities
+- Gap: UI allows CSV/XLS/XLSX while backend upload endpoint is CSV-only.
+- Files:
+  - `frontend/src/components/DropZone.tsx`
+  - `frontend/src/pages/Upload.tsx`
+  - `backend/app/routers/flight_tests.py`
+- Action:
+  - Either implement true Excel ingestion in backend or constrain UI to CSV until implemented.
+
+2. Replace synthetic upload history with real upload sessions
+- Gap: upload history is currently derived from parameter stats + localStorage.
+- Files:
+  - `frontend/src/services/api.ts`
+  - backend models/routers for ingestion session tracking
+- Action:
+  - Add persistent upload session entity with filename, row count, status, error log, timestamps.
+
+3. Scale parameter exploration for large datasets
+- Gap: chip-based selection is not viable for hundreds/thousands of channels.
+- Files:
+  - `frontend/src/pages/Parameters.tsx`
+  - `frontend/src/pages/FlightTestDetail.tsx`
+- Action:
+  - Add searchable parameter tree, subsystem grouping, favorites, and saved parameter sets.
+
+4. Improve chart architecture for engineer workflows
+- Gap: limited linked analysis (crosshair sync, event overlays, compare runs).
+- Files:
+  - `frontend/src/components/TimeSeriesChart.tsx`
+  - `frontend/src/components/CorrelationChart.tsx`
+  - `frontend/src/pages/Parameters.tsx`
+- Action:
+  - Add synchronized multi-panel timeline, event markers, threshold bands, and compare-flight overlay mode.
+
+### P2 — LLM/RAG Domainization & Report Provenance
+
+1. Move from single analysis path to domain modes
+- Gap: analysis pipeline is tuned to takeoff and not modular for electrical/vibration/propulsion.
+- Files:
+  - `backend/app/routers/documents.py`
+- Action:
+  - Introduce `analysis_mode` (`takeoff`, `landing`, `electrical`, `vibration`, `general`) and route to dedicated deterministic calculators/prompts.
+
+2. Enrich retrieval metadata and filtering
+- Gap: retrieval depends mainly on chunk text with weak domain constraints.
+- Files:
+  - `backend/app/models.py`
+  - `backend/app/routers/documents.py`
+  - DB migration scripts
+- Action:
+  - Add metadata fields (document revision, authority, domain tags, system tags) and pre-filter retrieval by mode/context.
+
+3. Persist analysis jobs and generate reports from immutable artifacts
+- Gap: PDF generation currently accepts freeform analysis text payload.
+- Files:
+  - `backend/app/routers/admin.py`
+  - new analysis job model + endpoints
+  - `frontend/src/pages/FlightTestDetail.tsx`
+- Action:
+  - Save analysis output with prompt/model/source ids/hash and export PDF by `analysis_job_id`.
+
+## Proposed API Contracts (Implementation Targets)
+
+1. `POST /api/flight-tests/{id}/analysis-jobs`
+- Request:
+  - `analysis_mode` (`takeoff|landing|electrical|vibration|general`)
+  - `user_prompt` (optional)
+  - `parameter_scope` (optional list)
+- Response:
+  - `job_id`, `status`, `created_at`
+
+2. `GET /api/flight-tests/{id}/analysis-jobs/{job_id}`
+- Response:
+  - deterministic metrics
+  - narrative analysis
+  - source references
+  - model/prompt metadata
+  - confidence/coverage indicators
+
+3. `POST /api/admin/analysis-jobs/{job_id}/report.pdf`
+- Response:
+  - PDF generated from persisted job data (no raw analysis body required).
