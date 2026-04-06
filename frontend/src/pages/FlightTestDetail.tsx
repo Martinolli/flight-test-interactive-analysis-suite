@@ -29,6 +29,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../lib/utils';
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -183,7 +184,17 @@ function AIAnalysisPanel({
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [userPrompt, setUserPrompt] = useState('');
   const { user } = useAuth();
+
+  // Quick-prompt chips — click to pre-fill the prompt box
+  const QUICK_PROMPTS = [
+    { label: 'Takeoff Performance', text: 'Analyse the takeoff performance: ground roll distance, rotation speed, climb gradient, and any deviations from expected values.' },
+    { label: 'Landing Performance', text: 'Analyse the landing performance: approach speed, touchdown point, ground roll distance, and deceleration rate.' },
+    { label: 'Climb Performance', text: 'Analyse the climb performance: rate of climb, climb gradient, engine parameters during climb, and fuel consumption.' },
+    { label: 'Vibration & Loads', text: 'Analyse structural loads and vibration data: identify any abnormal load factors, vibration frequencies, or exceedances of structural limits.' },
+    { label: 'General Summary', text: 'Produce a general flight test summary with executive overview, key parameter observations, anomalies, and recommendations.' },
+  ];
 
   async function handleExportPDF() {
     if (!result) return;
@@ -242,7 +253,7 @@ function AIAnalysisPanel({
     setError('');
     setResult(null);
     try {
-      const data = await ApiService.getAIAnalysis(flightTestId);
+      const data = await ApiService.getAIAnalysis(flightTestId, userPrompt.trim() || undefined);
       setResult(data);
     } catch (err) {
       setError((err as Error).message || 'AI analysis failed');
@@ -271,17 +282,42 @@ function AIAnalysisPanel({
         <p className="text-xs text-gray-500 mt-1">
           Cross-references your flight data against indexed standards and handbooks using RAG.
         </p>
+        {/* Quick-prompt chips */}
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {QUICK_PROMPTS.map((qp) => (
+            <button
+              key={qp.label}
+              onClick={() => setUserPrompt(qp.text)}
+              disabled={loading}
+              className={cn(
+                'text-xs px-2.5 py-1 rounded-full border transition-colors',
+                userPrompt === qp.text
+                  ? 'bg-purple-100 border-purple-300 text-purple-700'
+                  : 'border-gray-200 text-gray-500 hover:border-purple-300 hover:text-purple-600'
+              )}
+            >
+              {qp.label}
+            </button>
+          ))}
+        </div>
       </CardHeader>
       <CardContent>
+        {/* Prompt input — always visible */}
+        <div className="mb-4">
+          <textarea
+            value={userPrompt}
+            onChange={(e) => setUserPrompt(e.target.value)}
+            placeholder="Describe your analysis goal, or click a chip above to pre-fill… (leave blank for a general report)"
+            rows={2}
+            disabled={loading}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
+                       placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400
+                       focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+        </div>
+
         {!result && !loading && !error && (
-          <div className="text-center py-6">
-            <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Sparkles className="w-6 h-6 text-purple-400" />
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Run an AI analysis to compare this flight test's parameters against relevant
-              standards (MIL-STD, FAR/CS, DO-xxx) from the Document Library.
-            </p>
+          <div className="text-center py-4">
             <Button
               onClick={runAnalysis}
               className="bg-purple-600 hover:bg-purple-700 text-white"

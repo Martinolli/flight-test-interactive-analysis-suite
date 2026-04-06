@@ -7,7 +7,10 @@ import {
   AlertCircle,
   CheckSquare,
   Square,
+  Download,
+  Loader2,
 } from 'lucide-react';
+import { useChartDownload } from '../hooks/useChartDownload';
 import Sidebar from '../components/Sidebar';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import CorrelationChart from '../components/CorrelationChart';
@@ -44,6 +47,17 @@ export default function Parameters() {
   // UI state
   const [activeTab, setActiveTab] = useState<ChartTab>('timeseries');
   const [showMean, setShowMean] = useState(false);
+
+  // Chart download
+  const { chartRef, downloadChart, downloading } = useChartDownload();
+
+  const selectedTestName = flightTests.find((t) => t.id === selectedTestId)?.test_name ?? 'chart';
+
+  function handleDownloadChart() {
+    const paramNames = Array.from(selectedParams).join('_').replace(/\s+/g, '-').slice(0, 40);
+    const label = activeTab === 'timeseries' ? paramNames : `${corrX}_vs_${corrY}`;
+    downloadChart(`FTIAS_${label}_${selectedTestName.replace(/\s+/g, '_')}`);
+  }
 
   // Correlation axis selections
   const [corrX, setCorrX] = useState('');
@@ -299,20 +313,43 @@ export default function Parameters() {
                       </button>
                     </div>
 
-                    {/* Time series options */}
-                    {activeTab === 'timeseries' && (
-                      <button
-                        onClick={() => setShowMean((v) => !v)}
-                        className={cn(
-                          'text-xs px-3 py-1.5 rounded-lg border transition-colors',
-                          showMean
-                            ? 'bg-blue-50 border-blue-200 text-blue-700'
-                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                        )}
-                      >
-                        {showMean ? '✓ ' : ''}Show mean line
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Time series options */}
+                      {activeTab === 'timeseries' && (
+                        <button
+                          onClick={() => setShowMean((v) => !v)}
+                          className={cn(
+                            'text-xs px-3 py-1.5 rounded-lg border transition-colors',
+                            showMean
+                              ? 'bg-blue-50 border-blue-200 text-blue-700'
+                              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          )}
+                        >
+                          {showMean ? '✓ ' : ''}Show mean line
+                        </button>
+                      )}
+
+                      {/* Download chart button — shown when chart has data */}
+                      {!loadingChart && !chartError &&
+                        ((activeTab === 'timeseries' && seriesData.length > 0) ||
+                          (activeTab === 'correlation' && corrXSeries && corrYSeries)) && (
+                        <button
+                          onClick={handleDownloadChart}
+                          disabled={downloading}
+                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200
+                                     text-gray-600 hover:border-blue-300 hover:text-blue-600 transition-colors
+                                     disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Download chart as PNG"
+                        >
+                          {downloading ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                          {downloading ? 'Saving…' : 'Download PNG'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
 
@@ -348,11 +385,13 @@ export default function Parameters() {
 
                   {/* Time series chart */}
                   {!loadingChart && !chartError && seriesData.length > 0 && activeTab === 'timeseries' && (
-                    <TimeSeriesChart
-                      series={seriesData}
-                      height={340}
-                      showReferenceMean={showMean}
-                    />
+                    <div ref={chartRef} className="bg-white">
+                      <TimeSeriesChart
+                        series={seriesData}
+                        height={340}
+                        showReferenceMean={showMean}
+                      />
+                    </div>
                   )}
 
                   {/* Correlation chart */}
@@ -409,11 +448,13 @@ export default function Parameters() {
                       )}
 
                       {!loadingCorr && corrXSeries && corrYSeries ? (
-                        <CorrelationChart
-                          xSeries={corrXSeries}
-                          ySeries={corrYSeries}
-                          height={300}
-                        />
+                        <div ref={chartRef} className="bg-white">
+                          <CorrelationChart
+                            xSeries={corrXSeries}
+                            ySeries={corrYSeries}
+                            height={300}
+                          />
+                        </div>
                       ) : !loadingCorr && (
                         <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
                           Select parameters for both axes to display the scatter plot.

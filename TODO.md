@@ -31,8 +31,8 @@ This file tracks all features, fixes, and tasks. Completed items are kept as his
 
 ## Phase A — Quick Wins
 
-- [ ] A1: Chart PNG download button (TimeSeriesChart, CorrelationChart)
-- [ ] A2: Contextual AI prompt box with quick-prompt chips (Takeoff, Landing, Climb, Vibration, General)
+- [x] A1: Chart PNG download button (TimeSeriesChart, CorrelationChart)
+- [x] A2: Contextual AI prompt box with quick-prompt chips (Takeoff, Landing, Climb, Vibration, General)
 
 ---
 

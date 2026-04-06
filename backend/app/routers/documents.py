@@ -685,12 +685,17 @@ def query_documents(
 # POST /api/documents/flight-tests/{flight_test_id}/ai-analysis
 # ---------------------------------------------------------------------------
 
+class AIAnalysisRequest(BaseModel):
+    user_prompt: str | None = None
+
+
 @router.post(
     "/flight-tests/{flight_test_id}/ai-analysis",
     response_model=AIAnalysisResponse,
 )
 def ai_analysis(
     flight_test_id: int,
+    body: AIAnalysisRequest = AIAnalysisRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -700,6 +705,10 @@ def ai_analysis(
     Computes per-parameter statistics (min, max, mean, std dev, sample count),
     retrieves the most relevant document chunks from the library as context,
     and asks the LLM to produce a structured analysis report.
+
+    Optional body field:
+    - user_prompt: Free-text analysis goal from the user (e.g. 'Analyse takeoff performance').
+      When provided, this replaces the default generic analysis instruction.
     """
     _require_ai_packages()
     # Fetch the flight test
@@ -780,17 +789,26 @@ def ai_analysis(
     system_prompt = (
         "You are a senior flight test engineer. "
         "Analyse the provided flight test statistics and produce a structured report. "
-        "Include: (1) Executive Summary, (2) Parameter Analysis with notable observations, "
-        "(3) Potential Anomalies or Concerns, (4) Recommendations. "
         "Be concise and technical. Use the document excerpts as reference standards "
-        "where relevant, citing source and page."
+        "where relevant, citing source and page number."
     )
+
+    # If the user supplied a specific analysis goal, use it; otherwise use the default.
+    if body.user_prompt and body.user_prompt.strip():
+        analysis_goal = body.user_prompt.strip()
+    else:
+        analysis_goal = (
+            "Produce a structured report with: (1) Executive Summary, "
+            "(2) Parameter Analysis with notable observations, "
+            "(3) Potential Anomalies or Concerns, (4) Recommendations."
+        )
 
     user_prompt = (
         f"Flight Test: {ft.test_name}\n"
         f"Aircraft: {ft.aircraft_type or 'Not specified'}\n"
         f"Test Date: {ft.test_date.strftime('%Y-%m-%d') if ft.test_date else 'Not specified'}\n"
         f"Description: {ft.description or 'None'}\n\n"
+        f"Analysis Goal: {analysis_goal}\n\n"
         f"Parameter Statistics:\n{stats_table}"
     )
 

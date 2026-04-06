@@ -374,10 +374,17 @@ export class ApiService {
 
   // ─── AI Analysis ──────────────────────────────────────────────────────────
 
-  static async getAIAnalysis(flightTestId: number): Promise<AIAnalysisResponse> {
+  static async getAIAnalysis(
+    flightTestId: number,
+    userPrompt?: string
+  ): Promise<AIAnalysisResponse> {
     return this.request<AIAnalysisResponse>(
       `/api/documents/flight-tests/${flightTestId}/ai-analysis`,
-      { method: 'POST' }
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_prompt: userPrompt ?? null }),
+      }
     );
   }
 
