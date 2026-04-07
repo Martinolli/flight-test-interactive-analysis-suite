@@ -14,7 +14,7 @@
   - Restrict `/api/users/*` to admin or remove in favor of `/api/admin/users/*`.
 - [x] Enforce document tenancy
   - Scope document list/delete/query by `uploaded_by_id == current_user.id`.
-- [ ] Enforce strict timestamp validation on ingestion
+- [x] Enforce strict timestamp validation on ingestion
   - Reject invalid/missing timestamps with row-level errors.
 - [ ] Make frontend production build fully green
   - Resolve TS/type/lint blockers and enforce in CI.

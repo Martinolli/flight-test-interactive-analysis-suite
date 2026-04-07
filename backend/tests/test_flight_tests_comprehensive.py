@@ -424,6 +424,60 @@ EU,deg,deg,deg/s
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "timestamp" in response.json()["detail"].lower()
 
+    def test_csv_upload_invalid_timestamp_format(self, client,
+                                                 test_user, auth_headers, db_session):
+        """Invalid timestamp values should fail with row-level detail."""
+        flight_test = FlightTest(
+            test_name="Invalid Timestamp CSV Test", aircraft_type="F-16",
+            created_by_id=test_user["id"]
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        csv_content = """timestamp,ALT,IAS
+s,ft,kt
+abc,5000.0,250.0
+0.1,5050.0,251.0"""
+
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
+        response = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files=files, headers=auth_headers
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        detail = response.json()["detail"].lower()
+        assert "timestamp validation failed" in detail
+        assert "row 3" in detail
+
+    def test_csv_upload_missing_timestamp_value(self, client,
+                                                test_user, auth_headers, db_session):
+        """Blank timestamp cells should fail with row-level detail."""
+        flight_test = FlightTest(
+            test_name="Blank Timestamp CSV Test", aircraft_type="F-16",
+            created_by_id=test_user["id"]
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        csv_content = """timestamp,ALT,IAS
+s,ft,kt
+,5000.0,250.0
+0.1,5050.0,251.0"""
+
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
+        response = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files=files, headers=auth_headers
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        detail = response.json()["detail"].lower()
+        assert "timestamp validation failed" in detail
+        assert "row 3" in detail
+
     def test_csv_upload_nonexistent_flight_test(self, client, auth_headers):
         """Test uploading CSV to non-existent flight test"""
         csv_content = """timestamp,ALT

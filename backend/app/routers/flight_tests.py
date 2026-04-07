@@ -5,6 +5,7 @@ Flight test data management and CSV upload endpoints
 
 import csv
 import io
+import re
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -248,8 +249,28 @@ async def upload_flight_data_csv(
         units_row = lines[1]
 
         # Build parameter-name → unit mapping from the first two rows
-        headers = [h.strip() for h in header_row.split(",")]
-        units_list = [u.strip() for u in units_row.split(",")]
+        headers = [h.strip() for h in next(csv.reader([header_row]))]
+        units_list = [u.strip() for u in next(csv.reader([units_row]))]
+        if not headers:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV header row is empty.",
+            )
+
+        timestamp_candidates = {"timestamp", "time", "description"}
+        timestamp_col_name = next(
+            (h for h in headers if h and h.strip().lower() in timestamp_candidates),
+            None,
+        )
+        if not timestamp_col_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "CSV must contain a timestamp column. "
+                    "Accepted names: timestamp, time, or description."
+                ),
+            )
+
         param_units: dict[str, str] = {
             headers[i]: (units_list[i] if i < len(units_list) else "")
             for i in range(len(headers))
@@ -260,9 +281,9 @@ async def upload_flight_data_csv(
         param_cache: dict[str, TestParameter] = {p.name: p for p in existing_params}
 
         # Identify which parameter names appear in this CSV (skip timestamp cols)
-        TIMESTAMP_COLS = {"timestamp", "time", "description"}
+        TIMESTAMP_COLS = timestamp_candidates
         data_col_names = [
-            h for h in headers if h.lower() not in TIMESTAMP_COLS and h
+            h for h in headers if h and h != timestamp_col_name and h.lower() not in TIMESTAMP_COLS
         ]
 
         # Create any missing parameters in a single batch
@@ -290,29 +311,49 @@ async def upload_flight_data_csv(
         total_data_points = 0
         batch: list[DataPoint] = []
 
-        def _parse_timestamp(ts_str: str, fallback_offset: float) -> datetime:
-            """Parse the custom Day:HH:MM:SS.mmm format or a plain float offset."""
+        def _parse_timestamp(ts_str: str) -> datetime:
+            """Parse supported timestamp formats or raise ValueError."""
             ts_str = ts_str.strip()
+            if not ts_str:
+                raise ValueError("missing timestamp value")
+
+            # Numeric offset in seconds from base_date (legacy CSV format).
             try:
                 return base_date + timedelta(seconds=float(ts_str))
             except ValueError:
                 pass
+
+            # Day:HH:MM:SS[.ffffff]
+            day_format = re.match(
+                r"^\s*(\d+):(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,6}))?\s*$",
+                ts_str,
+            )
+            if day_format:
+                day = int(day_format.group(1))
+                hour = int(day_format.group(2))
+                minute = int(day_format.group(3))
+                second = int(day_format.group(4))
+                fraction = day_format.group(5) or ""
+                if hour >= 24 or minute >= 60 or second >= 60:
+                    raise ValueError("out-of-range timestamp component")
+                microseconds = int(fraction.ljust(6, "0")) if fraction else 0
+                return base_date + timedelta(
+                    days=day,
+                    hours=hour,
+                    minutes=minute,
+                    seconds=second,
+                    microseconds=microseconds,
+                )
+
+            # ISO datetime support when present in imported datasets.
             try:
-                parts = ts_str.split(":")
-                if len(parts) == 4:
-                    day = int(parts[0])
-                    hour = int(parts[1])
-                    minute = int(parts[2])
-                    sec_parts = parts[3].split(".")
-                    second = int(sec_parts[0])
-                    millisecond = int(sec_parts[1]) if len(sec_parts) > 1 else 0
-                    return base_date + timedelta(
-                        days=day, hours=hour, minutes=minute,
-                        seconds=second, milliseconds=millisecond,
-                    )
-            except (ValueError, IndexError):
-                pass
-            return base_date + timedelta(seconds=fallback_offset)
+                iso_value = ts_str.replace("Z", "+00:00")
+                return datetime.fromisoformat(iso_value)
+            except ValueError as exc:
+                raise ValueError("unsupported timestamp format") from exc
+
+        timestamp_errors: list[str] = []
+        max_timestamp_errors = 10
 
         for row in csv_reader:
             row_count += 1
@@ -323,17 +364,21 @@ async def upload_flight_data_csv(
                            "Please split the file and upload in parts.",
                 )
 
-            ts_raw = (
-                row.get("timestamp")
-                or row.get("Timestamp")
-                or row.get("TIME")
-                or row.get("Description")
-                or ""
-            ).strip()
+            csv_row_number = row_count + 2  # include header + units rows
+            ts_raw = (row.get(timestamp_col_name) or "").strip()
             if not ts_raw:
-                continue  # skip rows with no timestamp rather than aborting
+                if len(timestamp_errors) < max_timestamp_errors:
+                    timestamp_errors.append(f"row {csv_row_number}: missing timestamp")
+                continue
 
-            parsed_ts = _parse_timestamp(ts_raw, row_count * 0.1)
+            try:
+                parsed_ts = _parse_timestamp(ts_raw)
+            except ValueError:
+                if len(timestamp_errors) < max_timestamp_errors:
+                    timestamp_errors.append(
+                        f"row {csv_row_number}: invalid timestamp '{ts_raw}'"
+                    )
+                continue
 
             for col in data_col_names:
                 value_str = (row.get(col) or "").strip()
@@ -364,6 +409,16 @@ async def upload_flight_data_csv(
                 total_data_points += len(batch)
                 batch = []
 
+        if timestamp_errors:
+            error_count = len(timestamp_errors)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Timestamp validation failed. "
+                    f"Found {error_count} row error(s): " + "; ".join(timestamp_errors)
+                ),
+            )
+
         # Insert any remaining data points
         if batch:
             db.bulk_save_objects(batch)
@@ -380,6 +435,7 @@ async def upload_flight_data_csv(
         }
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         db.rollback()

@@ -614,3 +614,36 @@ pytest backend/tests/test_documents_tenancy.py backend/tests/test_users.py -q
 ```
 
 **Result:** `14 passed`.
+
+### Completed: Strict timestamp validation for CSV ingestion
+
+**Goal:** remove synthetic/fallback timeline fabrication and fail uploads with explicit row-level timestamp errors.
+
+**Files changed:**
+
+- `backend/app/routers/flight_tests.py`
+- `backend/tests/test_flight_tests_comprehensive.py`
+- `TODO.md`
+
+**What changed:**
+
+- Removed permissive timestamp fallback behavior that previously synthesized timestamps.
+- Added strict timestamp column detection (`timestamp`, `time`, or `description`).
+- Added strict timestamp parser supporting:
+  - numeric seconds offset
+  - `Day:HH:MM:SS[.fraction]`
+  - ISO datetime
+- Added row-level error collection for:
+  - missing timestamp values
+  - invalid timestamp format
+- Upload now returns `400` with explicit row references when timestamp validation fails.
+- Added rollback on `HTTPException` in upload flow to ensure validation failures do not leave partial DB changes.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+pytest backend/tests/test_csv_upload.py -q
+```
+
+**Result:** all tests passed.
