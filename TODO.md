@@ -16,7 +16,7 @@
   - Scope document list/delete/query by `uploaded_by_id == current_user.id`.
 - [x] Enforce strict timestamp validation on ingestion
   - Reject invalid/missing timestamps with row-level errors.
-- [ ] Make frontend production build fully green
+- [x] Make frontend production build fully green
   - Resolve TS/type/lint blockers and enforce in CI.
 - [ ] Add ingestion observability baseline
   - Log and track parse/chunk/embed stage durations per document.

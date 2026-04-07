@@ -12,7 +12,6 @@ import {
   AlertCircle,
   Sparkles,
   Loader2,
-  BookOpen,
   ChevronDown,
   ChevronUp,
   BarChart3,

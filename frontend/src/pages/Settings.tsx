@@ -153,7 +153,7 @@ export default function Settings() {
 
   const handleReset = () => {
     setSettings(DEFAULT_SETTINGS);
-    toast.info('Settings reset', 'All settings restored to defaults.');
+    toast.warning('Settings reset', 'All settings restored to defaults.');
   };
 
   return (

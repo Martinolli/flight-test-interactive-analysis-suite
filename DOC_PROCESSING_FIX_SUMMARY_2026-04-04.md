@@ -647,3 +647,43 @@ pytest backend/tests/test_csv_upload.py -q
 ```
 
 **Result:** all tests passed.
+
+### Completed: Frontend production build restored to green
+
+**Goal:** clear TypeScript build blockers so `npm run build` succeeds consistently.
+
+**Files changed:**
+
+- `frontend/src/components/TimeSeriesChart.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/pages/Settings.tsx`
+- `frontend/tsconfig.app.json`
+- `frontend/tsconfig.node.json`
+- `frontend/.gitignore`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Removed unused declarations/imports that failed `noUnusedLocals`.
+- Fixed settings toast API call (`toast.info` -> `toast.warning`) to match available hook methods.
+- Added per-config `tsBuildInfoFile` paths under `frontend/node_modules/.tmp/` to avoid root noise.
+- Set `frontend/tsconfig.node.json` to `noEmit: true` so build-time typecheck does not require emitted JS.
+- Added frontend ignore entries for generated files:
+  - `*.tsbuildinfo`
+  - `vite.config.js`
+  - `vite.config.d.ts`
+- Installed missing declared frontend dependencies used by code:
+  - `react-markdown`
+  - `remark-gfm`
+  - `html2canvas`
+
+**Validation run:**
+
+```powershell
+cd frontend
+npm run build
+```
+
+**Result:** build completed successfully (`tsc -b && vite build`).

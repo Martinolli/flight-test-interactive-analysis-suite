@@ -195,35 +195,6 @@ function CustomLegend({
   );
 }
 
-// ── Y-Axis label component ───────────────────────────────────────────────────
-function AxisLabel({
-  value,
-  angle,
-  x,
-  y,
-  fill,
-}: {
-  value: string;
-  angle: number;
-  x: number;
-  y: number;
-  fill: string;
-}) {
-  return (
-    <text
-      x={x}
-      y={y}
-      fill={fill}
-      textAnchor="middle"
-      dominantBaseline="central"
-      transform={`rotate(${angle}, ${x}, ${y})`}
-      fontSize={11}
-    >
-      {value}
-    </text>
-  );
-}
-
 // ── Main component ───────────────────────────────────────────────────────────
 export default function TimeSeriesChart({
   series,

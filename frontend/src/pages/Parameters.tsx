@@ -18,7 +18,6 @@ import StatCard from '../components/StatCard';
 import { ToastContainer, useToast } from '../components/ui/toast';
 import { ApiService, FlightTest, ParameterInfo, ParameterSeries } from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
 import { cn } from '@/lib/utils';
 
 type ChartTab = 'timeseries' | 'correlation';

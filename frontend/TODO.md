@@ -7,7 +7,7 @@
 
 ## P0 — Immediate Frontend Work
 
-- [ ] Restore production build reliability
+- [x] Restore production build reliability
   - Resolve all TypeScript and lint blockers in app build path.
   - Keep Tailwind utility normalization warnings cleaned up where touched.
 - [ ] Improve AI answer rendering for technical content
