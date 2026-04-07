@@ -366,14 +366,11 @@ class TestPasswordSecurity:
         assert "password" not in data
         assert "hashed_password" not in data
 
-        # Get user by ID
+        # /api/users/{id} is admin-only; regular users should be denied.
         response = client.get(f"/api/users/{test_user['id']}",
                               headers=auth_headers
                               )
-        data = response.json()
-
-        assert "password" not in data
-        assert "hashed_password" not in data
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 class TestRateLimiting:

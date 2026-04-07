@@ -9,11 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_superuser
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserResponse, UserUpdate
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_superuser)])
 
 # Password hashing
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")

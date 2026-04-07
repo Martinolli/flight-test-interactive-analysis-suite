@@ -10,7 +10,7 @@
 
 ### P0 — Immediate (Security, Correctness, Build Stability)
 
-- [ ] Lock down user-management routes
+- [x] Lock down user-management routes
   - Restrict `/api/users/*` to admin or remove in favor of `/api/admin/users/*`.
 - [ ] Enforce document tenancy
   - Scope document list/delete/query by `uploaded_by_id == current_user.id`.

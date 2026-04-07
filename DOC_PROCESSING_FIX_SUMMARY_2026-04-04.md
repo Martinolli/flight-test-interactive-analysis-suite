@@ -551,3 +551,35 @@ This section captures the priority roadmap focused on gaps and risks, not achiev
 
 - Response:
   - FRAT PDF generated from persisted assessment snapshot.
+
+## P0 Implementation Update (2026-04-07)
+
+### Completed: Lock down exposed `/api/users/*` endpoints
+
+**Goal:** close an admin-privilege bypass where user-management CRUD endpoints were previously unauthenticated.
+
+**Files changed:**
+
+- `backend/app/routers/users.py`
+- `backend/tests/conftest.py`
+- `backend/tests/test_users.py`
+- `backend/tests/test_csv_upload.py`
+- `backend/tests/test_auth_comprehensive.py`
+- `TODO.md`
+
+**What changed:**
+
+- Applied router-level dependency `Depends(get_current_superuser)` to `/api/users/*`.
+- Added dedicated superuser test fixtures (`admin_user`, `admin_headers`) for admin-only route coverage.
+- Updated user-route tests to use admin auth.
+- Added explicit test that a regular authenticated user receives `403` on `/api/users/*`.
+- Updated auth comprehensive test to reflect admin-only access for `/api/users/{id}`.
+- Updated CSV upload test setup to create users through admin-authenticated flow.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_users.py backend/tests/test_csv_upload.py backend/tests/test_auth_comprehensive.py -q
+```
+
+**Result:** `36 passed, 1 skipped`.

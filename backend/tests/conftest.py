@@ -108,3 +108,40 @@ def auth_headers(client, test_user):
     assert response.status_code == 200, response.text
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="function")
+def admin_user(db_session):
+    """Create a default active superuser for admin-only endpoint tests."""
+    password = "adminpass123"
+    user = User(
+        email="admin@test.com",
+        username="adminuser",
+        full_name="Admin User",
+        hashed_password=get_password_hash(password),
+        is_active=True,
+        is_superuser=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "username": user.username,
+        "full_name": user.full_name,
+        "password": password,
+    }
+
+
+@pytest.fixture(scope="function")
+def admin_headers(client, admin_user):
+    """Authorization header for the default superuser."""
+    response = client.post(
+        "/api/auth/login",
+        json={"username": admin_user["username"], "password": admin_user["password"]},
+    )
+    assert response.status_code == 200, response.text
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

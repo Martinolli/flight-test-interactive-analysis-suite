@@ -11,8 +11,8 @@ def _get_csv_path() -> Path:
     return repo_root / "sample_data" / "Flight_Test_Data_2025_08_06.csv"
 
 
-def _create_user(client, user_data: dict) -> None:
-    response = client.post("/api/users/", json=user_data)
+def _create_user(client, user_data: dict, admin_headers: dict) -> None:
+    response = client.post("/api/users/", json=user_data, headers=admin_headers)
     assert response.status_code == status.HTTP_201_CREATED
 
 
@@ -41,9 +41,9 @@ def _create_flight_test(client, token: str) -> int:
 
 @pytest.mark.api
 @pytest.mark.database
-def test_csv_upload_flow(client, sample_user_data):
+def test_csv_upload_flow(client, sample_user_data, admin_headers):
     """Upload a CSV file and verify data points are created."""
-    _create_user(client, sample_user_data)
+    _create_user(client, sample_user_data, admin_headers)
     token = _login(
         client,
         sample_user_data["username"],
