@@ -827,6 +827,13 @@ def _process_document_upload(doc_id: int, pdf_path: str):
     This keeps the upload HTTP request fast and avoids client-side timeouts.
     """
     started = time.monotonic()
+    parse_chunk_duration_s = 0.0
+    embed_duration_s = 0.0
+    persist_duration_s = 0.0
+    finalize_duration_s = 0.0
+    total_batches = 0
+    embedded_count = 0
+    missing_embeddings = 0
     db = SessionLocal()
     try:
         doc = db.query(Document).filter(Document.id == doc_id).first()
@@ -834,18 +841,22 @@ def _process_document_upload(doc_id: int, pdf_path: str):
             logger.error("Document %d not found for background processing", doc_id)
             return
 
+        parse_chunk_started = time.monotonic()
         chunks_data, total_pages = parse_and_chunk_pdf(
             pdf_path=pdf_path,
             file_size_bytes=doc.file_size_bytes,
             doc_id=doc_id,
         )
+        parse_chunk_duration_s = time.monotonic() - parse_chunk_started
         logger.info(
-            "Document %d chunking complete: pages=%s chunks=%d",
+            "Document %d chunking complete: pages=%s chunks=%d duration=%.2fs",
             doc_id,
             total_pages,
             len(chunks_data),
+            parse_chunk_duration_s,
         )
 
+        embed_started = time.monotonic()
         embeddings: List[Optional[List[float]]] = [None] * len(chunks_data)
         chunk_texts = [chunk["text"] for chunk in chunks_data]
 
@@ -891,6 +902,18 @@ def _process_document_upload(doc_id: int, pdf_path: str):
                             absolute_idx,
                             emb_exc,
                         )
+        embed_duration_s = time.monotonic() - embed_started
+        embedded_count = sum(1 for e in embeddings if e is not None)
+        missing_embeddings = len(embeddings) - embedded_count
+        logger.info(
+            "Document %d embedding complete: chunks=%d embedded=%d missing=%d batches=%d duration=%.2fs",
+            doc_id,
+            len(chunk_texts),
+            embedded_count,
+            missing_embeddings,
+            total_batches,
+            embed_duration_s,
+        )
 
         chunk_objects = []
         for idx, chunk_info in enumerate(chunks_data):
@@ -905,16 +928,20 @@ def _process_document_upload(doc_id: int, pdf_path: str):
                 )
             )
 
+        persist_started = time.monotonic()
         batch_size = 100
         for i in range(0, len(chunk_objects), batch_size):
             db.bulk_save_objects(chunk_objects[i : i + batch_size])
             db.commit()
+        persist_duration_s = time.monotonic() - persist_started
 
+        finalize_started = time.monotonic()
         doc.total_pages = total_pages
         doc.total_chunks = len(chunk_objects)
         doc.status = "ready"
         doc.error_message = None
         db.commit()
+        finalize_duration_s = time.monotonic() - finalize_started
 
         elapsed = time.monotonic() - started
         logger.info(
@@ -924,9 +951,28 @@ def _process_document_upload(doc_id: int, pdf_path: str):
             len(chunk_objects),
             elapsed,
         )
+        logger.info(
+            "Document %d ingestion timings: parse_chunk=%.2fs embed=%.2fs persist=%.2fs finalize=%.2fs total=%.2fs",
+            doc_id,
+            parse_chunk_duration_s,
+            embed_duration_s,
+            persist_duration_s,
+            finalize_duration_s,
+            elapsed,
+        )
 
     except Exception as exc:
-        logger.exception("Document processing failed for doc %d: %s", doc_id, exc)
+        elapsed = time.monotonic() - started
+        logger.exception(
+            "Document processing failed for doc %d: %s (parse_chunk=%.2fs embed=%.2fs persist=%.2fs finalize=%.2fs total=%.2fs)",
+            doc_id,
+            exc,
+            parse_chunk_duration_s,
+            embed_duration_s,
+            persist_duration_s,
+            finalize_duration_s,
+            elapsed,
+        )
         try:
             doc = db.query(Document).filter(Document.id == doc_id).first()
             if doc:

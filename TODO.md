@@ -18,7 +18,7 @@
   - Reject invalid/missing timestamps with row-level errors.
 - [x] Make frontend production build fully green
   - Resolve TS/type/lint blockers and enforce in CI.
-- [ ] Add ingestion observability baseline
+- [x] Add ingestion observability baseline
   - Log and track parse/chunk/embed stage durations per document.
 
 ### P1 — Next (UX/Data Model Alignment for Mixed Flight-Test Domains)

@@ -687,3 +687,34 @@ npm run build
 ```
 
 **Result:** build completed successfully (`tsc -b && vite build`).
+
+### Completed: Ingestion observability baseline (stage timing telemetry)
+
+**Goal:** expose per-document ingestion stage timings to diagnose slow uploads in production-like runs.
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `TODO.md`
+
+**What changed:**
+
+- Added explicit stage-duration tracking in background document ingestion:
+  - `parse_chunk_duration_s`
+  - `embed_duration_s`
+  - `persist_duration_s`
+  - `finalize_duration_s`
+  - total elapsed duration
+- Enhanced existing logs with durations:
+  - chunking completion now logs stage duration
+  - embedding completion now logs chunks, embedded count, missing embeddings, batch count, and duration
+  - final ingestion log now emits a structured timing summary across all stages
+- Enhanced failure logging to include partial stage timings at the point of exception.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_documents_tenancy.py backend/tests/test_users.py backend/tests/test_flight_tests_comprehensive.py -q
+```
+
+**Result:** `39 passed`.
