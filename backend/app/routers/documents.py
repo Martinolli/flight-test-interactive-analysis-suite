@@ -223,6 +223,7 @@ def _retrieve_hybrid_sources(
     db: Session,
     question: str,
     requested_top_k: int,
+    owner_user_id: int,
 ) -> tuple[list[dict], str]:
     """Hybrid retrieval (vector + lexical), returns ranked sources and context text."""
     try:
@@ -248,6 +249,7 @@ def _retrieve_hybrid_sources(
         FROM document_chunks dc
         JOIN documents d ON d.id = dc.document_id
         WHERE d.status = 'ready'
+          AND d.uploaded_by_id = :owner_user_id
           AND dc.embedding IS NOT NULL
         ORDER BY dc.embedding <=> :embedding ::vector
         LIMIT :limit_n
@@ -255,7 +257,11 @@ def _retrieve_hybrid_sources(
     )
     vector_rows = db.execute(
         vector_sql,
-        {"embedding": embedding_str, "limit_n": QUERY_VECTOR_CANDIDATES},
+        {
+            "embedding": embedding_str,
+            "limit_n": QUERY_VECTOR_CANDIDATES,
+            "owner_user_id": owner_user_id,
+        },
     ).fetchall()
 
     lexical_rows = []
@@ -277,6 +283,7 @@ def _retrieve_hybrid_sources(
         FROM document_chunks dc
         JOIN documents d ON d.id = dc.document_id
         WHERE d.status = 'ready'
+          AND d.uploaded_by_id = :owner_user_id
           AND websearch_to_tsquery('english', :question) @@ to_tsvector('english', dc.text)
         ORDER BY lexical_score DESC
         LIMIT :limit_n
@@ -285,7 +292,11 @@ def _retrieve_hybrid_sources(
     try:
         lexical_rows = db.execute(
             lexical_sql,
-            {"question": question, "limit_n": QUERY_LEXICAL_CANDIDATES},
+            {
+                "question": question,
+                "limit_n": QUERY_LEXICAL_CANDIDATES,
+                "owner_user_id": owner_user_id,
+            },
         ).fetchall()
     except Exception as lex_exc:
         logger.warning("Lexical retrieval fallback to vector-only: %s", lex_exc)
@@ -1009,7 +1020,12 @@ def list_documents(
     current_user: User = Depends(get_current_user),
 ):
     """List all documents in the library, newest first."""
-    docs = db.query(Document).order_by(Document.created_at.desc()).all()
+    docs = (
+        db.query(Document)
+        .filter(Document.uploaded_by_id == current_user.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
     return [_doc_to_out(d) for d in docs]
 
 
@@ -1024,7 +1040,11 @@ def delete_document(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a document and all its chunks from the library."""
-    doc = db.query(Document).filter(Document.id == doc_id).first()
+    doc = (
+        db.query(Document)
+        .filter(Document.id == doc_id, Document.uploaded_by_id == current_user.id)
+        .first()
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
     db.delete(doc)
@@ -1056,6 +1076,7 @@ def query_documents(
         db=db,
         question=request.question,
         requested_top_k=requested_top_k,
+        owner_user_id=current_user.id,
     )
     if not sources:
         return QueryResponse(
@@ -1215,6 +1236,7 @@ def ai_analysis(
         db=db,
         question=retrieval_question,
         requested_top_k=8,
+        owner_user_id=current_user.id,
     )
 
     # Build the LLM prompt (LLM writes interpretation/cross-check only)

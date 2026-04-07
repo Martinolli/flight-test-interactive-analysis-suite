@@ -583,3 +583,34 @@ pytest backend/tests/test_users.py backend/tests/test_csv_upload.py backend/test
 ```
 
 **Result:** `36 passed, 1 skipped`.
+
+### Completed: Enforce document tenancy isolation (`/api/documents/*`)
+
+**Goal:** prevent cross-user access to documents during list, delete, and retrieval-driven query paths.
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `backend/tests/test_documents_tenancy.py`
+- `TODO.md`
+
+**What changed:**
+
+- Scoped `GET /api/documents/` to the authenticated user's owned documents only.
+- Scoped `DELETE /api/documents/{id}` to owned documents only (returns `404` when not owned/not found).
+- Added user-scope filter to hybrid retrieval SQL (`d.uploaded_by_id = :owner_user_id`).
+- Passed `owner_user_id=current_user.id` into retrieval calls for:
+  - `POST /api/documents/query`
+  - `POST /api/documents/flight-tests/{id}/ai-analysis`
+- Added tenancy tests for:
+  - list isolation
+  - delete isolation
+  - query path ownership scoping propagation
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_documents_tenancy.py backend/tests/test_users.py -q
+```
+
+**Result:** `14 passed`.

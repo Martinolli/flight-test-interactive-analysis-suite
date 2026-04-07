@@ -12,7 +12,7 @@
 
 - [x] Lock down user-management routes
   - Restrict `/api/users/*` to admin or remove in favor of `/api/admin/users/*`.
-- [ ] Enforce document tenancy
+- [x] Enforce document tenancy
   - Scope document list/delete/query by `uploaded_by_id == current_user.id`.
 - [ ] Enforce strict timestamp validation on ingestion
   - Reject invalid/missing timestamps with row-level errors.
