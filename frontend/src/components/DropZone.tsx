@@ -2,13 +2,8 @@ import { useRef, useState, useCallback } from 'react';
 import { Upload, FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const ACCEPTED_TYPES: Record<string, string[]> = {
-  'text/csv': ['.csv'],
-  'application/vnd.ms-excel': ['.xls'],
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-};
-
-const ACCEPTED_EXTENSIONS = ['.csv', '.xls', '.xlsx'];
+const ACCEPT_ATTRIBUTE = '.csv,text/csv';
+const ACCEPTED_EXTENSIONS = ['.csv'];
 const MAX_SIZE_MB = 50;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
@@ -21,7 +16,6 @@ function formatBytes(bytes: number): string {
 function getFileIcon(filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase();
   if (ext === 'csv') return '📄';
-  if (ext === 'xls' || ext === 'xlsx') return '📊';
   return '📁';
 }
 
@@ -43,7 +37,7 @@ export default function DropZone({ onFileSelected, disabled = false }: DropZoneP
       const ext = '.' + file.name.split('.').pop()?.toLowerCase();
       if (!ACCEPTED_EXTENSIONS.includes(ext)) {
         setValidationError(
-          `Unsupported file type "${ext}". Please upload a CSV, XLS, or XLSX file.`
+          `Unsupported file type "${ext}". Please upload a CSV file.`
         );
         return;
       }
@@ -111,7 +105,7 @@ export default function DropZone({ onFileSelected, disabled = false }: DropZoneP
         <input
           ref={inputRef}
           type="file"
-          accept={Object.keys(ACCEPTED_TYPES).join(',')}
+          accept={ACCEPT_ATTRIBUTE}
           className="sr-only"
           onChange={handleInputChange}
           disabled={disabled}

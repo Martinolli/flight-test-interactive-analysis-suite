@@ -27,7 +27,7 @@ export interface UploadRecord {
   id: number;
   flight_test_id: number;
   filename: string;
-  file_type: 'csv' | 'excel';
+  file_type: 'csv';
   row_count: number | null;
   status: 'pending' | 'processing' | 'success' | 'failed';
   error_message: string | null;

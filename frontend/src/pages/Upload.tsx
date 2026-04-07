@@ -104,7 +104,7 @@ export default function Upload() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-1">Upload Data</h1>
-          <p className="text-gray-500">Import flight test data from CSV or Excel files</p>
+          <p className="text-gray-500">Import flight test data from CSV files</p>
         </div>
 
         {/* Upload Card */}
@@ -112,7 +112,7 @@ export default function Upload() {
           <CardHeader>
             <CardTitle>Import File</CardTitle>
             <CardDescription>
-              Select a flight test, then upload a CSV or Excel file containing the data.
+              Select a flight test, then upload a CSV file containing the data.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -194,15 +194,15 @@ export default function Upload() {
                 <p className="font-semibold">Expected file format</p>
                 <p>
                   The first row must contain column headers. Each subsequent row represents one
-                  data point. Accepted formats: <strong>.csv</strong>, <strong>.xls</strong>,{' '}
-                  <strong>.xlsx</strong> (max 50 MB).
+                  data point. Accepted format: <strong>.csv</strong> (max 50 MB).
                 </p>
                 <p>
-                  Recommended columns:{' '}
+                  Required structure:{' '}
+                  row 1 = parameter names, row 2 = units, rows 3+ = data with a timestamp column
+                  named{' '}
                   <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">timestamp</code>,{' '}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">parameter_name</code>,{' '}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">value</code>,{' '}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">unit</code>
+                  <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">time</code>, or{' '}
+                  <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">description</code>.
                 </p>
               </div>
             </div>

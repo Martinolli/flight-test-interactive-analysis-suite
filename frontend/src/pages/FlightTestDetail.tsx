@@ -125,7 +125,7 @@ function ParametersPanel({ flightTestId }: { flightTestId: number }) {
         <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
         <p className="text-gray-400 text-sm font-medium">No data uploaded yet</p>
         <p className="text-gray-400 text-xs mt-1">
-          Upload a CSV or Excel file from the <strong>Upload Data</strong> page to see parameters here.
+          Upload a CSV file from the <strong>Upload Data</strong> page to see parameters here.
         </p>
       </div>
     );

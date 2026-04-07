@@ -23,8 +23,8 @@
 
 ### P1 — Next (UX/Data Model Alignment for Mixed Flight-Test Domains)
 
-- [ ] Align upload UX and backend capability
-  - Either support true Excel ingestion backend-side or constrain UI to CSV-only.
+- [x] Align upload UX and backend capability
+  - Constrained upload UX to CSV-only to match backend `/upload-csv` support.
 - [ ] Replace synthetic upload history with persisted ingestion sessions
   - Add backend model/API for filename, row count, status, errors, timestamps.
 - [ ] Scale parameter exploration UX

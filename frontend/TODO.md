@@ -21,8 +21,8 @@
 
 ## P1 — Next Frontend Work (UX/Data Alignment)
 
-- [ ] Upload UX/backend parity decision
-  - Either keep UI CSV-only or enable XLS/XLSX only after backend support is live.
+- [x] Upload UX/backend parity decision
+  - UI constrained to CSV-only until backend adds true XLS/XLSX ingestion support.
 - [ ] Replace synthetic upload history with backend ingestion sessions
   - Render real status/error/timestamps from API (no localStorage-derived records).
 - [ ] Parameter explorer for large channel sets

@@ -718,3 +718,39 @@ pytest backend/tests/test_documents_tenancy.py backend/tests/test_users.py backe
 ```
 
 **Result:** `39 passed`.
+
+## P1 Implementation Update (2026-04-07)
+
+### Completed: Align upload UX with backend capability (CSV-only)
+
+**Decision implemented:** constrain frontend upload flow to CSV-only until backend XLS/XLSX ingestion is implemented.
+
+**Files changed:**
+
+- `frontend/src/components/DropZone.tsx`
+- `frontend/src/pages/Upload.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `frontend/src/services/api.ts`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Removed XLS/XLSX acceptance from upload dropzone and validation.
+- Updated upload-page copy to explicitly state CSV-only support.
+- Updated format guidance to match real backend parser expectations:
+  - row 1: parameter names
+  - row 2: units
+  - rows 3+: data with timestamp column (`timestamp`, `time`, or `description`)
+- Updated `FlightTestDetail` empty-state helper text from "CSV or Excel" to "CSV".
+- Narrowed frontend upload history `file_type` typing from `'csv' | 'excel'` to `'csv'`.
+- Marked P1 upload parity item complete in root and frontend TODOs.
+
+**Validation run:**
+
+```powershell
+cd frontend
+npm run build
+```
+
+**Result:** build completed successfully (`tsc -b && vite build`).
