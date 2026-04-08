@@ -818,3 +818,25 @@ npm run build
 ```
 
 **Result:** backend module compiles; frontend build succeeded with Node engine warning (`20.18.1` detected, Vite recommends `20.19+`).
+
+### Hotfix: Frontend container dependency sync for new packages (2026-04-08)
+
+**Issue observed:**
+
+- Vite runtime import error inside container:
+  - `Failed to resolve import "remark-math" from "src/pages/AIQuery.tsx"`
+- Cause: persisted Docker volume at `/app/node_modules` retained stale dependencies.
+
+**File changed:**
+
+- `docker-compose.yml`
+
+**What changed:**
+
+- Updated frontend runtime command to always sync dependencies before dev server startup:
+  - from: `pnpm dev --host 0.0.0.0`
+  - to: `sh -c "pnpm install && pnpm dev --host 0.0.0.0"`
+
+**Operational impact:**
+
+- On each frontend container start, missing/new deps from `frontend/package.json` are installed into mounted `/app/node_modules`, preventing stale-volume import failures.
