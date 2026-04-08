@@ -101,6 +101,7 @@ export interface QuerySource {
 export interface QueryResponse {
   answer: string;
   sources: QuerySource[];
+  warnings?: string[];
 }
 
 export interface AIAnalysisResponse {

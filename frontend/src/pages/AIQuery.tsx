@@ -5,6 +5,9 @@ import { Button } from '../components/ui/button';
 import { ApiService, QueryResponse } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import {
   Sparkles,
   Send,
@@ -72,14 +75,14 @@ function AnswerCard({ entry }: { entry: HistoryEntry }) {
     <div className="space-y-3">
       {/* Question bubble */}
       <div className="flex justify-end">
-        <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[80%] text-sm">
+        <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[92%] md:max-w-[85%] xl:max-w-[78%] text-sm">
           {entry.question}
         </div>
       </div>
 
       {/* Answer bubble */}
       <div className="flex justify-start">
-        <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[90%] shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[96%] md:max-w-[90%] xl:max-w-[84%] shadow-sm">
           <div className="flex items-center gap-1.5 mb-2">
             <Sparkles className="w-3.5 h-3.5 text-purple-500" />
             <span className="text-xs font-medium text-purple-600">AI Answer</span>
@@ -101,10 +104,25 @@ function AnswerCard({ entry }: { entry: HistoryEntry }) {
               prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg prose-pre:p-3
             "
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
               {entry.response.answer}
             </ReactMarkdown>
           </div>
+
+          {(entry.response.warnings?.length ?? 0) > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                Quality Notice
+              </p>
+              <div className="space-y-0.5">
+                {entry.response.warnings?.map((warning) => (
+                  <p key={warning} className="text-xs text-amber-800">
+                    - {warning}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
 
           {entry.response.sources.length > 0 && (
             <div className="mt-3 pt-3 border-t border-gray-100">
@@ -176,7 +194,7 @@ export default function AIQuery() {
 
   return (
     <Sidebar>
-      <div className="flex flex-col h-screen max-h-screen p-8 max-w-4xl">
+      <div className="mx-auto flex h-[100dvh] w-full max-w-[1400px] flex-col p-3 sm:p-4 md:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 shrink-0">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
@@ -190,7 +208,7 @@ export default function AIQuery() {
         </div>
 
         {/* Chat area */}
-        <div className="flex-1 overflow-y-auto space-y-6 mb-4 pr-1">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-6 mb-4 pr-1">
           {history.length === 0 && !loading && (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4">

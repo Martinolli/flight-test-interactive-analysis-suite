@@ -59,6 +59,8 @@
 - [x] Hybrid retrieval + citation-density gate for analysis quality
 - [x] Deterministic takeoff section with explicit WOW transition logic
 - [x] AI response markdown/table rendering improvements in frontend
+- [x] AI query response now supports formula rendering and responsive chat layout
+- [x] Query response now emits citation-integrity/coverage warnings for frontend display
 - [x] Docker frontend healthcheck fix (`127.0.0.1` for container health probe)
 
 ---

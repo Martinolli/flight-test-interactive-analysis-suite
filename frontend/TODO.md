@@ -10,10 +10,10 @@
 - [x] Restore production build reliability
   - Resolve all TypeScript and lint blockers in app build path.
   - Keep Tailwind utility normalization warnings cleaned up where touched.
-- [ ] Improve AI answer rendering for technical content
+- [x] Improve AI answer rendering for technical content
   - Ensure formulas/equations render consistently on screen and in exported report text.
   - Keep markdown tables/lists/headers robust for long responses.
-- [ ] Tighten source-reference UX in AI responses
+- [x] Tighten source-reference UX in AI responses
   - Keep citation ids stable (`[S1]`, `[S2]`) and clearly map to source cards.
   - Surface "insufficient citation coverage" warning in UI when backend flags low density.
 - [ ] Add ingestion progress observability in UI
@@ -56,6 +56,9 @@
 - [x] Source cards now display stable source ids for citation mapping
 - [x] Frontend Docker healthcheck fix (`127.0.0.1`) to avoid false unhealthy state
 - [x] Time-series chart PNG export flow repaired
+- [x] Math equation rendering added in AI query via `remark-math` + `rehype-katex`
+- [x] Citation coverage warnings surfaced in AI answer cards
+- [x] AI chat layout made responsive to window expansion
 
 ---
 

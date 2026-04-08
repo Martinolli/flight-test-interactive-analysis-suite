@@ -13,7 +13,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     from openai import OpenAI as _OpenAI
@@ -39,6 +39,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    return normalized in {"1", "true", "yes", "on"}
+
+
 # ---------------------------------------------------------------------------
 # OpenAI client (reads OPENAI_API_KEY from environment)
 # ---------------------------------------------------------------------------
@@ -60,14 +69,10 @@ QUERY_CONTEXT_LIMIT = max(
 QUERY_MAX_TOKENS = max(512, min(4096, int(os.getenv("QUERY_MAX_TOKENS", "1800"))))
 QUERY_TEMPERATURE = max(0.0, min(1.0, float(os.getenv("QUERY_TEMPERATURE", "0.1"))))
 QUERY_MODEL = os.getenv("QUERY_LLM_MODEL") or os.getenv("LLM_MODEL", "gpt-4o-mini")
-
-
-def _env_flag(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    normalized = value.strip().lower()
-    return normalized in {"1", "true", "yes", "on"}
+QUERY_MIN_CITATION_DENSITY = max(
+    0.0, min(1.0, float(os.getenv("QUERY_MIN_CITATION_DENSITY", "0.6")))
+)
+QUERY_STRICT_CITATIONS = _env_flag("QUERY_STRICT_CITATIONS", True)
 
 
 def _require_ai_packages():
@@ -132,6 +137,7 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     sources: List[dict]
+    warnings: List[str] = Field(default_factory=list)
 
 
 class AIAnalysisResponse(BaseModel):
@@ -182,6 +188,118 @@ def _extract_inline_source_ids(answer: str) -> List[str]:
     """Extract source IDs from inline citations only (strict mode)."""
     ids = set(re.findall(r"\[(S\d+)\]", answer))
     return sorted(ids, key=lambda x: int(x[1:]) if x[1:].isdigit() else 10_000)
+
+
+def _strip_used_sources_footer(answer: str) -> str:
+    return re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", answer or "").strip()
+
+
+def _extract_unknown_inline_source_ids(answer: str, allowed_source_ids: set[str]) -> List[str]:
+    inline_ids = _extract_inline_source_ids(answer)
+    return [source_id for source_id in inline_ids if source_id not in allowed_source_ids]
+
+
+def _sanitize_invalid_inline_citations(answer: str, allowed_source_ids: set[str]) -> str:
+    def _replace(match: re.Match[str]) -> str:
+        source_id = match.group(1)
+        return match.group(0) if source_id in allowed_source_ids else ""
+
+    sanitized = re.sub(r"\[(S\d+)\]", _replace, answer or "")
+    sanitized = re.sub(r" {2,}", " ", sanitized)
+    return sanitized.strip()
+
+
+def _is_brief_request(question: str) -> bool:
+    q = (question or "").lower()
+    return any(
+        key in q
+        for key in (
+            "succinct",
+            "concise",
+            "brief",
+            "short answer",
+            "short summary",
+            "preliminar",
+            "preliminary",
+        )
+    )
+
+
+def _is_risk_assessment_request(question: str) -> bool:
+    q = (question or "").lower()
+    if "risk assessment" in q:
+        return True
+    if "hazard" in q and ("likelihood" in q or "severity" in q):
+        return True
+    if "likelihood and severity" in q:
+        return True
+    return False
+
+
+def _build_query_source_legend(sources: List[dict]) -> str:
+    lines: List[str] = []
+    for source in sources:
+        source_id = source.get("source_id", "")
+        label = (
+            f"{source.get('title') or source.get('filename')}"
+            + (f", p.{source.get('page_numbers')}" if source.get("page_numbers") else "")
+            + (f" — {source.get('section_title')}" if source.get("section_title") else "")
+        )
+        lines.append(f"- {source_id}: {label}")
+    return "\n".join(lines)
+
+
+def _repair_query_answer_citations(
+    *,
+    client,
+    question: str,
+    answer: str,
+    sources: List[dict],
+    is_brief: bool,
+    is_risk_assessment: bool,
+) -> str:
+    source_legend = _build_query_source_legend(sources)
+    format_instructions = (
+        "- Keep it concise (<= 220 words) with dense technical content.\n"
+        if is_brief
+        else "- Keep specialist depth and avoid generic phrasing.\n"
+    )
+    if is_risk_assessment:
+        format_instructions += (
+            "- Use this structure:\n"
+            "  1) Assumptions (short bullets)\n"
+            "  2) Risk Matrix table with columns:\n"
+            "     Hazard | Likelihood (qualitative) | Severity (qualitative) | Scenario | Mitigation | Residual Risk\n"
+            "  3) Go/No-Go gates (short bullets)\n"
+        )
+
+    repair_system = (
+        "You are a technical editor for flight test documentation. "
+        "Revise the answer for citation integrity and specialist tone only. "
+        "Every substantive claim should carry at least one inline [Sx] citation. "
+        "Use ONLY source IDs present in the Source ID legend. "
+        "Do not invent new source IDs. "
+        "Do not output USED_SOURCES footer. "
+        "Do not use LaTeX delimiters ($$, \\(...\\), \\[...\\]); use plain-text equations."
+    )
+    repair_user = (
+        f"Question:\n{question}\n\n"
+        f"Source ID legend:\n{source_legend}\n\n"
+        "Formatting requirements:\n"
+        f"{format_instructions}\n"
+        f"Current answer to revise:\n{answer}"
+    )
+
+    completion = client.chat.completions.create(
+        model=QUERY_MODEL,
+        messages=[
+            {"role": "system", "content": repair_system},
+            {"role": "user", "content": repair_user},
+        ],
+        temperature=0.0,
+        max_tokens=QUERY_MAX_TOKENS,
+    )
+    return _strip_used_sources_footer(completion.choices[0].message.content or "")
 
 
 def _extract_standards_cross_check_section(text_content: str) -> str:
@@ -1133,21 +1251,40 @@ def query_documents(
             sources=[],
         )
 
+    brief_request = _is_brief_request(request.question)
+    risk_request = _is_risk_assessment_request(request.question)
+    source_legend = _build_query_source_legend(sources)
+
+    format_instructions = (
+        "- Keep the response succinct (max 220 words), but technically specific.\n"
+        if brief_request
+        else "- Provide specialist depth with concrete engineering detail.\n"
+    )
+    if risk_request:
+        format_instructions += (
+            "- Use this structure:\n"
+            "  1) Assumptions\n"
+            "  2) Risk Matrix table with columns: Hazard | Likelihood | Severity | Scenario | Mitigation | Residual Risk\n"
+            "  3) Go/No-Go gates\n"
+        )
+
     system_prompt = (
-        "You are an expert flight test engineer and technical analyst. "
+        "You are a senior flight-test engineer writing for specialist readers. "
         "Use ONLY the provided source excerpts. "
-        "Write a detailed technical answer with explicit assumptions, equations, "
-        "step-by-step method, and units where relevant. "
-        "For every technical claim or calculation step, cite source IDs like [S1]. "
-        "If critical inputs are missing, state exactly what is missing and do not invent values. "
-        "End your response with a single line: USED_SOURCES: S1,S2"
+        "Every substantive technical claim must include at least one inline [Sx] citation. "
+        "Use only source IDs present in the Source ID legend. "
+        "Do not invent citations, standards, equations, or numeric values. "
+        "If key inputs are missing, explicitly state what is missing and why it blocks a precise answer. "
+        "Do not output a USED_SOURCES footer. "
+        "Use plain-text equations and markdown tables where helpful."
     )
 
     user_prompt = (
-        f"Question: {request.question}\n\n"
-        "Instructions:\n"
-        "- Be comprehensive and precise.\n"
-        "- Include equations in markdown form when useful.\n"
+        f"Question:\n{request.question}\n\n"
+        "Source ID legend:\n"
+        f"{source_legend}\n\n"
+        "Formatting requirements:\n"
+        f"{format_instructions}"
         "- Keep citations tightly mapped to claims.\n\n"
         f"Source excerpts:\n\n{context}"
     )
@@ -1170,8 +1307,56 @@ def query_documents(
             detail=f"LLM call failed: {exc}",
         )
 
-    used_source_ids = _extract_used_source_ids(answer)
-    answer = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", answer).strip()
+    answer = _strip_used_sources_footer(answer)
+    allowed_source_ids = {str(s.get("source_id")) for s in sources if s.get("source_id")}
+    warnings: List[str] = []
+
+    inline_source_ids = _extract_inline_source_ids(answer)
+    unknown_source_ids = _extract_unknown_inline_source_ids(answer, allowed_source_ids)
+    citation_density = _citation_density(answer)
+
+    requires_repair = (
+        bool(unknown_source_ids)
+        or (QUERY_STRICT_CITATIONS and not inline_source_ids)
+        or (bool(sources) and citation_density < QUERY_MIN_CITATION_DENSITY)
+    )
+    if requires_repair:
+        try:
+            repaired = _repair_query_answer_citations(
+                client=client,
+                question=request.question,
+                answer=answer,
+                sources=sources,
+                is_brief=brief_request,
+                is_risk_assessment=risk_request,
+            )
+            if repaired:
+                answer = repaired
+        except Exception as repair_exc:
+            logger.warning("Query answer citation repair skipped due to LLM error: %s", repair_exc)
+
+        answer = _sanitize_invalid_inline_citations(answer, allowed_source_ids)
+        inline_source_ids = _extract_inline_source_ids(answer)
+        unknown_source_ids = _extract_unknown_inline_source_ids(answer, allowed_source_ids)
+        citation_density = _citation_density(answer)
+
+    if unknown_source_ids:
+        answer = _sanitize_invalid_inline_citations(answer, allowed_source_ids)
+        warnings.append("Removed invalid source citation IDs that were not present in retrieved evidence.")
+        inline_source_ids = _extract_inline_source_ids(answer)
+
+    if QUERY_STRICT_CITATIONS and sources and not inline_source_ids:
+        warnings.append(
+            "Insufficient citation coverage: answer contains no valid inline [Sx] citations."
+        )
+    elif sources and citation_density < QUERY_MIN_CITATION_DENSITY:
+        warnings.append(
+            "Insufficient citation coverage: some technical statements may not be fully referenced."
+        )
+
+    used_source_ids = inline_source_ids
+    if not QUERY_STRICT_CITATIONS:
+        used_source_ids = _extract_used_source_ids(answer) or inline_source_ids
 
     if used_source_ids:
         cited = [s for s in sources if s.get("source_id") in set(used_source_ids)]
@@ -1179,7 +1364,7 @@ def query_documents(
             sources = cited
 
     response_sources = [{k: v for k, v in s.items() if k != "text"} for s in sources]
-    return QueryResponse(answer=answer, sources=response_sources)
+    return QueryResponse(answer=answer, sources=response_sources, warnings=warnings)
 
 
 # ---------------------------------------------------------------------------

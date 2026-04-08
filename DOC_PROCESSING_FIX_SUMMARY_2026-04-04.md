@@ -754,3 +754,67 @@ npm run build
 ```
 
 **Result:** build completed successfully (`tsc -b && vite build`).
+
+## P0/P1 Implementation Update (2026-04-08)
+
+### Completed: Query answer quality hardening (specialist depth + citation integrity)
+
+**Goal:** reduce generic AI answers and tighten source-reference correctness in `/api/documents/query`.
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `.env.example`
+
+**What changed:**
+
+- Added query-level citation controls:
+  - `QUERY_MIN_CITATION_DENSITY` (default `0.6`)
+  - `QUERY_STRICT_CITATIONS` (default `true`)
+- Added specialist-aware prompt shaping:
+  - brief-response detection for succinct requests
+  - risk-assessment request detection with structured risk-matrix output format
+- Added strict post-processing for citations:
+  - strips `USED_SOURCES` footer
+  - rejects unknown inline source IDs
+  - optional editorial repair pass when citation coverage is weak or invalid IDs are present
+  - source list is filtered to only cited source IDs
+- Added `warnings` to query API response payload for UI surfacing when citation coverage is insufficient.
+- Fixed import-time initialization safety by ensuring `_env_flag` is defined before use.
+
+### Completed: AI Query frontend usability upgrades (responsive + formula rendering + warning UX)
+
+**Goal:** make AI chat adaptive to window size and improve rendering of technical/math content.
+
+**Files changed:**
+
+- `frontend/src/pages/AIQuery.tsx`
+- `frontend/src/services/api.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/TODO.md`
+- `TODO.md`
+
+**What changed:**
+
+- Added markdown math rendering pipeline:
+  - `remark-math`
+  - `rehype-katex`
+  - KaTeX stylesheet import in AI query page
+- Added AI answer quality warning panel in chat bubbles using backend `warnings`.
+- Updated AI chat layout to be responsive to viewport expansion:
+  - removed narrow fixed-width behavior
+  - expanded max content width
+  - ensured scroll area uses `min-h-0` + flex sizing for stable resizing
+- Marked related TODO items complete in root and frontend TODO trackers.
+
+**Validation run:**
+
+```powershell
+python -m compileall backend/app/routers/documents.py
+cd frontend
+npm install
+npm run build
+```
+
+**Result:** backend module compiles; frontend build succeeded with Node engine warning (`20.18.1` detected, Vite recommends `20.19+`).
