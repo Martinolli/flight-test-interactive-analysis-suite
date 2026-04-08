@@ -901,3 +901,34 @@ python -c "import app.routers.documents as d; print('documents_import_ok')"
 ```
 
 **Result:** module compiles/imports successfully.
+
+### Query Quality Notice Tuning (2026-04-08)
+
+**Issue observed:**
+
+- “Quality Notice” remained visible in answers that were materially cited, due to strict sentence-level density checks on structural markdown lines.
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `.env.example`
+- `docker-compose.yml`
+
+**What changed:**
+
+- Added `QUERY_WARNING_CITATION_DENSITY` (default `0.4`) separate from repair threshold.
+- Kept repair enforcement using `QUERY_MIN_CITATION_DENSITY` (default `0.6`), but relaxed warning threshold to reduce noisy alerts.
+- Added `_query_citation_density()` for query answers:
+  - computes density from substantive prose lines
+  - ignores markdown headings, list wrappers, and table rows that created false low-density signals
+- Kept concentration warning logic focused on retrieval breadth while preserving citation-integrity checks.
+
+**Validation run:**
+
+```powershell
+python -m compileall backend/app/routers/documents.py
+cd backend
+python -c "import app.routers.documents as d; print('documents_import_ok')"
+```
+
+**Result:** module compiles/imports successfully.

@@ -78,6 +78,18 @@ QUERY_MODEL = os.getenv("QUERY_LLM_MODEL") or os.getenv("LLM_MODEL", "gpt-4o-min
 QUERY_MIN_CITATION_DENSITY = max(
     0.0, min(1.0, float(os.getenv("QUERY_MIN_CITATION_DENSITY", "0.6")))
 )
+QUERY_WARNING_CITATION_DENSITY = max(
+    0.0,
+    min(
+        1.0,
+        float(
+            os.getenv(
+                "QUERY_WARNING_CITATION_DENSITY",
+                str(max(0.35, QUERY_MIN_CITATION_DENSITY - 0.2)),
+            )
+        ),
+    ),
+)
 QUERY_STRICT_CITATIONS = _env_flag("QUERY_STRICT_CITATIONS", True)
 
 
@@ -333,6 +345,38 @@ def _citation_density(text_content: str) -> float:
         return 1.0
     cited = sum(1 for s in sentences if re.search(r"\[S\d+\]", s))
     return cited / len(sentences)
+
+
+def _query_citation_density(answer: str) -> float:
+    """
+    Citation density tuned for user-facing query answers.
+    Ignores structural markdown lines (headings/tables/list wrappers) to avoid false warnings.
+    """
+    if not answer:
+        return 1.0
+
+    candidate_lines: List[str] = []
+    for raw_line in (answer or "").splitlines():
+        line = raw_line.strip()
+        if len(line) < 35:
+            continue
+        if line.startswith("#"):
+            continue
+        if line.startswith(("- ", "* ", "+ ")):
+            continue
+        if re.match(r"^\d+[).]\s+", line):
+            continue
+        if "|" in line:
+            continue
+        if not re.search(r"[A-Za-z]", line):
+            continue
+        candidate_lines.append(line)
+
+    if not candidate_lines:
+        return _citation_density(answer)
+
+    cited = sum(1 for line in candidate_lines if re.search(r"\[S\d+\]", line))
+    return cited / len(candidate_lines)
 
 
 def _build_source_label(row: Any) -> str:
@@ -1355,7 +1399,13 @@ def query_documents(
 
     inline_source_ids = _extract_inline_source_ids(answer)
     unknown_source_ids = _extract_unknown_inline_source_ids(answer, allowed_source_ids)
-    citation_density = _citation_density(answer)
+    citation_density = _query_citation_density(answer)
+    warning_citation_density = citation_density
+    retrieved_unique_doc_labels = {
+        str((s.get("title") or s.get("filename") or "")).strip()
+        for s in sources
+        if (s.get("title") or s.get("filename"))
+    }
 
     requires_repair = (
         bool(unknown_source_ids)
@@ -1380,7 +1430,8 @@ def query_documents(
         answer = _sanitize_invalid_inline_citations(answer, allowed_source_ids)
         inline_source_ids = _extract_inline_source_ids(answer)
         unknown_source_ids = _extract_unknown_inline_source_ids(answer, allowed_source_ids)
-        citation_density = _citation_density(answer)
+        citation_density = _query_citation_density(answer)
+        warning_citation_density = citation_density
 
     if unknown_source_ids:
         answer = _sanitize_invalid_inline_citations(answer, allowed_source_ids)
@@ -1391,7 +1442,7 @@ def query_documents(
         warnings.append(
             "Insufficient citation coverage: answer contains no valid inline [Sx] citations."
         )
-    elif sources and citation_density < QUERY_MIN_CITATION_DENSITY:
+    elif sources and warning_citation_density < QUERY_WARNING_CITATION_DENSITY:
         warnings.append(
             "Insufficient citation coverage: some technical statements may not be fully referenced."
         )
@@ -1405,13 +1456,10 @@ def query_documents(
         if cited:
             sources = cited
 
-    unique_doc_labels = {
-        str((s.get("title") or s.get("filename") or "")).strip()
-        for s in sources
-        if (s.get("title") or s.get("filename"))
-    }
-    target_unique_docs = min(QUERY_MIN_UNIQUE_DOCUMENTS, len(sources))
-    if sources and len(unique_doc_labels) < target_unique_docs:
+    if (
+        retrieved_unique_doc_labels
+        and len(retrieved_unique_doc_labels) < QUERY_MIN_UNIQUE_DOCUMENTS
+    ):
         warnings.append(
             "Retrieved evidence is concentrated in too few documents for this query. "
             "Consider more specific terms or additional reference material."
