@@ -1,6 +1,6 @@
 # FTIAS Frontend — TODO (Aligned to Root P0/P1/P2 Plan)
 
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-08  
 **Alignment:** mirrors priorities in root `TODO.md` and summary backlog
 
 ---
@@ -33,6 +33,8 @@
   - Compare mode between multiple flight tests.
 - [ ] Report UX upgrades
   - Better chart-to-report selection and preview before generating PDF.
+- [ ] AI panel UX parity in Flight Test Detail
+  - Apply the same adaptive width/height + scrollable chat behavior used in `AI Standards Query` to the `Analyze with AI` interaction panel.
 - [ ] Add `Risk Assessment (FRAT)` workspace in Flight Test Detail
   - Category checklist UI, live score/disposition badge, hard-stop alert banner, and approval/signature section.
 

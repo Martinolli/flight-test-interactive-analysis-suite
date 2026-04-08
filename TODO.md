@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Root Plan)
 
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-08  
 **Scope:** Backend + Frontend + LLM/RAG + Reporting  
 **Source of truth:** aligned with `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` (Improvement Backlog section)
 
@@ -33,6 +33,8 @@
   - Linked crosshair, event markers, threshold bands, compare-runs mode.
 - [ ] Improve report visual quality
   - Better formula rendering, chart snapshots, clearer source references.
+- [ ] Standardize AI chat UX across pages
+  - Apply the adaptive/scrollable AI chat behavior from `AI Standards Query` to `Analyze with AI` in Flight Test Detail (dashboard workflow).
 - [ ] Add Flight Test Risk Assessment module (FRAT)
   - Implement versioned risk templates, deterministic scoring, hard-stop checks, approval routing, and PDF export tied to each flight test.
 

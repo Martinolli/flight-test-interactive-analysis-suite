@@ -932,3 +932,9 @@ python -c "import app.routers.documents as d; print('documents_import_ok')"
 ```
 
 **Result:** module compiles/imports successfully.
+
+## Next Session Note (2026-04-08)
+
+- Frontend UX follow-up requested:
+  - replicate the responsive/adaptive + scrollable chat interaction now used in `AI Standards Query`
+  - target location: `Analyze with AI` panel in Flight Test Detail (dashboard workflow)
