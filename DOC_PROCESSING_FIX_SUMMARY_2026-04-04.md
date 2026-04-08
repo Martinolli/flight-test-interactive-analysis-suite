@@ -863,3 +863,41 @@ npm run build
 **Operational impact:**
 
 - Frontend container no longer aborts during dependency sync when `node_modules` must be replaced.
+
+### Query Retrieval Diversity Update (2026-04-08)
+
+**Issue observed:**
+
+- AI query answers could over-concentrate citations on a single handbook even when multiple relevant documents were uploaded.
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `.env.example`
+- `docker-compose.yml`
+- `frontend/.gitignore`
+
+**What changed:**
+
+- Added retrieval diversity controls:
+  - `QUERY_MIN_UNIQUE_DOCUMENTS` (default `3`)
+  - `QUERY_MAX_CHUNKS_PER_DOCUMENT` (default `3`)
+- Updated hybrid retrieval selection to:
+  - pass 1: prioritize one chunk per distinct document up to unique-document target
+  - pass 2: fill remaining context with per-document cap to prevent over-representation
+- Added query warning when retrieved/cited evidence remains concentrated in too few documents.
+- Wired new retrieval env vars into backend container configuration.
+- Added frontend gitignore entries for:
+  - `.pnpm-store`
+  - `pnpm-lock.yaml`
+  to avoid Docker-generated workspace noise.
+
+**Validation run:**
+
+```powershell
+python -m compileall backend/app/routers/documents.py
+cd backend
+python -c "import app.routers.documents as d; print('documents_import_ok')"
+```
+
+**Result:** module compiles/imports successfully.

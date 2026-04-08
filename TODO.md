@@ -61,6 +61,7 @@
 - [x] AI response markdown/table rendering improvements in frontend
 - [x] AI query response now supports formula rendering and responsive chat layout
 - [x] Query response now emits citation-integrity/coverage warnings for frontend display
+- [x] Hybrid retrieval now enforces cross-document diversity and per-document chunk caps
 - [x] Docker frontend healthcheck fix (`127.0.0.1` for container health probe)
 
 ---

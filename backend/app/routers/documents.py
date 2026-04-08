@@ -66,6 +66,12 @@ QUERY_LEXICAL_CANDIDATES = max(
 QUERY_CONTEXT_LIMIT = max(
     QUERY_TOP_K_DEFAULT, min(20, int(os.getenv("QUERY_CONTEXT_LIMIT", "12")))
 )
+QUERY_MIN_UNIQUE_DOCUMENTS = max(
+    1, min(QUERY_CONTEXT_LIMIT, int(os.getenv("QUERY_MIN_UNIQUE_DOCUMENTS", "3")))
+)
+QUERY_MAX_CHUNKS_PER_DOCUMENT = max(
+    1, min(QUERY_CONTEXT_LIMIT, int(os.getenv("QUERY_MAX_CHUNKS_PER_DOCUMENT", "3")))
+)
 QUERY_MAX_TOKENS = max(512, min(4096, int(os.getenv("QUERY_MAX_TOKENS", "1800"))))
 QUERY_TEMPERATURE = max(0.0, min(1.0, float(os.getenv("QUERY_TEMPERATURE", "0.1"))))
 QUERY_MODEL = os.getenv("QUERY_LLM_MODEL") or os.getenv("LLM_MODEL", "gpt-4o-mini")
@@ -441,7 +447,43 @@ def _retrieve_hybrid_sources(
     )]
 
     context_limit = min(max(requested_top_k, QUERY_CONTEXT_LIMIT), len(ranked_rows))
-    context_rows = ranked_rows[:context_limit]
+    desired_unique_docs = min(QUERY_MIN_UNIQUE_DOCUMENTS, context_limit)
+    per_doc_cap = min(QUERY_MAX_CHUNKS_PER_DOCUMENT, context_limit)
+
+    context_rows: List[Any] = []
+    selected_row_ids: set[int] = set()
+    doc_chunk_counts: Dict[int, int] = {}
+
+    # Pass 1: prioritize cross-document diversity (one chunk per document).
+    for row in ranked_rows:
+        if len(context_rows) >= context_limit:
+            break
+        if row.id in selected_row_ids:
+            continue
+        doc_id = int(row.document_id)
+        if doc_chunk_counts.get(doc_id, 0) > 0:
+            continue
+        context_rows.append(row)
+        selected_row_ids.add(row.id)
+        doc_chunk_counts[doc_id] = 1
+        if len(doc_chunk_counts) >= desired_unique_docs:
+            break
+
+    # Pass 2: fill remaining slots while capping over-representation per document.
+    for row in ranked_rows:
+        if len(context_rows) >= context_limit:
+            break
+        if row.id in selected_row_ids:
+            continue
+        doc_id = int(row.document_id)
+        if doc_chunk_counts.get(doc_id, 0) >= per_doc_cap:
+            continue
+        context_rows.append(row)
+        selected_row_ids.add(row.id)
+        doc_chunk_counts[doc_id] = doc_chunk_counts.get(doc_id, 0) + 1
+
+    if not context_rows:
+        context_rows = ranked_rows[:context_limit]
 
     sources: List[dict] = []
     context_parts: List[str] = []
@@ -1362,6 +1404,18 @@ def query_documents(
         cited = [s for s in sources if s.get("source_id") in set(used_source_ids)]
         if cited:
             sources = cited
+
+    unique_doc_labels = {
+        str((s.get("title") or s.get("filename") or "")).strip()
+        for s in sources
+        if (s.get("title") or s.get("filename"))
+    }
+    target_unique_docs = min(QUERY_MIN_UNIQUE_DOCUMENTS, len(sources))
+    if sources and len(unique_doc_labels) < target_unique_docs:
+        warnings.append(
+            "Retrieved evidence is concentrated in too few documents for this query. "
+            "Consider more specific terms or additional reference material."
+        )
 
     response_sources = [{k: v for k, v in s.items() if k != "text"} for s in sources]
     return QueryResponse(answer=answer, sources=response_sources, warnings=warnings)
