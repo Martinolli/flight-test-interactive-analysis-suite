@@ -840,3 +840,26 @@ npm run build
 **Operational impact:**
 
 - On each frontend container start, missing/new deps from `frontend/package.json` are installed into mounted `/app/node_modules`, preventing stale-volume import failures.
+
+### Hotfix: Non-interactive pnpm install in Docker (2026-04-08)
+
+**Issue observed:**
+
+- Frontend restart loop with:
+  - `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`
+- Cause: `pnpm install` attempted module purge confirmation in a non-TTY container.
+
+**File changed:**
+
+- `docker-compose.yml`
+
+**What changed:**
+
+- Added `CI=true` for frontend container environment.
+- Updated frontend startup command to enforce non-interactive install behavior:
+  - `pnpm install --config.confirmModulesPurge=false --no-frozen-lockfile`
+  - then `pnpm dev --host 0.0.0.0`
+
+**Operational impact:**
+
+- Frontend container no longer aborts during dependency sync when `node_modules` must be replaced.
