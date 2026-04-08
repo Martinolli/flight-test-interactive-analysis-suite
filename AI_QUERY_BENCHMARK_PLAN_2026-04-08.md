@@ -1,9 +1,11 @@
 # AI Query Benchmark Plan (2026-04-08)
 
 ## Objective
+
 Run repeatable A/B tests for `AI Standards Query` across different `.env` parameter profiles.
 
 ## Run Protocol
+
 1. Set one parameter profile in `.env`.
 2. Recreate backend:
    - `docker compose up -d --force-recreate backend`
@@ -12,6 +14,7 @@ Run repeatable A/B tests for `AI Standards Query` across different `.env` parame
 5. Repeat with next profile.
 
 ## Scoring (1-5)
+
 - `TechnicalDepth`: specialist-level reasoning vs generic wording
 - `SourceAccuracy`: claims correctly supported by retrieved sources
 - `MultiSourceSynthesis`: uses multiple relevant docs coherently
@@ -22,6 +25,7 @@ Run repeatable A/B tests for `AI Standards Query` across different `.env` parame
 ## Parameter Profiles To Test
 
 ### Profile A - Specialist / High Quality
+
 ```env
 QUERY_LLM_MODEL=gpt-4o
 QUERY_TEMPERATURE=0.05
@@ -37,6 +41,7 @@ QUERY_STRICT_CITATIONS=true
 ```
 
 ### Profile B - Balanced (Baseline)
+
 ```env
 QUERY_LLM_MODEL=gpt-4o-mini
 QUERY_TEMPERATURE=0.10
@@ -52,6 +57,7 @@ QUERY_STRICT_CITATIONS=true
 ```
 
 ### Profile C - Faster / Lower Cost
+
 ```env
 QUERY_LLM_MODEL=gpt-4o-mini
 QUERY_TEMPERATURE=0.15
@@ -67,11 +73,13 @@ QUERY_STRICT_CITATIONS=true
 ```
 
 ### Optional Noise-Reduction Variant (overlay on any profile)
+
 ```env
 QUERY_WARNING_CITATION_DENSITY=0.30
 ```
 
 ## Systematic Benchmark Questions
+
 1. Explain separation analysis for guided dummy stores and define minimum pre-flight evidence required before first release.
 2. Build a preliminary qualitative risk matrix (5x5 likelihood/severity) for a campaign with no operational separation report.
 3. For the same scenario, list explicit No-Go gates and objective release criteria that must be met before flight.
@@ -86,23 +94,25 @@ QUERY_WARNING_CITATION_DENSITY=0.30
 12. Give a structured unknowns list when data is missing, separating critical blockers vs non-critical assumptions.
 
 ## Prompt Variants To Apply
+
 - `Answer for specialist audience, avoid generic wording.`
 - `Use only inline [Sx] citations and cite each substantive claim.`
 - `Return concise output <=220 words.`
 - `Return full detailed output with assumptions, method, and limits.`
 
 ## Results Template
-| Q# | Profile | TechnicalDepth | SourceAccuracy | MultiSourceSynthesis | Actionability | FormatCompliance | Latency | Notes |
-|---|---|---|---|---|---|---|---|---|
-| 1 | A |  |  |  |  |  |  |  |
-| 2 | A |  |  |  |  |  |  |  |
-| 3 | A |  |  |  |  |  |  |  |
-| 4 | A |  |  |  |  |  |  |  |
-| 5 | A |  |  |  |  |  |  |  |
-| 6 | A |  |  |  |  |  |  |  |
-| 7 | A |  |  |  |  |  |  |  |
-| 8 | A |  |  |  |  |  |  |  |
-| 9 | A |  |  |  |  |  |  |  |
-| 10 | A |  |  |  |  |  |  |  |
-| 11 | A |  |  |  |  |  |  |  |
-| 12 | A |  |  |  |  |  |  |  |
+
+| Q#  | Profile | TechnicalDepth | SourceAccuracy | MultiSourceSynthesis | Actionability | FormatCompliance | Latency | Notes |
+| :-: | :-----: | :------------: | :------------: | :------------------: | :-----------: | :--------------: | :-----: | :---: |
+|  1  |    A    |                |                |                      |               |                  |         |       |
+|  2  |    A    |                |                |                      |               |                  |         |       |
+|  3  |    A    |                |                |                      |               |                  |         |       |
+|  4  |    A    |                |                |                      |               |                  |         |       |
+|  5  |    A    |                |                |                      |               |                  |         |       |
+|  6  |    A    |                |                |                      |               |                  |         |       |
+|  7  |    A    |                |                |                      |               |                  |         |       |
+|  8  |    A    |                |                |                      |               |                  |         |       |
+|  9  |    A    |                |                |                      |               |                  |         |       |
+| 10  |    A    |                |                |                      |               |                  |         |       |
+| 11  |    A    |                |                |                      |               |                  |         |       |
+| 12  |    A    |                |                |                      |               |                  |         |       |
