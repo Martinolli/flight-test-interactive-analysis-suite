@@ -1,66 +1,59 @@
-# FTIAS Frontend — TODO (Aligned to Root P0/P1/P2 Plan)
+# FTIAS Frontend — TODO (Execution Alignment)
 
-**Last updated:** 2026-04-08  
-**Alignment:** mirrors priorities in root `TODO.md` and summary backlog
-
----
-
-## P0 — Immediate Frontend Work
-
-- [x] Restore production build reliability
-  - Resolve all TypeScript and lint blockers in app build path.
-  - Keep Tailwind utility normalization warnings cleaned up where touched.
-- [x] Improve AI answer rendering for technical content
-  - Ensure formulas/equations render consistently on screen and in exported report text.
-  - Keep markdown tables/lists/headers robust for long responses.
-- [x] Tighten source-reference UX in AI responses
-  - Keep citation ids stable (`[S1]`, `[S2]`) and clearly map to source cards.
-  - Surface "insufficient citation coverage" warning in UI when backend flags low density.
-- [ ] Add ingestion progress observability in UI
-  - Show parsing/chunking/indexing stage and elapsed time when available from backend.
-
-## P1 — Next Frontend Work (UX/Data Alignment)
-
-- [x] Upload UX/backend parity decision
-  - UI constrained to CSV-only until backend adds true XLS/XLSX ingestion support.
-- [ ] Replace synthetic upload history with backend ingestion sessions
-  - Render real status/error/timestamps from API (no localStorage-derived records).
-- [ ] Parameter explorer for large channel sets
-  - Add search, subsystem grouping, favorites, saved parameter sets.
-- [ ] Chart workflow upgrades for engineering analysis
-  - Linked cursor/crosshair across charts.
-  - Event markers and threshold bands.
-  - Compare mode between multiple flight tests.
-- [ ] Report UX upgrades
-  - Better chart-to-report selection and preview before generating PDF.
-- [ ] AI panel UX parity in Flight Test Detail
-  - Apply the same adaptive width/height + scrollable chat behavior used in `AI Standards Query` to the `Analyze with AI` interaction panel.
-- [ ] Add `Risk Assessment (FRAT)` workspace in Flight Test Detail
-  - Category checklist UI, live score/disposition badge, hard-stop alert banner, and approval/signature section.
-
-## P2 — Frontend Support for LLM/RAG Domainization
-
-- [ ] Add analysis mode selector in AI panel
-  - `takeoff`, `landing`, `electrical`, `vibration`, `general`.
-- [ ] Introduce analysis jobs UI
-  - Job history list, job detail view, immutable source/provenance panel.
-- [ ] Add confidence and coverage indicators in responses/reports
-  - Visual badges and warning states for low confidence/coverage.
-- [ ] Add AI-assisted mitigation drafting in FRAT UI
-  - Suggest mitigation text from selected risk factors, but require explicit human acceptance before saving.
+**Last updated:** 2026-04-09  
+**Alignment:** mirrors root execution plan (`TODO.md`) and REV01 review.
 
 ---
 
-## Recently Completed (Frontend-Relevant)
+## P0 — Product Truth + Unified AI UX
 
-- [x] AI Analysis panel reset/new-query flow
-- [x] Markdown table rendering improvements in AI response panel
-- [x] Source cards now display stable source ids for citation mapping
-- [x] Frontend Docker healthcheck fix (`127.0.0.1`) to avoid false unhealthy state
-- [x] Time-series chart PNG export flow repaired
-- [x] Math equation rendering added in AI query via `remark-math` + `rehype-katex`
-- [x] Citation coverage warnings surfaced in AI answer cards
-- [x] AI chat layout made responsive to window expansion
+- [ ] P0.1 Upload history from persisted ingestion sessions only
+  - Remove remaining synthetic/localStorage operational truth.
+  - Render backend status lifecycle + persisted errors.
+- [ ] P0.2 Support richer query response contract rendering
+  - Prepare UI for structured fields (`assumptions`, `limitations`, `coverage`, etc.) with graceful fallback.
+- [ ] P0.3 AI UX parity between `AI Standards Query` and `Analyze with AI`
+  - Shared adaptive width/height behavior
+  - stable long-answer scroll
+  - consistent markdown/formula/warning/source rendering
+- [ ] P0.4 Analysis job persistence UX
+  - Store/display `analysis_job_id` context in analysis/export flows.
+  - Export actions must target persisted backend artifacts.
+
+---
+
+## P1 — Engineering Usability and Report Quality
+
+- [ ] P1.1 Parameter exploration at scale
+  - Search/filter, grouping, favorites, saved plot sets.
+- [ ] P1.2 Chart workflow upgrades
+  - Linked cursor/crosshair, markers, thresholds, compare mode.
+- [ ] P1.3 Report UX quality improvements
+  - Better figure selection/preview and clearer professional formatting expectations.
+- [ ] P1.4 Capability-catalog-aware UI preparation
+  - Support capability/mode applicability hints once backend catalog is defined.
+
+---
+
+## P2 — Domainization and Risk Workflow
+
+- [ ] P2.1 Analysis mode selector and mode-specific UX cues
+- [ ] P2.2 Analysis job history + provenance panel
+- [ ] P2.3 Confidence/coverage/applicability badges
+- [ ] P2.4 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)
+- [ ] P2.5 AI mitigation drafting assistant (advisory only, not authoritative scoring)
+
+---
+
+## Completed Frontend Baseline (Protected)
+
+- [x] Production build reliability restored
+- [x] AI markdown/table rendering improvements
+- [x] Source IDs visible in source cards
+- [x] AI query math rendering (`remark-math` + `rehype-katex`)
+- [x] Citation warning panel surfaced in AI query
+- [x] AI query responsive layout with stable scrolling
+- [x] Frontend Docker healthcheck/runtime fixes
 
 ---
 

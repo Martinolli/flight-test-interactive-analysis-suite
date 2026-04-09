@@ -938,3 +938,35 @@ python -c "import app.routers.documents as d; print('documents_import_ok')"
 - Frontend UX follow-up requested:
   - replicate the responsive/adaptive + scrollable chat interaction now used in `AI Standards Query`
   - target location: `Analyze with AI` panel in Flight Test Detail (dashboard workflow)
+
+## Plan Review Adoption (REV 01) — 2026-04-09
+
+### Review Outcome
+
+- `TODO_REV_01.md` is strong enough to adopt as the active execution direction.
+- It improves the previous roadmap by adding:
+  - clear sequencing and dependency discipline
+  - assurance points and exit criteria
+  - explicit test expectations
+  - management gates for phase closure decisions
+
+### Planning Realignment Applied
+
+- Root plan (`TODO.md`) was realigned to REV01 priorities:
+  - P0 now focuses on product truth + response contract + AI UX unification + analysis-job provenance.
+  - P1 now focuses on parameter/charts/report quality + capability catalog definition.
+  - P2 now focuses on domainization, deterministic expansion, retrieval metadata, confidence/applicability, and FRAT.
+- Frontend plan (`frontend/TODO.md`) was realigned accordingly:
+  - ingestion-session truth UI
+  - structured response rendering
+  - AI panel parity between AIQuery and FlightTestDetail
+  - analysis job and provenance UX follow-through.
+
+### Adoption Notes
+
+- Previously completed baseline controls remain protected and should not be reopened without defect evidence.
+- The adopted immediate execution order remains:
+  1. P0.1 ingestion sessions
+  2. P0.2 response contract
+  3. P0.3 unified AI UX
+  4. P0.4 persisted analysis jobs
