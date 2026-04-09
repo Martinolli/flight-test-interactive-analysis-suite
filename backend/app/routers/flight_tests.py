@@ -15,9 +15,35 @@ from sqlalchemy.orm import Session
 
 from app import auth, schemas
 from app.database import get_db
-from app.models import DataPoint, FlightTest, TestParameter, User
+from app.models import DataPoint, FlightTest, IngestionSession, TestParameter, User
 
 router = APIRouter()
+
+
+def _persist_ingestion_failure(
+    db: Session,
+    *,
+    session_id: int | None,
+    error_message: str,
+    row_count: int | None = None,
+) -> None:
+    """Persist failed ingestion state in a separate commit-safe step."""
+    if not session_id:
+        return
+    session = (
+        db.query(IngestionSession)
+        .filter(IngestionSession.id == session_id)
+        .first()
+    )
+    if not session:
+        return
+    session.status = "failed"
+    session.error_message = error_message[:1024]
+    session.error_log = error_message[:4000]
+    if row_count is not None and row_count >= 0:
+        session.row_count = row_count
+    db.add(session)
+    db.commit()
 
 
 @router.post("/", response_model=schemas.FlightTestResponse, status_code=status.HTTP_201_CREATED)
@@ -100,6 +126,70 @@ async def get_flight_test(
         )
 
     return flight_test
+
+
+@router.get(
+    "/{test_id}/ingestion-sessions",
+    response_model=List[schemas.IngestionSessionResponse],
+)
+async def list_ingestion_sessions(
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """List persisted ingestion sessions for a flight test, newest first."""
+    flight_test = (
+        db.query(FlightTest)
+        .filter(
+            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
+        )
+        .first()
+    )
+    if not flight_test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
+        )
+
+    sessions = (
+        db.query(IngestionSession)
+        .filter(
+            IngestionSession.flight_test_id == test_id,
+            IngestionSession.uploaded_by_id == current_user.id,
+        )
+        .order_by(IngestionSession.created_at.desc())
+        .all()
+    )
+    return sessions
+
+
+@router.get(
+    "/{test_id}/ingestion-sessions/{session_id}",
+    response_model=schemas.IngestionSessionResponse,
+)
+async def get_ingestion_session(
+    test_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """Get one ingestion session record scoped to current user + flight test."""
+    session = (
+        db.query(IngestionSession)
+        .join(FlightTest, FlightTest.id == IngestionSession.flight_test_id)
+        .filter(
+            IngestionSession.id == session_id,
+            IngestionSession.flight_test_id == test_id,
+            IngestionSession.uploaded_by_id == current_user.id,
+            FlightTest.created_by_id == current_user.id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ingestion session not found",
+        )
+    return session
 
 
 @router.put("/{test_id}", response_model=schemas.FlightTestResponse)
@@ -222,6 +312,23 @@ async def upload_flight_data_csv(
             detail="File must be a CSV file",
         )
 
+    ingestion_session = IngestionSession(
+        flight_test_id=test_id,
+        filename=file.filename,
+        file_type="csv",
+        source_format="csv",
+        row_count=None,
+        status="processing",
+        error_message=None,
+        error_log=None,
+        uploaded_by_id=current_user.id,
+    )
+    db.add(ingestion_session)
+    db.commit()
+    db.refresh(ingestion_session)
+
+    row_count = 0
+
     try:
         # ── Delete all existing data points for this flight test ─────────────
         # This ensures re-uploads replace data rather than appending to it.
@@ -307,7 +414,6 @@ async def upload_flight_data_csv(
         csv_reader = csv.DictReader(csv_data_only)
 
         base_date = datetime(2025, 8, 6, 0, 0, 0)
-        row_count = 0
         total_data_points = 0
         batch: list[DataPoint] = []
 
@@ -424,6 +530,11 @@ async def upload_flight_data_csv(
             db.bulk_save_objects(batch)
             total_data_points += len(batch)
 
+        ingestion_session.status = "success"
+        ingestion_session.row_count = row_count
+        ingestion_session.error_message = None
+        ingestion_session.error_log = None
+        db.add(ingestion_session)
         db.commit()
 
         return {
@@ -432,13 +543,26 @@ async def upload_flight_data_csv(
             "rows_processed": row_count,
             "data_points_created": total_data_points,
             "previous_data_points_deleted": deleted,
+            "session_id": ingestion_session.id,
         }
 
-    except HTTPException:
+    except HTTPException as exc:
         db.rollback()
+        _persist_ingestion_failure(
+            db,
+            session_id=ingestion_session.id,
+            error_message=str(exc.detail),
+            row_count=row_count,
+        )
         raise
     except Exception as e:
         db.rollback()
+        _persist_ingestion_failure(
+            db,
+            session_id=ingestion_session.id,
+            error_message=f"Error processing CSV file: {str(e)}",
+            row_count=row_count,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing CSV file: {str(e)}",

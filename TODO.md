@@ -18,7 +18,7 @@
 
 ## P0 — Immediate (Product Truth + Response Contract + Provenance)
 
-- [ ] P0.1 Persist ingestion sessions and remove synthetic upload history
+- [x] P0.1 Persist ingestion sessions and remove synthetic upload history
   - Backend model/API for filename, row count, status lifecycle, and persisted error details.
   - Frontend upload history must use backend session data only.
 - [ ] P0.2 Standardize `/api/documents/query` response contract for engineering workflows

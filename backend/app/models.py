@@ -71,6 +71,11 @@ class FlightTest(Base):
         back_populates="flight_test",
         cascade="all, delete-orphan",
     )
+    ingestion_sessions = relationship(
+        "IngestionSession",
+        back_populates="flight_test",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return (
@@ -102,6 +107,40 @@ class TestParameter(Base):
         return (
             f"<TestParameter(id={self.id}, name={self.name}, "
             f"unit={self.unit})>"
+        )
+
+
+class IngestionSession(Base):
+    """Persisted ingestion lifecycle for each uploaded data file."""
+
+    __tablename__ = "ingestion_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flight_test_id = Column(
+        Integer,
+        ForeignKey("flight_tests.id"),
+        nullable=False,
+        index=True,
+    )
+    filename = Column(String(512), nullable=False)
+    file_type = Column(String(32), nullable=False, default="csv")
+    source_format = Column(String(32), nullable=False, default="csv")
+    row_count = Column(Integer, nullable=True)
+    status = Column(String(32), nullable=False, default="pending")
+    error_message = Column(Text, nullable=True)
+    error_log = Column(Text, nullable=True)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    flight_test = relationship("FlightTest", back_populates="ingestion_sessions")
+    uploaded_by = relationship("User", backref="ingestion_sessions")
+
+    def __repr__(self):
+        return (
+            f"<IngestionSession(id={self.id}, flight_test_id={self.flight_test_id}, "
+            f"status={self.status}, filename={self.filename})>"
         )
 
 

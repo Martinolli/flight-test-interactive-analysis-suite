@@ -970,3 +970,52 @@ python -c "import app.routers.documents as d; print('documents_import_ok')"
   2. P0.2 response contract
   3. P0.3 unified AI UX
   4. P0.4 persisted analysis jobs
+
+## P0.1 Implementation Update (2026-04-09)
+
+### Completed: Persist real ingestion sessions and remove synthetic upload history
+
+**Goal:** make upload history/status/error reporting backend-truthful and tenant-scoped.
+
+**Files changed:**
+
+- `backend/app/models.py`
+- `backend/app/schemas.py`
+- `backend/app/routers/flight_tests.py`
+- `backend/tests/test_flight_tests_comprehensive.py`
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/Upload.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Added persisted backend model:
+  - `IngestionSession` with `flight_test_id`, `filename`, `file_type`, `source_format`, `row_count`, `status`, `error_message`, `error_log`, `uploaded_by_id`, timestamps.
+- Added `FlightTest -> ingestion_sessions` relationship.
+- Added API endpoints:
+  - `GET /api/flight-tests/{test_id}/ingestion-sessions`
+  - `GET /api/flight-tests/{test_id}/ingestion-sessions/{session_id}`
+- Updated CSV upload lifecycle:
+  - create `IngestionSession(status="processing")` at upload start
+  - transition to `success` with authoritative `row_count` on commit
+  - persist `failed` with error detail when validation/runtime failures occur
+  - include `session_id` in upload response payload
+- Removed synthetic upload history logic in frontend:
+  - dropped parameter-count/localStorage-derived history synthesis
+  - `getUploadHistory()` now uses backend ingestion-session endpoint directly
+  - removed localStorage filename/timestamp writes from upload flow
+- Added periodic upload-history refresh polling in Upload page (`5s`) while a flight test is selected.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- Backend: `28 passed`
+- Frontend: build successful (`tsc -b && vite build`)

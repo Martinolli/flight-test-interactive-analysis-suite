@@ -9,7 +9,7 @@ from datetime import datetime
 from fastapi import status
 
 from app.auth import get_password_hash
-from app.models import DataPoint, FlightTest, TestParameter, User
+from app.models import DataPoint, FlightTest, IngestionSession, TestParameter, User
 
 
 class TestFlightTestCRUD:
@@ -491,6 +491,163 @@ s,ft,kt
         )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_csv_upload_creates_success_ingestion_session(
+        self, client, test_user, auth_headers, db_session
+    ):
+        """Successful upload must persist a success ingestion session."""
+        flight_test = FlightTest(
+            test_name="Session Success CSV Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        csv_content = """timestamp,ALT,IAS
+s,ft,kt
+0.0,5000.0,250.0
+0.1,5050.0,251.0"""
+        files = {"file": ("session_success.csv", io.BytesIO(csv_content.encode()), "text/csv")}
+        response = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files=files,
+            headers=auth_headers,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        payload = response.json()
+        assert "session_id" in payload
+
+        session = (
+            db_session.query(IngestionSession)
+            .filter(IngestionSession.id == payload["session_id"])
+            .first()
+        )
+        assert session is not None
+        assert session.status == "success"
+        assert session.flight_test_id == flight_test.id
+        assert session.filename == "session_success.csv"
+        assert session.row_count == 2
+        assert session.error_message is None
+
+    def test_csv_upload_failure_persists_failed_ingestion_session(
+        self, client, test_user, auth_headers, db_session
+    ):
+        """Validation failure must persist a failed ingestion session with error detail."""
+        flight_test = FlightTest(
+            test_name="Session Failure CSV Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        csv_content = """timestamp,ALT
+s,ft
+bad-time,5000.0
+0.1,5050.0"""
+        files = {"file": ("session_failure.csv", io.BytesIO(csv_content.encode()), "text/csv")}
+        response = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files=files,
+            headers=auth_headers,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        session = (
+            db_session.query(IngestionSession)
+            .filter(
+                IngestionSession.flight_test_id == flight_test.id,
+                IngestionSession.filename == "session_failure.csv",
+            )
+            .order_by(IngestionSession.created_at.desc())
+            .first()
+        )
+        assert session is not None
+        assert session.status == "failed"
+        assert session.error_message is not None
+        assert "timestamp validation failed" in session.error_message.lower()
+
+    def test_ingestion_session_endpoints_are_tenant_scoped(
+        self, client, test_user, auth_headers, db_session
+    ):
+        """Session list/detail must only expose records belonging to current user."""
+        own_test = FlightTest(
+            test_name="Own Sessions Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(own_test)
+        db_session.commit()
+        db_session.refresh(own_test)
+
+        own_session = IngestionSession(
+            flight_test_id=own_test.id,
+            filename="own.csv",
+            file_type="csv",
+            source_format="csv",
+            row_count=10,
+            status="success",
+            uploaded_by_id=test_user["id"],
+        )
+        db_session.add(own_session)
+
+        other_user = User(
+            email="upload-other@test.com",
+            username="uploadotheruser",
+            hashed_password=get_password_hash("password123"),
+            full_name="Upload Other User",
+        )
+        db_session.add(other_user)
+        db_session.commit()
+        db_session.refresh(other_user)
+
+        other_test = FlightTest(
+            test_name="Other Sessions Test",
+            aircraft_type="F-18",
+            created_by_id=other_user.id,
+        )
+        db_session.add(other_test)
+        db_session.commit()
+        db_session.refresh(other_test)
+
+        other_session = IngestionSession(
+            flight_test_id=other_test.id,
+            filename="other.csv",
+            file_type="csv",
+            source_format="csv",
+            row_count=5,
+            status="success",
+            uploaded_by_id=other_user.id,
+        )
+        db_session.add(other_session)
+        db_session.commit()
+        db_session.refresh(own_session)
+
+        list_response = client.get(
+            f"/api/flight-tests/{own_test.id}/ingestion-sessions",
+            headers=auth_headers,
+        )
+        assert list_response.status_code == status.HTTP_200_OK
+        items = list_response.json()
+        assert len(items) == 1
+        assert items[0]["filename"] == "own.csv"
+
+        detail_response = client.get(
+            f"/api/flight-tests/{own_test.id}/ingestion-sessions/{own_session.id}",
+            headers=auth_headers,
+        )
+        assert detail_response.status_code == status.HTTP_200_OK
+        assert detail_response.json()["filename"] == "own.csv"
+
+        forbidden_list = client.get(
+            f"/api/flight-tests/{other_test.id}/ingestion-sessions",
+            headers=auth_headers,
+        )
+        assert forbidden_list.status_code == status.HTTP_404_NOT_FOUND
 
 
 class TestDataRetrieval:

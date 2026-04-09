@@ -7,7 +7,7 @@
 
 ## P0 — Product Truth + Unified AI UX
 
-- [ ] P0.1 Upload history from persisted ingestion sessions only
+- [x] P0.1 Upload history from persisted ingestion sessions only
   - Remove remaining synthetic/localStorage operational truth.
   - Render backend status lifecycle + persisted errors.
 - [ ] P0.2 Support richer query response contract rendering

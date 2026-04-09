@@ -42,11 +42,27 @@ export default function Upload() {
       setHistory([]);
       return;
     }
-    setLoadingHistory(true);
-    ApiService.getUploadHistory(Number(selectedTestId))
-      .then(setHistory)
-      .catch(() => setHistory([]))
-      .finally(() => setLoadingHistory(false));
+    let active = true;
+
+    const refreshHistory = async (showLoading = false) => {
+      if (showLoading) setLoadingHistory(true);
+      try {
+        const records = await ApiService.getUploadHistory(Number(selectedTestId));
+        if (active) setHistory(records);
+      } catch {
+        if (active) setHistory([]);
+      } finally {
+        if (showLoading && active) setLoadingHistory(false);
+      }
+    };
+
+    refreshHistory(true);
+    const timer = window.setInterval(() => refreshHistory(false), 5000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [selectedTestId]);
 
   const handleUpload = async () => {
@@ -67,9 +83,6 @@ export default function Upload() {
       setUploadStatus('success');
       const rowCount = result.rows_processed ?? result.row_count ?? 0;
       setLastRowCount(rowCount);
-      // Persist filename and upload timestamp for the history display
-      localStorage.setItem(`upload_filename_${selectedTestId}`, selectedFile.name);
-      localStorage.setItem(`upload_date_${selectedTestId}`, new Date().toISOString());
       setSelectedFile(null);
       const deletedMsg = result.previous_data_points_deleted
         ? ` (replaced ${result.previous_data_points_deleted.toLocaleString()} previous data points)`

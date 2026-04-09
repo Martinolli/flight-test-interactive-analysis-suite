@@ -28,11 +28,14 @@ export interface UploadRecord {
   flight_test_id: number;
   filename: string;
   file_type: 'csv';
+  source_format?: string;
   row_count: number | null;
   status: 'pending' | 'processing' | 'success' | 'failed';
   error_message: string | null;
+  error_log?: string | null;
   uploaded_by_id: number;
   created_at: string;
+  updated_at?: string | null;
 }
 
 export interface UploadResponse {
@@ -41,6 +44,7 @@ export interface UploadResponse {
   rows_processed: number;
   data_points_created: number;
   previous_data_points_deleted?: number;
+  session_id?: number;
   // convenience alias so callers can use row_count uniformly
   row_count?: number;
 }
@@ -251,39 +255,8 @@ export class ApiService {
     });
   }
 
-  /**
-   * Derive upload history from the parameters endpoint.
-   * Each distinct parameter group represents an upload session.
-   * Returns a synthetic UploadRecord so the UI renders without a dedicated endpoint.
-   */
   static async getUploadHistory(flightTestId: number): Promise<UploadRecord[]> {
-    try {
-      const params = await this.request<ParameterInfo[]>(
-        `/api/flight-tests/${flightTestId}/parameters`
-      );
-      if (!params || params.length === 0) return [];
-      // Use the sample_count of the first parameter as a proxy for CSV rows
-      // (each row produces one data point per parameter, so any single parameter's
-      // sample_count equals the number of CSV data rows)
-      const csvRowCount = params[0]?.sample_count ?? 0;
-      const storedFilename = localStorage.getItem(`upload_filename_${flightTestId}`) || 'Uploaded data';
-      const storedDate = localStorage.getItem(`upload_date_${flightTestId}`) || new Date().toISOString();
-      return [
-        {
-          id: flightTestId,
-          flight_test_id: flightTestId,
-          filename: storedFilename,
-          file_type: 'csv',
-          row_count: csvRowCount,
-          status: 'success',
-          error_message: null,
-          uploaded_by_id: 0,
-          created_at: storedDate,
-        },
-      ];
-    } catch {
-      return [];
-    }
+    return this.request<UploadRecord[]>(`/api/flight-tests/${flightTestId}/ingestion-sessions`);
   }
 
   static async getAllUploads(): Promise<UploadRecord[]> {

@@ -160,6 +160,26 @@ class FlightTestResponse(FlightTestBase):
         from_attributes = True
 
 
+class IngestionSessionResponse(BaseModel):
+    """Schema for persisted ingestion session records."""
+
+    id: int
+    flight_test_id: int
+    filename: str
+    file_type: str
+    source_format: str
+    row_count: Optional[int] = None
+    status: str
+    error_message: Optional[str] = None
+    error_log: Optional[str] = None
+    uploaded_by_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 # Test Parameter Schemas
 
 
