@@ -99,6 +99,12 @@ services:
     networks:
       - ftias-network
     command: sh -c "pnpm install --config.confirmModulesPurge=false --no-frozen-lockfile && pnpm dev --host 0.0.0.0"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5173 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      start_period: 7m
+      retries: 5
     profiles:
       - frontend
 
