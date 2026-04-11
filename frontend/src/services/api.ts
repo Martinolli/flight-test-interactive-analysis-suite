@@ -102,10 +102,39 @@ export interface QuerySource {
   similarity: number;
 }
 
+export interface QueryCoverage {
+  citation_density: number;
+  warning_threshold: number;
+  repair_threshold: number;
+  has_inline_citations: boolean;
+  retrieved_sources_count: number;
+  cited_sources_count: number;
+  unique_documents_retrieved: number;
+  unique_documents_cited: number;
+}
+
+export interface QueryRetrievalMetadata {
+  requested_top_k: number;
+  context_limit: number;
+  vector_candidates: number;
+  lexical_candidates: number;
+  min_unique_documents: number;
+  max_chunks_per_document: number;
+}
+
 export interface QueryResponse {
   answer: string;
+  summary?: string | null;
+  answer_type?: string;
+  technical_scope?: string;
+  assumptions?: string[];
+  limitations?: string[];
+  calculation_notes?: string[];
+  recommended_next_queries?: string[];
   sources: QuerySource[];
   warnings?: string[];
+  coverage?: QueryCoverage;
+  retrieval_metadata?: QueryRetrievalMetadata;
 }
 
 export interface AIAnalysisResponse {

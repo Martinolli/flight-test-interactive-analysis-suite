@@ -1019,3 +1019,74 @@ npm run build
 
 - Backend: `28 passed`
 - Frontend: build successful (`tsc -b && vite build`)
+
+## P0.1 Hardening Update (2026-04-11)
+
+### Added DB migration artifact for ingestion sessions
+
+**File added:**
+
+- `backend/migrations/20260411_add_ingestion_sessions.sql`
+
+**What changed:**
+
+- Added explicit SQL migration script to create `ingestion_sessions` with indexes and FK constraints.
+- This closes the gap for existing databases that were created before ingestion-session persistence was introduced in code.
+
+### Narrowed Upload-page polling to active processing only
+
+**File changed:**
+
+- `frontend/src/pages/Upload.tsx`
+
+**What changed:**
+
+- Upload history polling is now conditional:
+  - poll every 5s only when at least one ingestion session is `pending` or `processing`
+  - no continuous polling when all sessions are terminal (`success` / `failed`)
+- Result: reduced unnecessary API load while preserving near-real-time status updates during active ingestion.
+
+## P0.2 Implementation Update (2026-04-11)
+
+### Completed: standardized `/api/documents/query` response contract for engineering workflows
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `backend/tests/test_documents_tenancy.py`
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/AIQuery.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Expanded query response contract with structured fields:
+  - `summary`, `answer_type`, `technical_scope`
+  - `assumptions`, `limitations`, `calculation_notes`
+  - `recommended_next_queries`
+  - `coverage` (citation density + source/document counts)
+  - `retrieval_metadata` (top-k/context/diversity knobs)
+- Added deterministic fallback for empty retrieval:
+  - explicit `insufficient_evidence` answer type
+  - structured warnings and next-query guidance
+  - populated metadata blocks even when no sources are returned
+- Frontend AI Standards Query now renders structured sections when present while remaining backward-safe if fields are absent.
+- Added/updated backend tests to assert structured response shape for:
+  - normal retrieval path
+  - empty retrieval path
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_documents_tenancy.py -q
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- `test_documents_tenancy`: `4 passed`
+- `test_flight_tests_comprehensive`: `28 passed`
+- Frontend build: successful (`tsc -b && vite build`)

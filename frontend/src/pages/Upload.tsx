@@ -28,6 +28,10 @@ export default function Upload() {
   const [history, setHistory] = useState<UploadRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  const hasActiveIngestion = history.some(
+    (record) => record.status === 'pending' || record.status === 'processing'
+  );
+
   // Load flight tests for the selector
   useEffect(() => {
     ApiService.getFlightTests()
@@ -57,13 +61,32 @@ export default function Upload() {
     };
 
     refreshHistory(true);
-    const timer = window.setInterval(() => refreshHistory(false), 5000);
+
+    return () => {
+      active = false;
+    };
+  }, [selectedTestId]);
+
+  // Poll only while there are active ingestion sessions.
+  useEffect(() => {
+    if (!selectedTestId || !hasActiveIngestion) {
+      return;
+    }
+    let active = true;
+    const timer = window.setInterval(async () => {
+      try {
+        const records = await ApiService.getUploadHistory(Number(selectedTestId));
+        if (active) setHistory(records);
+      } catch {
+        // Keep last-known UI state on transient polling failures.
+      }
+    }, 5000);
 
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [selectedTestId]);
+  }, [selectedTestId, hasActiveIngestion]);
 
   const handleUpload = async () => {
     if (!selectedFile || !selectedTestId) return;

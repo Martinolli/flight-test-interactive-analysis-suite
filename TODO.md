@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan)
 
-**Last updated:** 2026-04-09  
+**Last updated:** 2026-04-11  
 **Scope:** Backend + Frontend + LLM/RAG + Reporting  
 **Plan basis:** aligned to `TODO_REV_01.md` review and `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
 
@@ -21,9 +21,11 @@
 - [x] P0.1 Persist ingestion sessions and remove synthetic upload history
   - Backend model/API for filename, row count, status lifecycle, and persisted error details.
   - Frontend upload history must use backend session data only.
-- [ ] P0.2 Standardize `/api/documents/query` response contract for engineering workflows
+- [x] P0.2 Standardize `/api/documents/query` response contract for engineering workflows
   - Evolve beyond `answer/sources/warnings` with structured fields (`assumptions`, `limitations`, `coverage`, etc.).
   - Keep backward-safe rendering during transition.
+  - Added structured backend contract fields and frontend rendering fallback for legacy-safe behavior.
+  - Added focused test coverage for structured response on both populated and empty-retrieval query paths.
 - [ ] P0.3 Standardize AI UX across `AI Standards Query` and `Analyze with AI`
   - Shared adaptive layout, scroll behavior, markdown/formula rendering, warnings, and sources.
 - [ ] P0.4 Persist analysis jobs and export PDF from immutable artifacts
@@ -77,6 +79,8 @@
 - [x] Frontend production build stability
 - [x] Ingestion observability baseline
 - [x] CSV-only upload alignment
+- [x] DB migration artifact for `ingestion_sessions` table (`backend/migrations/20260411_add_ingestion_sessions.sql`)
+- [x] Upload-page polling narrowed to active ingestion states only (`pending`/`processing`)
 - [x] Hybrid retrieval + citation hardening
 - [x] Deterministic takeoff section
 - [x] Responsive AI Standards Query page

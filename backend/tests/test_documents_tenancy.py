@@ -132,3 +132,31 @@ def test_query_documents_passes_current_user_scope(client, test_user, auth_heade
     body = response.json()
     assert body["sources"][0]["source_id"] == "S1"
     assert "text" not in body["sources"][0]
+    assert body["answer_type"] == "technical_explanation"
+    assert "coverage" in body
+    assert "retrieval_metadata" in body
+    assert isinstance(body.get("recommended_next_queries"), list)
+
+
+def test_query_documents_empty_retrieval_returns_structured_response(client, auth_headers, monkeypatch):
+    """Empty retrieval should still return full structured response contract."""
+
+    def fake_retrieve_hybrid_sources(*, db, question, requested_top_k, owner_user_id):
+        return [], ""
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router, "_retrieve_hybrid_sources", fake_retrieve_hybrid_sources)
+
+    response = client.post(
+        "/api/documents/query",
+        json={"question": "test no sources", "top_k": 4},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["answer_type"] == "insufficient_evidence"
+    assert body["sources"] == []
+    assert "coverage" in body
+    assert body["coverage"]["retrieved_sources_count"] == 0
+    assert "retrieval_metadata" in body

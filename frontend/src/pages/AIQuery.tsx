@@ -68,6 +68,30 @@ function SourceCard({ source }: { source: QueryResponse['sources'][0] }) {
   );
 }
 
+function StructuredList({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[] | undefined;
+}) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600 mb-1.5">
+        {title}
+      </p>
+      <ul className="space-y-1">
+        {items.map((item) => (
+          <li key={`${title}-${item}`} className="text-xs text-gray-700 leading-relaxed">
+            - {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function AnswerCard({ entry }: { entry: HistoryEntry }) {
   const [showSources, setShowSources] = useState(false);
 
@@ -108,6 +132,37 @@ function AnswerCard({ entry }: { entry: HistoryEntry }) {
               {entry.response.answer}
             </ReactMarkdown>
           </div>
+
+          {entry.response.summary && (
+            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700 mb-1">
+                Summary
+              </p>
+              <p className="text-xs text-blue-900 leading-relaxed">{entry.response.summary}</p>
+            </div>
+          )}
+
+          <StructuredList title="Assumptions" items={entry.response.assumptions} />
+          <StructuredList title="Limitations" items={entry.response.limitations} />
+          <StructuredList title="Calculation Notes" items={entry.response.calculation_notes} />
+          <StructuredList
+            title="Recommended Next Queries"
+            items={entry.response.recommended_next_queries}
+          />
+
+          {entry.response.coverage && (
+            <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600 mb-1.5">
+                Coverage
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
+                <p>Citation density: {(entry.response.coverage.citation_density * 100).toFixed(0)}%</p>
+                <p>Cited sources: {entry.response.coverage.cited_sources_count}</p>
+                <p>Retrieved sources: {entry.response.coverage.retrieved_sources_count}</p>
+                <p>Unique docs (cited): {entry.response.coverage.unique_documents_cited}</p>
+              </div>
+            </div>
+          )}
 
           {(entry.response.warnings?.length ?? 0) > 0 && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">

@@ -1,6 +1,6 @@
 # FTIAS Frontend — TODO (Execution Alignment)
 
-**Last updated:** 2026-04-09  
+**Last updated:** 2026-04-11  
 **Alignment:** mirrors root execution plan (`TODO.md`) and REV01 review.
 
 ---
@@ -10,8 +10,9 @@
 - [x] P0.1 Upload history from persisted ingestion sessions only
   - Remove remaining synthetic/localStorage operational truth.
   - Render backend status lifecycle + persisted errors.
-- [ ] P0.2 Support richer query response contract rendering
+- [x] P0.2 Support richer query response contract rendering
   - Prepare UI for structured fields (`assumptions`, `limitations`, `coverage`, etc.) with graceful fallback.
+  - Added rendering blocks for summary, assumptions, limitations, calculation notes, recommended-next-queries, and coverage metrics.
 - [ ] P0.3 AI UX parity between `AI Standards Query` and `Analyze with AI`
   - Shared adaptive width/height behavior
   - stable long-answer scroll
@@ -54,6 +55,7 @@
 - [x] Citation warning panel surfaced in AI query
 - [x] AI query responsive layout with stable scrolling
 - [x] Frontend Docker healthcheck/runtime fixes
+- [x] Upload history polling runs only when ingestion is active (`pending`/`processing`)
 
 ---
 

@@ -152,10 +152,39 @@ class QueryRequest(BaseModel):
     flight_test_id: Optional[int] = None  # optional context filter
 
 
+class QueryCoverage(BaseModel):
+    citation_density: float
+    warning_threshold: float
+    repair_threshold: float
+    has_inline_citations: bool
+    retrieved_sources_count: int
+    cited_sources_count: int
+    unique_documents_retrieved: int
+    unique_documents_cited: int
+
+
+class QueryRetrievalMetadata(BaseModel):
+    requested_top_k: int
+    context_limit: int
+    vector_candidates: int
+    lexical_candidates: int
+    min_unique_documents: int
+    max_chunks_per_document: int
+
+
 class QueryResponse(BaseModel):
     answer: str
+    summary: Optional[str] = None
+    answer_type: str = "technical_explanation"
+    technical_scope: str = "standards_query"
+    assumptions: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+    calculation_notes: List[str] = Field(default_factory=list)
+    recommended_next_queries: List[str] = Field(default_factory=list)
     sources: List[dict]
     warnings: List[str] = Field(default_factory=list)
+    coverage: QueryCoverage
+    retrieval_metadata: QueryRetrievalMetadata
 
 
 class AIAnalysisResponse(BaseModel):
@@ -377,6 +406,143 @@ def _query_citation_density(answer: str) -> float:
 
     cited = sum(1 for line in candidate_lines if re.search(r"\[S\d+\]", line))
     return cited / len(candidate_lines)
+
+
+def _extract_summary(answer: str) -> Optional[str]:
+    for raw_line in (answer or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            continue
+        if line.startswith(("- ", "* ", "+ ")):
+            continue
+        if re.match(r"^\d+[).]\s+", line):
+            continue
+        if "|" in line:
+            continue
+        return line[:420]
+    return None
+
+
+def _extract_markdown_section_items(
+    answer: str,
+    heading_keywords: list[str],
+    *,
+    max_items: int = 6,
+) -> List[str]:
+    lines = (answer or "").splitlines()
+    if not lines:
+        return []
+
+    heading_index = -1
+    keywords = [k.lower() for k in heading_keywords]
+    for idx, raw_line in enumerate(lines):
+        line = raw_line.strip().lower()
+        if not line:
+            continue
+        cleaned = line.lstrip("#").strip()
+        if any(k in cleaned for k in keywords):
+            heading_index = idx
+            break
+
+    if heading_index < 0:
+        return []
+
+    items: List[str] = []
+    for raw_line in lines[heading_index + 1:]:
+        line = raw_line.strip()
+        if not line:
+            if items:
+                break
+            continue
+        normalized = line.lower().lstrip("#").strip()
+        if (
+            line.startswith("#")
+            or re.match(r"^\d+[).:-]\s+\w+", line)
+            or normalized.endswith(":")
+        ):
+            # stop at the next section-like heading after collecting something
+            if items:
+                break
+            continue
+
+        item = re.sub(r"^[-*+]\s*", "", line)
+        item = re.sub(r"^\d+[).]\s*", "", item).strip()
+        if len(item) < 8:
+            continue
+        items.append(item[:240])
+        if len(items) >= max_items:
+            break
+    return items
+
+
+def _extract_calculation_notes(answer: str, max_items: int = 6) -> List[str]:
+    notes: List[str] = []
+    for raw_line in (answer or "").splitlines():
+        line = raw_line.strip()
+        if len(line) < 12:
+            continue
+        if "|" in line:
+            continue
+        lowered = line.lower()
+        if (
+            "=" in line
+            or "formula" in lowered
+            or "equation" in lowered
+            or "calculate" in lowered
+            or "computed" in lowered
+        ):
+            notes.append(line[:240])
+        if len(notes) >= max_items:
+            break
+    return notes
+
+
+def _default_recommended_next_queries(
+    *,
+    question: str,
+    has_coverage_warning: bool,
+    is_risk_assessment: bool,
+    answer_type: str,
+) -> List[str]:
+    base: List[str] = []
+    if is_risk_assessment:
+        base.extend(
+            [
+                "Refine the qualitative risk matrix with aircraft-specific operating envelope limits.",
+                "List objective no-go gates with measurable pass/fail criteria for each release condition.",
+            ]
+        )
+    if answer_type == "calculation_guidance":
+        base.append(
+            "Provide the exact input values available and request a step-by-step deterministic calculation."
+        )
+    if has_coverage_warning:
+        base.append(
+            "Cite the exact sections/pages that justify each high-severity risk statement."
+        )
+    if not base:
+        base.append(
+            "Request a document-by-document comparison table with citations for each conclusion."
+        )
+    # De-duplicate while preserving order
+    deduped: List[str] = []
+    for item in base:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped[:4]
+
+
+def _infer_answer_type(question: str, is_risk_assessment: bool) -> str:
+    q = (question or "").lower()
+    if is_risk_assessment:
+        return "risk_assessment"
+    if any(token in q for token in ("calculate", "calculation", "distance", "performance")):
+        return "calculation_guidance"
+    if any(token in q for token in ("compare", "difference", "versus", "vs")):
+        return "comparison"
+    return "technical_explanation"
 
 
 def _build_source_label(row: Any) -> str:
@@ -1334,11 +1500,41 @@ def query_documents(
                 "No relevant documents found in the library. "
                 "Please upload some standards or handbooks first."
             ),
+            summary="No indexed evidence was found for this query.",
+            answer_type="insufficient_evidence",
+            technical_scope="standards_query",
+            assumptions=[],
+            limitations=["No relevant source documents were retrieved."],
+            calculation_notes=[],
+            recommended_next_queries=[
+                "Upload standards/handbooks relevant to this topic and rerun the query.",
+                "Ask a narrower question including target system, test phase, and regulation family.",
+            ],
             sources=[],
+            warnings=["No relevant source evidence was retrieved for this query."],
+            coverage=QueryCoverage(
+                citation_density=0.0,
+                warning_threshold=QUERY_WARNING_CITATION_DENSITY,
+                repair_threshold=QUERY_MIN_CITATION_DENSITY,
+                has_inline_citations=False,
+                retrieved_sources_count=0,
+                cited_sources_count=0,
+                unique_documents_retrieved=0,
+                unique_documents_cited=0,
+            ),
+            retrieval_metadata=QueryRetrievalMetadata(
+                requested_top_k=requested_top_k,
+                context_limit=QUERY_CONTEXT_LIMIT,
+                vector_candidates=QUERY_VECTOR_CANDIDATES,
+                lexical_candidates=QUERY_LEXICAL_CANDIDATES,
+                min_unique_documents=QUERY_MIN_UNIQUE_DOCUMENTS,
+                max_chunks_per_document=QUERY_MAX_CHUNKS_PER_DOCUMENT,
+            ),
         )
 
     brief_request = _is_brief_request(request.question)
     risk_request = _is_risk_assessment_request(request.question)
+    answer_type = _infer_answer_type(request.question, risk_request)
     source_legend = _build_query_source_legend(sources)
 
     format_instructions = (
@@ -1447,6 +1643,8 @@ def query_documents(
             "Insufficient citation coverage: some technical statements may not be fully referenced."
         )
 
+    retrieved_sources_count = len(sources)
+
     used_source_ids = inline_source_ids
     if not QUERY_STRICT_CITATIONS:
         used_source_ids = _extract_used_source_ids(answer) or inline_source_ids
@@ -1465,8 +1663,60 @@ def query_documents(
             "Consider more specific terms or additional reference material."
         )
 
+    assumptions = _extract_markdown_section_items(answer, ["assumptions"])
+    limitations = _extract_markdown_section_items(answer, ["limitations", "constraints", "gaps"])
+    calculation_notes = _extract_calculation_notes(answer)
+    coverage_warning_present = any("citation coverage" in warning.lower() for warning in warnings)
+    recommended_next_queries = _extract_markdown_section_items(
+        answer,
+        ["recommended next queries", "next queries", "next steps"],
+        max_items=4,
+    )
+    if not recommended_next_queries:
+        recommended_next_queries = _default_recommended_next_queries(
+            question=request.question,
+            has_coverage_warning=coverage_warning_present,
+            is_risk_assessment=risk_request,
+            answer_type=answer_type,
+        )
+
+    cited_unique_doc_labels = {
+        str((s.get("title") or s.get("filename") or "")).strip()
+        for s in sources
+        if (s.get("title") or s.get("filename"))
+    }
+
     response_sources = [{k: v for k, v in s.items() if k != "text"} for s in sources]
-    return QueryResponse(answer=answer, sources=response_sources, warnings=warnings)
+    return QueryResponse(
+        answer=answer,
+        summary=_extract_summary(answer),
+        answer_type=answer_type,
+        technical_scope="standards_query",
+        assumptions=assumptions,
+        limitations=limitations,
+        calculation_notes=calculation_notes,
+        recommended_next_queries=recommended_next_queries,
+        sources=response_sources,
+        warnings=warnings,
+        coverage=QueryCoverage(
+            citation_density=round(warning_citation_density, 3),
+            warning_threshold=QUERY_WARNING_CITATION_DENSITY,
+            repair_threshold=QUERY_MIN_CITATION_DENSITY,
+            has_inline_citations=bool(inline_source_ids),
+            retrieved_sources_count=retrieved_sources_count,
+            cited_sources_count=len(response_sources),
+            unique_documents_retrieved=len(retrieved_unique_doc_labels),
+            unique_documents_cited=len(cited_unique_doc_labels),
+        ),
+        retrieval_metadata=QueryRetrievalMetadata(
+            requested_top_k=requested_top_k,
+            context_limit=QUERY_CONTEXT_LIMIT,
+            vector_candidates=QUERY_VECTOR_CANDIDATES,
+            lexical_candidates=QUERY_LEXICAL_CANDIDATES,
+            min_unique_documents=QUERY_MIN_UNIQUE_DOCUMENTS,
+            max_chunks_per_document=QUERY_MAX_CHUNKS_PER_DOCUMENT,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
