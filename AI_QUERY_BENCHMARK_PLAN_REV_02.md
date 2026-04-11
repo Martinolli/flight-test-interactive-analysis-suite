@@ -5,6 +5,7 @@
 Run repeatable A/B tests for `AI Standards Query` across different `.env` parameter profiles and identify the best operating profile for specialist flight-test engineering use.
 
 This revision keeps the original benchmark structure, but improves:
+
 - evaluation discipline
 - failure detection
 - comparison fairness
@@ -29,6 +30,7 @@ This revision keeps the original benchmark structure, but improves:
 ### When to restart vs rebuild
 
 Use **restart** when you only change:
+
 - `QUERY_LLM_MODEL`
 - `QUERY_TEMPERATURE`
 - `QUERY_MAX_TOKENS`
@@ -43,6 +45,7 @@ docker compose restart backend
 ```
 
 Use **rebuild** only when you change:
+
 - Python dependencies
 - `requirements.txt`
 - Dockerfile
@@ -71,6 +74,7 @@ docker compose up -d --build backend
 ### Control Conditions
 
 Keep these fixed during the benchmark:
+
 - same indexed documents
 - same user account
 - same backend code revision
@@ -115,6 +119,7 @@ For each answer, perform this sequence:
 ## Scoring Rubric (1-5)
 
 ### Core Quality Dimensions
+
 - `TechnicalDepth`: specialist-level reasoning vs generic wording
 - `SourceAccuracy`: claims correctly supported by retrieved sources
 - `MultiSourceSynthesis`: uses multiple relevant docs coherently
@@ -122,14 +127,17 @@ For each answer, perform this sequence:
 - `FormatCompliance`: follows requested structure (matrix, assumptions, gates)
 
 ### Reliability / Safety Dimensions
+
 - `UncertaintyHandling`: clearly separates evidence, assumptions, blockers, and unknowns
 - `OverclaimControl`: avoids pretending confidence beyond available evidence
 - `Groundedness`: stays close to retrieved material instead of drifting into plausible but unsupported text
 
 ### Operational Dimension
+
 - `Latency`: perceived response speed
 
 ### Optional Extra Notes
+
 - `ReviewEffort`: how easy the answer is for an engineer to inspect quickly
 - `BestUseCase`: where this profile performs best
 
@@ -138,6 +146,7 @@ For each answer, perform this sequence:
 ## Quick Interpretation of Scores
 
 ### Quality Guidance
+
 - **5** = excellent, specialist-ready
 - **4** = strong, minor issues only
 - **3** = useful but mixed
@@ -145,7 +154,9 @@ For each answer, perform this sequence:
 - **1** = poor or misleading
 
 ### Gate Rule
+
 If an answer fails the gate check, mark:
+
 - `Gate = Fail`
 - still score it
 - add the reason in Notes
@@ -217,24 +228,29 @@ QUERY_WARNING_CITATION_DENSITY=0.30
 ## Benchmark Question Families
 
 ### A. Evidence Sufficiency / Readiness
+
 1. Explain separation analysis for guided dummy stores and define minimum pre-flight evidence required before first release.
 2. What evidence is required to claim safe envelope expansion from one release condition to the next?
 3. Give a structured unknowns list when data is missing, separating critical blockers vs non-critical assumptions.
 
 ### B. Risk Framing / Decision Support
+
 4. Build a preliminary qualitative risk matrix (5x5 likelihood/severity) for a campaign with no operational separation report.
 5. For the same scenario, list explicit No-Go gates and objective release criteria that must be met before flight.
 6. Draft a concise specialist brief to a Flight Test Review Board: readiness status, gaps, conditions to proceed, and decision recommendation.
 
 ### C. Standards / Concept Comparison
+
 7. Compare jettison analysis vs operational separation analysis and explain why jettison-only evidence is insufficient.
 8. Explain launch transient risks for guided stores and failure modes that can cause aircraft/store recontact.
 
 ### D. Procedure / Test Design
+
 9. Provide a test-card sequence for risk reduction: ground checks -> captive carry -> incremental release envelope expansion.
 10. Propose instrumentation requirements for first release campaign (aircraft + store + telemetry + video) and minimum sampling expectations.
 
 ### E. Uncertainty Drivers / Hazard Structure
+
 11. Identify top uncertainty drivers in separation prediction (aero, mass properties, release dynamics, controls) and how to reduce each.
 12. Provide an example hazard log with at least 8 hazards, initial risk, mitigations, residual risk, and verification method.
 
@@ -245,19 +261,25 @@ QUERY_WARNING_CITATION_DENSITY=0.30
 Use these after the main 12 if you want stronger model discrimination.
 
 ### Challenge 1 — Insufficient Evidence Discipline
+
 Ask for a precise recommendation where the available documents are unlikely to support a definitive answer.
 Goal:
+
 - reward models that admit limits clearly
 - penalize bluffing
 
 ### Challenge 2 — Multi-Document Comparison
+
 Ask for a side-by-side comparison across multiple standards or guidance types.
 Goal:
+
 - measure synthesis quality
 
 ### Challenge 3 — Concise Expert Brief
+
 Ask for a <=220 word specialist answer with dense technical meaning.
 Goal:
+
 - identify the best operational default profile
 
 ---
@@ -267,17 +289,21 @@ Goal:
 Run each profile under both of these styles where practical.
 
 ### Variant S1 — Specialist concise
+
 - `Answer for specialist audience, avoid generic wording.`
 - `Use only inline [Sx] citations and cite each substantive claim.`
 - `Return concise output <=220 words.`
 
 ### Variant S2 — Full technical detail
+
 - `Answer for specialist audience, avoid generic wording.`
 - `Use only inline [Sx] citations and cite each substantive claim.`
 - `Return full detailed output with assumptions, method, and limits.`
 
 ### Variant S3 — Risk/decision style
+
 Use on the risk questions:
+
 - `Answer for specialist audience, avoid generic wording.`
 - `Use only inline [Sx] citations and cite each substantive claim.`
 - `Return assumptions, qualitative risk matrix, and explicit no-go gates.`
@@ -287,14 +313,17 @@ Use on the risk questions:
 ## Recommended Benchmark Matrix
 
 Minimum practical benchmark:
+
 - 3 profiles
 - 12 questions
 - 2 prompt styles
 
 This gives:
+
 - 72 scored responses
 
 If that is too heavy, start with:
+
 - Profiles A, B, C
 - Questions 1, 4, 5, 7, 9, 12
 - Variants S1 and S2
@@ -308,7 +337,9 @@ This reduced run still gives good discrimination.
 At the end of testing, choose:
 
 ### Best default profile
+
 Highest combination of:
+
 - TechnicalDepth
 - SourceAccuracy
 - Groundedness
@@ -316,17 +347,22 @@ Highest combination of:
 - acceptable Latency
 
 ### Best concise profile
+
 Highest performance in:
+
 - S1 concise specialist mode
 - low review effort
 - strong actionability
 
 ### Best deep-analysis profile
+
 Highest performance in:
+
 - S2 full-detail mode
 - synthesis + uncertainty handling
 
 ### Reject a profile if
+
 - gate failures are frequent
 - citations are often missing or weak
 - answers overclaim beyond evidence
@@ -337,21 +373,22 @@ Highest performance in:
 ## Results Template
 
 | Q# | Family | Profile | Variant | Gate | TechnicalDepth | SourceAccuracy | MultiSourceSynthesis | Actionability | FormatCompliance | UncertaintyHandling | OverclaimControl | Groundedness | Latency | ReviewEffort | BestUseCase | Notes |
-|----|--------|---------|---------|------|----------------|----------------|----------------------|---------------|------------------|---------------------|------------------|-------------|---------|--------------|-------------|-------|
-| 1  | A      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 2  | A      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 3  | A      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 4  | B      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 5  | B      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 6  | B      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 7  | C      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 8  | C      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 9  | D      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 10 | D      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 11 | E      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
-| 12 | E      | A       | S1      |      |                |                |                      |               |                  |                     |                  |             |         |              |             |       |
+|----|--------|---------|---------|------|----------------|----------------|----------------------|---------------|------------------|---------------------|------------------|------------- |---------|--------------|-------------|-------|
+| 1  | A      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 2  | A      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 3  | A      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 4  | B      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 5  | B      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 6  | B      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 7  | C      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 8  | C      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 9  | D      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 10 | D      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 11 | E      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
+| 12 | E      | A       | S1      |      |                |                |                      |               |                  |                     |                  |              |         |              |             |       |
 
 Duplicate the block for:
+
 - Profile A / S2
 - Profile B / S1
 - Profile B / S2
@@ -364,19 +401,20 @@ Duplicate the block for:
 
 At the end of benchmarking, write a short conclusion:
 
-- **Best default profile:**  
-- **Best concise profile:**  
-- **Best deep-analysis profile:**  
-- **Weakest recurring failure:**  
-- **Most common overclaim pattern:**  
-- **Recommended production default:**  
-- **Recommended fallback / low-cost mode:**  
+- **Best default profile:**
+- **Best concise profile:**
+- **Best deep-analysis profile:**
+- **Weakest recurring failure:**
+- **Most common overclaim pattern:**
+- **Recommended production default:**
+- **Recommended fallback / low-cost mode:**
 
 ---
 
 ## Practical Recommendation Before Starting
 
 Start with:
+
 - Profile A
 - Profile B
 - Profile C
