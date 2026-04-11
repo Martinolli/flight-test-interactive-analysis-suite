@@ -31,6 +31,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -58,6 +61,42 @@ function formatDuration(seconds: number | null): string {
   if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+}
+
+interface ParsedAnalysisContent {
+  body: string;
+  sources: string[];
+  warnings: string[];
+}
+
+function parseAnalysisContent(analysisMarkdown: string): ParsedAnalysisContent {
+  const referencesMatch = analysisMarkdown.match(/\n###\s+References\s*\n([\s\S]*)$/i);
+  const body = (referencesMatch
+    ? analysisMarkdown.slice(0, referencesMatch.index).trim()
+    : analysisMarkdown
+  ).trim();
+
+  const sources: string[] = [];
+  const warnings: string[] = [];
+
+  if (referencesMatch?.[1]) {
+    const referenceLines = referencesMatch[1]
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('- '));
+
+    for (const line of referenceLines) {
+      const cleaned = line.replace(/^-+\s*/, '').trim();
+      if (!cleaned) continue;
+      if (cleaned.toLowerCase().includes('no inline [sx] citations')) {
+        warnings.push(cleaned);
+        continue;
+      }
+      sources.push(cleaned);
+    }
+  }
+
+  return { body, sources, warnings };
 }
 
 // ─── Parameters & Data Panel ─────────────────────────────────────────────────
@@ -184,9 +223,11 @@ function AIAnalysisPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(true);
+  const [showSources, setShowSources] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [userPrompt, setUserPrompt] = useState('');
   const { user } = useAuth();
+  const parsedAnalysis = result ? parseAnalysisContent(result.analysis) : null;
 
   // Quick-prompt chips — click to pre-fill the prompt box
   const QUICK_PROMPTS = [
@@ -256,6 +297,7 @@ function AIAnalysisPanel({
     try {
       const data = await ApiService.getAIAnalysis(flightTestId, userPrompt.trim() || undefined);
       setResult(data);
+      setShowSources(false);
     } catch (err) {
       setError((err as Error).message || 'AI analysis failed');
     } finally {
@@ -361,22 +403,72 @@ function AIAnalysisPanel({
               <span>Flight test: {result.flight_test_name}</span>
             </div>
 
-            {/* Markdown-rendered analysis */}
-            <div className="
-              prose prose-sm max-w-none
-              prose-headings:font-semibold prose-headings:text-gray-800
-              prose-p:text-gray-700 prose-p:leading-relaxed
-              prose-strong:text-gray-900
-              prose-table:text-xs prose-table:w-full
-              prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-gray-700 prose-th:border prose-th:border-gray-200
-              prose-td:px-3 prose-td:py-1.5 prose-td:border prose-td:border-gray-200 prose-td:text-gray-700 prose-td:align-top
-              prose-tr:even:bg-gray-50
-              prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-xs
-              prose-blockquote:border-l-purple-300 prose-blockquote:text-gray-600
-            ">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {result.analysis}
-              </ReactMarkdown>
+            <div className="max-h-[65vh] min-h-[240px] overflow-y-auto rounded-xl border border-purple-100 bg-purple-50/40 p-3 pr-1">
+              <div className="flex justify-start">
+                <div className="w-full rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="text-xs font-medium text-purple-600">AI Analysis</span>
+                  </div>
+                  <div
+                    className="
+                      prose prose-sm max-w-none
+                      prose-headings:font-semibold prose-headings:text-gray-800
+                      prose-p:text-gray-700 prose-p:leading-relaxed
+                      prose-strong:text-gray-900
+                      prose-ul:my-2 prose-ol:my-2
+                      prose-table:text-xs prose-table:w-full
+                      prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-gray-700 prose-th:border prose-th:border-gray-200
+                      prose-td:px-3 prose-td:py-1.5 prose-td:border prose-td:border-gray-200 prose-td:text-gray-700 prose-td:align-top
+                      prose-tr:even:bg-gray-50
+                      prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-xs
+                      prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg prose-pre:p-3
+                      prose-blockquote:border-l-purple-300 prose-blockquote:text-gray-600
+                    "
+                  >
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                      {parsedAnalysis?.body || result.analysis}
+                    </ReactMarkdown>
+                  </div>
+
+                  {(parsedAnalysis?.warnings.length ?? 0) > 0 && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                        Quality Notice
+                      </p>
+                      <div className="space-y-0.5">
+                        {parsedAnalysis?.warnings.map((warning) => (
+                          <p key={warning} className="text-xs text-amber-800">
+                            - {warning}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(parsedAnalysis?.sources.length ?? 0) > 0 && (
+                    <div className="mt-3 border-t border-gray-100 pt-3">
+                      <button
+                        onClick={() => setShowSources((v) => !v)}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        {parsedAnalysis?.sources.length} source{(parsedAnalysis?.sources.length ?? 0) > 1 ? 's' : ''}
+                        {showSources ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+                      {showSources && (
+                        <div className="mt-2 space-y-1.5">
+                          {parsedAnalysis?.sources.map((source) => (
+                            <div key={source} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                              {source}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
@@ -491,7 +583,7 @@ export default function FlightTestDetail() {
 
   return (
     <Sidebar>
-      <div className="p-8 max-w-4xl">
+      <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6 lg:p-8">
         {/* Back button */}
         <button
           onClick={() => setLocation('/')}

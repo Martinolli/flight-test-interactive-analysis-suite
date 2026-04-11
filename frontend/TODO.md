@@ -13,10 +13,11 @@
 - [x] P0.2 Support richer query response contract rendering
   - Prepare UI for structured fields (`assumptions`, `limitations`, `coverage`, etc.) with graceful fallback.
   - Added rendering blocks for summary, assumptions, limitations, calculation notes, recommended-next-queries, and coverage metrics.
-- [ ] P0.3 AI UX parity between `AI Standards Query` and `Analyze with AI`
+- [x] P0.3 AI UX parity between `AI Standards Query` and `Analyze with AI`
   - Shared adaptive width/height behavior
   - stable long-answer scroll
   - consistent markdown/formula/warning/source rendering
+  - Flight Test Detail `Analyze with AI` now matches the AI query chat behavior for adaptive sizing and answer presentation.
 - [ ] P0.4 Analysis job persistence UX
   - Store/display `analysis_job_id` context in analysis/export flows.
   - Export actions must target persisted backend artifacts.

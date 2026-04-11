@@ -26,8 +26,9 @@
   - Keep backward-safe rendering during transition.
   - Added structured backend contract fields and frontend rendering fallback for legacy-safe behavior.
   - Added focused test coverage for structured response on both populated and empty-retrieval query paths.
-- [ ] P0.3 Standardize AI UX across `AI Standards Query` and `Analyze with AI`
+- [x] P0.3 Standardize AI UX across `AI Standards Query` and `Analyze with AI`
   - Shared adaptive layout, scroll behavior, markdown/formula rendering, warnings, and sources.
+  - `Analyze with AI` now uses responsive width, bounded internal answer scroll, markdown+math rendering, and explicit quality/source sections aligned with `AI Standards Query`.
 - [ ] P0.4 Persist analysis jobs and export PDF from immutable artifacts
   - Introduce `analysis_job_id` flow and provenance records (prompt/model/source snapshot/hash).
   - Eliminate ad hoc report generation from mutable in-memory text.

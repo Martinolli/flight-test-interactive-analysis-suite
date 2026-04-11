@@ -1090,3 +1090,36 @@ npm run build
 - `test_documents_tenancy`: `4 passed`
 - `test_flight_tests_comprehensive`: `28 passed`
 - Frontend build: successful (`tsc -b && vite build`)
+
+## P0.3 Implementation Update (2026-04-11)
+
+### Completed: AI UX parity between `AI Standards Query` and `Analyze with AI`
+
+**Files changed:**
+
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- `Analyze with AI` panel upgraded to adaptive layout behavior:
+  - expanded page container width for large screens
+  - bounded, internally scrollable analysis viewport for long answers
+- Markdown rendering parity improved:
+  - enabled `remark-math` + `rehype-katex` for formula rendering consistency
+- Added explicit quality/sources display behavior aligned with AI query page:
+  - parses generated analysis references block
+  - shows a `Quality Notice` panel when citation coverage is missing
+  - exposes collapsible source list in the analysis panel
+
+**Validation run:**
+
+```powershell
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`)
