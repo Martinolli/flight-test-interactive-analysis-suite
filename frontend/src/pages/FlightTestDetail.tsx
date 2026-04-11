@@ -226,6 +226,8 @@ function AIAnalysisPanel({
   const [expanded, setExpanded] = useState(true);
   const [showSources, setShowSources] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [loadingSavedJob, setLoadingSavedJob] = useState(false);
+  const [savedJobIdInput, setSavedJobIdInput] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
   const { user } = useAuth();
   const parsedAnalysis = result ? parseAnalysisContent(result.analysis) : null;
@@ -241,9 +243,13 @@ function AIAnalysisPanel({
 
   async function handleExportPDF() {
     if (!result) return;
+    if (!result.analysis_job_id) {
+      toast.error('Missing analysis job ID for immutable PDF export.');
+      return;
+    }
     setExportingPdf(true);
     try {
-      const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis);
+      const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis_job_id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -262,9 +268,13 @@ function AIAnalysisPanel({
 
   async function handlePrintPDF() {
     if (!result) return;
+    if (!result.analysis_job_id) {
+      toast.error('Missing analysis job ID for immutable PDF export.');
+      return;
+    }
     setExportingPdf(true);
     try {
-      const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis);
+      const blob = await ApiService.exportAnalysisPDF(flightTestId, result.analysis_job_id);
       const url = URL.createObjectURL(blob);
       const iframe = document.createElement('iframe');
       iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:none;';
@@ -303,6 +313,36 @@ function AIAnalysisPanel({
       setError((err as Error).message || 'AI analysis failed');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadSavedAnalysisJob() {
+    const parsedId = Number(savedJobIdInput);
+    if (!savedJobIdInput.trim() || Number.isNaN(parsedId) || parsedId <= 0) {
+      toast.warning('Enter a valid analysis job ID.');
+      return;
+    }
+    setLoadingSavedJob(true);
+    setError('');
+    try {
+      const job = await ApiService.getAIAnalysisJob(flightTestId, parsedId);
+      setResult({
+        analysis: job.analysis,
+        flight_test_name: job.flight_test_name,
+        parameters_analysed: job.parameters_analysed,
+        analysis_job_id: job.id,
+        model_name: job.model_name,
+        model_version: job.model_version,
+        output_sha256: job.output_sha256,
+        created_at: job.created_at,
+        retrieved_source_ids: job.retrieved_source_ids,
+      });
+      setShowSources(false);
+      toast.success(`Loaded analysis job #${job.id}`);
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to load saved analysis job.');
+    } finally {
+      setLoadingSavedJob(false);
     }
   }
 
@@ -360,6 +400,32 @@ function AIAnalysisPanel({
           />
         </div>
 
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600 mb-2">
+            Re-open Saved Analysis by ID
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              placeholder="Analysis Job ID"
+              value={savedJobIdInput}
+              onChange={(e) => setSavedJobIdInput(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
+                         placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400
+                         focus:border-transparent"
+            />
+            <Button
+              variant="outline"
+              onClick={loadSavedAnalysisJob}
+              disabled={loadingSavedJob}
+              className="shrink-0"
+            >
+              {loadingSavedJob ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Open'}
+            </Button>
+          </div>
+        </div>
+
         {!result && !loading && !error && (
           <div className="text-center py-4">
             <Button
@@ -402,6 +468,8 @@ function AIAnalysisPanel({
               <span>{result.parameters_analysed} parameters analysed</span>
               <span>·</span>
               <span>Flight test: {result.flight_test_name}</span>
+              <span>·</span>
+              <span>Analysis Job #{result.analysis_job_id}</span>
             </div>
 
             <div className="max-h-[65vh] min-h-[240px] overflow-y-auto rounded-xl border border-purple-100 bg-purple-50/40 p-3 pr-1">

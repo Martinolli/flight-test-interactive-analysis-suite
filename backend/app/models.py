@@ -76,6 +76,11 @@ class FlightTest(Base):
         back_populates="flight_test",
         cascade="all, delete-orphan",
     )
+    analysis_jobs = relationship(
+        "AnalysisJob",
+        back_populates="flight_test",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return (
@@ -244,4 +249,39 @@ class DocumentChunk(Base):
         return (
             f"<DocumentChunk(id={self.id}, document_id={self.document_id}, "
             f"chunk_index={self.chunk_index})>"
+        )
+
+
+class AnalysisJob(Base):
+    """Immutable persisted AI analysis artifact + provenance metadata."""
+
+    __tablename__ = "analysis_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flight_test_id = Column(
+        Integer,
+        ForeignKey("flight_tests.id"),
+        nullable=False,
+        index=True,
+    )
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="completed")
+    model_name = Column(String(128), nullable=False)
+    model_version = Column(String(128), nullable=True)
+    prompt_text = Column(Text, nullable=False)
+    retrieved_source_ids_json = Column(Text, nullable=False, default="[]")
+    retrieved_sources_snapshot_json = Column(Text, nullable=False, default="[]")
+    output_sha256 = Column(String(64), nullable=False, index=True)
+    analysis_text = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    flight_test = relationship("FlightTest", back_populates="analysis_jobs")
+    created_by = relationship("User", backref="analysis_jobs")
+
+    def __repr__(self):
+        return (
+            f"<AnalysisJob(id={self.id}, flight_test_id={self.flight_test_id}, "
+            f"model_name={self.model_name}, status={self.status})>"
         )

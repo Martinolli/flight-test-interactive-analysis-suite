@@ -141,6 +141,37 @@ export interface AIAnalysisResponse {
   analysis: string;
   flight_test_name: string;
   parameters_analysed: number;
+  analysis_job_id: number;
+  model_name: string;
+  model_version?: string | null;
+  output_sha256: string;
+  created_at: string;
+  retrieved_source_ids: string[];
+}
+
+export interface AnalysisJobResponse {
+  id: number;
+  flight_test_id: number;
+  flight_test_name: string;
+  parameters_analysed: number;
+  status: string;
+  model_name: string;
+  model_version?: string | null;
+  prompt_text: string;
+  analysis: string;
+  output_sha256: string;
+  created_at: string;
+  updated_at?: string | null;
+  retrieved_source_ids: string[];
+  retrieved_sources_snapshot: Array<{
+    source_id?: string;
+    filename?: string;
+    title?: string;
+    page_numbers?: string;
+    section_title?: string;
+    similarity?: number;
+    excerpt?: string;
+  }>;
 }
 
 // ─── Admin Types ──────────────────────────────────────────────────────────────
@@ -392,11 +423,20 @@ export class ApiService {
     );
   }
 
+  static async getAIAnalysisJob(
+    flightTestId: number,
+    analysisJobId: number
+  ): Promise<AnalysisJobResponse> {
+    return this.request<AnalysisJobResponse>(
+      `/api/documents/flight-tests/${flightTestId}/ai-analysis/jobs/${analysisJobId}`
+    );
+  }
+
   // ─── PDF Export ───────────────────────────────────────────────────────────
 
   static async exportAnalysisPDF(
     flightTestId: number,
-    analysisText: string
+    analysisJobId: number
   ): Promise<Blob> {
     const token = AuthService.getAccessToken();
     const response = await fetch(
@@ -407,7 +447,7 @@ export class ApiService {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
         },
-        body: JSON.stringify({ analysis_text: analysisText }),
+        body: JSON.stringify({ analysis_job_id: analysisJobId }),
       }
     );
     if (!response.ok) {

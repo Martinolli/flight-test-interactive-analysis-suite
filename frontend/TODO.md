@@ -21,9 +21,10 @@
 - [x] P0.3a Clarify active-dataset behavior in UI
   - Added explicit user-facing notices in Upload Data, Flight Test Detail, and Parameters.
   - Clarified that Upload History is audit-focused while analysis surfaces use the active dataset only.
-- [ ] P0.4 Analysis job persistence UX
+- [x] P0.4 Analysis job persistence UX
   - Store/display `analysis_job_id` context in analysis/export flows.
-  - Export actions must target persisted backend artifacts.
+  - Export actions now target persisted backend artifacts via immutable `analysis_job_id`.
+  - Added "Re-open Saved Analysis by ID" input flow in `Analyze with AI`.
 
 ---
 

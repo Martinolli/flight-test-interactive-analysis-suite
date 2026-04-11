@@ -1124,6 +1124,71 @@ npm run build
 
 - Frontend build: successful (`tsc -b && vite build`)
 
+## P0.4 Implementation Update (2026-04-11)
+
+### Completed: persist analysis jobs + export PDF from immutable artifacts
+
+**Files changed:**
+
+- `backend/app/models.py`
+- `backend/migrations/20260411_add_analysis_jobs.sql`
+- `backend/app/routers/documents.py`
+- `backend/app/routers/admin.py`
+- `backend/tests/test_documents_tenancy.py`
+- `backend/tests/test_admin_report_export.py`
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Added persisted `AnalysisJob` model + migration with provenance fields:
+  - `flight_test_id`, `created_by_id`, `model_name`, `model_version`
+  - `prompt_text`
+  - `retrieved_source_ids_json`, `retrieved_sources_snapshot_json`
+  - `analysis_text`, `output_sha256`, timestamps
+- `POST /api/documents/flight-tests/{id}/ai-analysis` now:
+  - generates analysis as before
+  - persists immutable analysis artifact + provenance
+  - returns `analysis_job_id`, model/hash metadata, and retrieval source IDs
+- Added re-open-by-ID endpoint:
+  - `GET /api/documents/flight-tests/{flight_test_id}/ai-analysis/jobs/{analysis_job_id}`
+  - tenant-scoped to owning user (superuser override retained)
+- PDF export now uses immutable job artifact only:
+  - admin report export endpoints accept `analysis_job_id`
+  - analysis text is loaded from persisted `analysis_jobs`
+  - freeform `analysis_text` payload export path removed
+  - PDF metadata includes analysis job provenance (ID/model/hash snippet)
+- Frontend Analyze with AI flow updated:
+  - displays analysis job ID in result metadata
+  - exports PDF via `analysis_job_id`
+  - adds "Re-open Saved Analysis by ID" input/action
+
+### Acceptance Check
+
+- [x] analysis can be re-opened by ID
+- [x] PDF export uses saved analysis job
+- [x] provenance is inspectable in API response and PDF metadata
+- [x] existing UI flow remains usable
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_documents_tenancy.py -q
+pytest backend/tests/test_admin_report_export.py -q
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- `test_documents_tenancy`: `6 passed`
+- `test_admin_report_export`: `2 passed`
+- `test_flight_tests_comprehensive`: `28 passed`
+- Frontend build: successful (`tsc -b && vite build`)
+
 ## P0.3a Implementation Update (2026-04-11)
 
 ### Completed: clarify active-dataset behavior in UI (no backend behavior change)

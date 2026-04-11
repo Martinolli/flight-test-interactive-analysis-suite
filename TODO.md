@@ -63,7 +63,7 @@
   - Added explicit notices in Upload Data, Flight Test Detail, and Parameters pages.
   - Added acceptance checklist in `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`.
 
-- [ ] P0.4 Persist analysis jobs and export PDF from immutable artifacts
+- [x] P0.4 Persist analysis jobs and export PDF from immutable artifacts
   - Introduce `analysis_job_id` flow and provenance records.
   - Persist:
     - prompt text
@@ -79,6 +79,7 @@
     - PDF export uses saved analysis job
     - provenance is inspectable
     - existing UI flow remains usable
+  - Implemented with persisted `analysis_jobs` model + migration, `GET` by analysis job ID, and immutable PDF export keyed by `analysis_job_id`.
 
 ---
 
@@ -159,14 +160,13 @@
 
 ## Immediate Execution Order
 
-1. P0.4 — Persist analysis jobs and PDF provenance
-2. P1.1 — Standardize Upload/Data Library framing
-3. P1.0 — Dataset versioning / active dataset selection
+1. P1.1 — Standardize Upload/Data Library framing  
+2. P1.0 — Dataset versioning / active dataset selection  
 
 - **Reason for this order**
 
 - P0.3a is completed and user-facing dataset-scope behavior is now explicit.
-- P0.4 is still the correct next architecture step and improves traceability.
+- P0.4 is completed: analysis artifacts are now persisted and exported by immutable job ID.
 - P1.1 improves visual consistency with low technical risk.
 - P1.0 is important, but larger and should be implemented deliberately as a model/workflow change.
 
@@ -174,7 +174,7 @@
 
 ## Execution Gates
 
-- [ ] G1 Product Truth Gate (after P0.1–P0.4 plus P0.3a)
+- [ ] G1 Product Truth Gate (after P0.1–P0.4 plus P0.3a) — ready for formal closure review
 - [ ] G2 Engineering UX Gate (after P1.0–P1.4)
 - [ ] G3 Capability Definition Gate (after P1.5)
 - [ ] G4 Domainization Gate (after P2.1 + first additional deterministic modules)

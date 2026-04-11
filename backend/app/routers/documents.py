@@ -10,6 +10,8 @@ import os
 import re
 import tempfile
 import time
+import json
+import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -33,7 +35,15 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import SessionLocal, get_db
-from app.models import DataPoint, Document, DocumentChunk, FlightTest, TestParameter, User
+from app.models import (
+    AnalysisJob,
+    DataPoint,
+    Document,
+    DocumentChunk,
+    FlightTest,
+    TestParameter,
+    User,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +201,29 @@ class AIAnalysisResponse(BaseModel):
     analysis: str
     flight_test_name: str
     parameters_analysed: int
+    analysis_job_id: int
+    model_name: str
+    model_version: Optional[str] = None
+    output_sha256: str
+    created_at: str
+    retrieved_source_ids: List[str] = Field(default_factory=list)
+
+
+class AnalysisJobResponse(BaseModel):
+    id: int
+    flight_test_id: int
+    flight_test_name: str
+    parameters_analysed: int
+    status: str
+    model_name: str
+    model_version: Optional[str] = None
+    prompt_text: str
+    analysis: str
+    output_sha256: str
+    created_at: str
+    updated_at: Optional[str] = None
+    retrieved_source_ids: List[str] = Field(default_factory=list)
+    retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1720,6 +1753,135 @@ def query_documents(
 
 
 # ---------------------------------------------------------------------------
+# Analysis job helpers
+# ---------------------------------------------------------------------------
+
+def _get_accessible_flight_test(
+    *,
+    db: Session,
+    flight_test_id: int,
+    current_user: User,
+) -> FlightTest:
+    query = db.query(FlightTest).filter(FlightTest.id == flight_test_id)
+    if not current_user.is_superuser:
+        query = query.filter(FlightTest.created_by_id == current_user.id)
+    flight_test = query.first()
+    if not flight_test:
+        raise HTTPException(status_code=404, detail="Flight test not found.")
+    return flight_test
+
+
+def _safe_json_load(value: Optional[str], default):
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+
+def _serialize_retrieval_snapshot(sources: List[dict], excerpt_chars: int = 320) -> List[dict]:
+    snapshot: List[dict] = []
+    for source in sources:
+        snapshot.append(
+            {
+                "source_id": source.get("source_id"),
+                "filename": source.get("filename"),
+                "title": source.get("title"),
+                "page_numbers": source.get("page_numbers"),
+                "section_title": source.get("section_title"),
+                "similarity": source.get("similarity"),
+                "excerpt": (source.get("text") or "")[:excerpt_chars],
+            }
+        )
+    return snapshot
+
+
+def _count_flight_test_parameters(db: Session, flight_test_id: int) -> int:
+    return (
+        db.query(func.count(func.distinct(DataPoint.parameter_id)))
+        .filter(DataPoint.flight_test_id == flight_test_id)
+        .scalar()
+        or 0
+    )
+
+
+def _analysis_job_to_response(
+    *,
+    job: AnalysisJob,
+    flight_test_name: str,
+    parameters_analysed: int,
+) -> AIAnalysisResponse:
+    source_ids = _safe_json_load(job.retrieved_source_ids_json, [])
+    if not isinstance(source_ids, list):
+        source_ids = []
+    return AIAnalysisResponse(
+        analysis=job.analysis_text,
+        flight_test_name=flight_test_name,
+        parameters_analysed=parameters_analysed,
+        analysis_job_id=job.id,
+        model_name=job.model_name,
+        model_version=job.model_version,
+        output_sha256=job.output_sha256,
+        created_at=job.created_at.isoformat() if job.created_at else "",
+        retrieved_source_ids=[str(item) for item in source_ids if item],
+    )
+
+
+@router.get(
+    "/flight-tests/{flight_test_id}/ai-analysis/jobs/{analysis_job_id}",
+    response_model=AnalysisJobResponse,
+)
+def get_ai_analysis_job(
+    flight_test_id: int,
+    analysis_job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ft = _get_accessible_flight_test(
+        db=db,
+        flight_test_id=flight_test_id,
+        current_user=current_user,
+    )
+    job = (
+        db.query(AnalysisJob)
+        .filter(
+            AnalysisJob.id == analysis_job_id,
+            AnalysisJob.flight_test_id == ft.id,
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Analysis job not found.")
+    if not current_user.is_superuser and job.created_by_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Analysis job not found.")
+
+    retrieved_source_ids = _safe_json_load(job.retrieved_source_ids_json, [])
+    if not isinstance(retrieved_source_ids, list):
+        retrieved_source_ids = []
+    retrieved_sources_snapshot = _safe_json_load(job.retrieved_sources_snapshot_json, [])
+    if not isinstance(retrieved_sources_snapshot, list):
+        retrieved_sources_snapshot = []
+
+    return AnalysisJobResponse(
+        id=job.id,
+        flight_test_id=job.flight_test_id,
+        flight_test_name=ft.test_name,
+        parameters_analysed=_count_flight_test_parameters(db, ft.id),
+        status=job.status,
+        model_name=job.model_name,
+        model_version=job.model_version,
+        prompt_text=job.prompt_text,
+        analysis=job.analysis_text,
+        output_sha256=job.output_sha256,
+        created_at=job.created_at.isoformat() if job.created_at else "",
+        updated_at=job.updated_at.isoformat() if job.updated_at else None,
+        retrieved_source_ids=[str(item) for item in retrieved_source_ids if item],
+        retrieved_sources_snapshot=retrieved_sources_snapshot,
+    )
+
+
+# ---------------------------------------------------------------------------
 # POST /api/documents/flight-tests/{flight_test_id}/ai-analysis
 # ---------------------------------------------------------------------------
 
@@ -1749,10 +1911,11 @@ def ai_analysis(
       When provided, this replaces the default generic analysis instruction.
     """
     _require_ai_packages()
-    # Fetch the flight test
-    ft = db.query(FlightTest).filter(FlightTest.id == flight_test_id).first()
-    if not ft:
-        raise HTTPException(status_code=404, detail="Flight test not found.")
+    ft = _get_accessible_flight_test(
+        db=db,
+        flight_test_id=flight_test_id,
+        current_user=current_user,
+    )
 
     # Compute statistics per parameter
     stats_rows = (
@@ -1949,8 +2112,32 @@ def ai_analysis(
             "- No inline [Sx] citations were produced by the model for standards claims."
         )
 
-    return AIAnalysisResponse(
-        analysis=final_analysis,
+    retrieved_source_ids = [
+        str(source.get("source_id"))
+        for source in sources
+        if source.get("source_id")
+    ]
+    retrieved_sources_snapshot = _serialize_retrieval_snapshot(sources)
+    output_sha256 = hashlib.sha256(final_analysis.encode("utf-8")).hexdigest()
+
+    analysis_job = AnalysisJob(
+        flight_test_id=ft.id,
+        created_by_id=current_user.id,
+        status="completed",
+        model_name=analysis_model,
+        model_version=os.getenv("ANALYSIS_MODEL_VERSION"),
+        prompt_text=user_prompt,
+        retrieved_source_ids_json=json.dumps(retrieved_source_ids),
+        retrieved_sources_snapshot_json=json.dumps(retrieved_sources_snapshot),
+        output_sha256=output_sha256,
+        analysis_text=final_analysis,
+    )
+    db.add(analysis_job)
+    db.commit()
+    db.refresh(analysis_job)
+
+    return _analysis_job_to_response(
+        job=analysis_job,
         flight_test_name=ft.test_name,
         parameters_analysed=len(stats_rows),
     )
