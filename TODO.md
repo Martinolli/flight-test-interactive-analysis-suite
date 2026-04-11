@@ -1,7 +1,7 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 02
 
-**Last updated:** 2026-04-11  
-**Scope:** Backend + Frontend + LLM/RAG + Reporting  
+**Last updated:** 2026-04-11
+**Scope:** Backend + Frontend + LLM/RAG + Reporting
 **Plan basis:** aligned to `TODO_REV_01.md`, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, current `TODO.md`, and post-P0.3 audit findings
 
 ---
@@ -159,11 +159,12 @@
 
 ## Immediate Execution Order
 
-1. P0.4 — Persist analysis jobs and PDF provenance  
-2. P1.1 — Standardize Upload/Data Library framing  
-3. P1.0 — Dataset versioning / active dataset selection  
+1. P0.4 — Persist analysis jobs and PDF provenance
+2. P1.1 — Standardize Upload/Data Library framing
+3. P1.0 — Dataset versioning / active dataset selection
 
-**Reason for this order**
+- **Reason for this order**
+
 - P0.3a is completed and user-facing dataset-scope behavior is now explicit.
 - P0.4 is still the correct next architecture step and improves traceability.
 - P1.1 improves visual consistency with low technical risk.
