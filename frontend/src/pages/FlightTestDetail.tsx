@@ -10,6 +10,7 @@ import {
   Edit,
   Trash2,
   AlertCircle,
+  Info,
   Sparkles,
   Loader2,
   ChevronDown,
@@ -734,6 +735,26 @@ export default function FlightTestDetail() {
                 ) : (
                   <p className="text-gray-400 text-sm italic">No description provided.</p>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card className="mt-4 border-amber-200 bg-amber-50/60">
+              <CardContent className="pt-5">
+                <div className="flex gap-3">
+                  <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-sm text-amber-900">
+                    <p className="font-semibold">Active dataset scope</p>
+                    <p>
+                      Parameters & Data and Analyze with AI use the{' '}
+                      <strong>active dataset</strong> only (latest successful upload for this
+                      flight test).
+                    </p>
+                    <p>
+                      Upload History is retained for audit/tracking and does not select historical
+                      dataset versions.
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 

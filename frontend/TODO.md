@@ -1,7 +1,7 @@
 # FTIAS Frontend — TODO (Execution Alignment)
 
 **Last updated:** 2026-04-11  
-**Alignment:** mirrors root execution plan (`TODO.md`) and REV01 review.
+**Alignment:** mirrors root execution plan (`TODO.md`) and REV02 review.
 
 ---
 
@@ -18,6 +18,9 @@
   - stable long-answer scroll
   - consistent markdown/formula/warning/source rendering
   - Flight Test Detail `Analyze with AI` now matches the AI query chat behavior for adaptive sizing and answer presentation.
+- [x] P0.3a Clarify active-dataset behavior in UI
+  - Added explicit user-facing notices in Upload Data, Flight Test Detail, and Parameters.
+  - Clarified that Upload History is audit-focused while analysis surfaces use the active dataset only.
 - [ ] P0.4 Analysis job persistence UX
   - Store/display `analysis_job_id` context in analysis/export flows.
   - Export actions must target persisted backend artifacts.

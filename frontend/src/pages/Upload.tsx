@@ -245,6 +245,26 @@ export default function Upload() {
           </CardContent>
         </Card>
 
+        {/* Active dataset behavior notice */}
+        <Card className="mb-6 border-amber-200 bg-amber-50/60">
+          <CardContent className="pt-5">
+            <div className="flex gap-3">
+              <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1.5 text-sm text-amber-900">
+                <p className="font-semibold">Active dataset behavior</p>
+                <p>
+                  <strong>Upload History</strong> is an ingestion audit trail. The{' '}
+                  <strong>latest successful upload</strong> becomes the active dataset for this
+                  flight test.
+                </p>
+                <p>
+                  Dashboard, Parameters, and AI Analysis use the active dataset only.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Upload history */}
         {selectedTestId && (
           <Card>

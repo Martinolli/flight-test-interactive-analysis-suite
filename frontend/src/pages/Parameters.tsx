@@ -3,6 +3,7 @@ import {
   BarChart3,
   TrendingUp,
   ScatterChart,
+  Info,
   RefreshCw,
   AlertCircle,
   CheckSquare,
@@ -208,6 +209,24 @@ export default function Parameters() {
             </div>
           </CardContent>
         </Card>
+
+        {selectedTestId && (
+          <Card className="mb-6 border-amber-200 bg-amber-50/60">
+            <CardContent className="pt-5">
+              <div className="flex gap-3">
+                <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-sm text-amber-900">
+                  <p className="font-semibold">Dataset scope</p>
+                  <p>
+                    This page visualizes the <strong>active dataset</strong> only (latest
+                    successful upload for the selected flight test).
+                  </p>
+                  <p>Upload History records ingestion events and does not switch dataset versions.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main content — only shown when a test is selected */}
         {selectedTestId ? (

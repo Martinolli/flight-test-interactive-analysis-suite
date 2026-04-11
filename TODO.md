@@ -48,7 +48,7 @@
   - Shared adaptive layout, scroll behavior, markdown/formula rendering, warnings, and sources.
   - `Analyze with AI` now uses responsive width, bounded internal answer scroll, markdown+math rendering, and explicit quality/source sections aligned with `AI Standards Query`.
 
-- [ ] P0.3a Clarify active-dataset behavior in UI
+- [x] P0.3a Clarify active-dataset behavior in UI
   - **Reason:** current product behavior preserves ingestion history but replaces active flight-test data on re-upload.
   - Upload History currently implies multiple usable datasets may exist, while Dashboard / Parameters / AI Analysis operate only on the latest active dataset.
   - Add explicit user-facing notice in:
@@ -60,7 +60,8 @@
     - the latest successful upload is the active dataset
     - Dashboard, Parameters, and AI Analysis use the active dataset only
   - Keep current backend behavior unchanged for this task.
-  - Add a small regression-safe UI test or at minimum a clear acceptance checklist in docs.
+  - Added explicit notices in Upload Data, Flight Test Detail, and Parameters pages.
+  - Added acceptance checklist in `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`.
 
 - [ ] P0.4 Persist analysis jobs and export PDF from immutable artifacts
   - Introduce `analysis_job_id` flow and provenance records.
@@ -158,13 +159,12 @@
 
 ## Immediate Execution Order
 
-1. P0.3a — Clarify active-dataset behavior in UI  
-2. P0.4 — Persist analysis jobs and PDF provenance  
-3. P1.1 — Standardize Upload/Data Library framing  
-4. P1.0 — Dataset versioning / active dataset selection  
+1. P0.4 — Persist analysis jobs and PDF provenance  
+2. P1.1 — Standardize Upload/Data Library framing  
+3. P1.0 — Dataset versioning / active dataset selection  
 
 **Reason for this order**
-- P0.3a removes immediate user confusion without changing backend data behavior.
+- P0.3a is completed and user-facing dataset-scope behavior is now explicit.
 - P0.4 is still the correct next architecture step and improves traceability.
 - P1.1 improves visual consistency with low technical risk.
 - P1.0 is important, but larger and should be implemented deliberately as a model/workflow change.

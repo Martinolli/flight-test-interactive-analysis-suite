@@ -1123,3 +1123,46 @@ npm run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`)
+
+## P0.3a Implementation Update (2026-04-11)
+
+### Completed: clarify active-dataset behavior in UI (no backend behavior change)
+
+**Files changed:**
+
+- `frontend/src/pages/Upload.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Added explicit user-facing notices that:
+  - Upload History is an ingestion/audit trail
+  - the latest successful upload is the active dataset
+  - Parameters, Dashboard surfaces, and Analyze with AI use the active dataset only
+- Clarified this in the three required work surfaces:
+  - Upload Data page
+  - Flight Test Detail page
+  - Parameters page
+- Kept backend and data behavior unchanged (no dataset versioning introduced in this task).
+
+### Acceptance Checklist
+
+- [x] Upload page displays active-dataset notice next to upload/history workflow.
+- [x] Flight Test Detail displays active-dataset notice for Parameters + AI Analysis context.
+- [x] Parameters page displays active-dataset scope notice for selected flight test.
+- [x] No API contract or backend behavior change for ingestion history.
+- [x] Frontend build passes after UI copy/layout updates.
+
+**Validation run:**
+
+```powershell
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`)
