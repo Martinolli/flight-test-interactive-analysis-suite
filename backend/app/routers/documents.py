@@ -224,6 +224,7 @@ class AnalysisJobResponse(BaseModel):
     updated_at: Optional[str] = None
     retrieved_source_ids: List[str] = Field(default_factory=list)
     retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
+    parameter_stats_snapshot: List[dict] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1797,20 +1798,27 @@ def _serialize_retrieval_snapshot(sources: List[dict], excerpt_chars: int = 320)
     return snapshot
 
 
-def _count_flight_test_parameters(db: Session, flight_test_id: int) -> int:
-    return (
-        db.query(func.count(func.distinct(DataPoint.parameter_id)))
-        .filter(DataPoint.flight_test_id == flight_test_id)
-        .scalar()
-        or 0
-    )
+def _serialize_parameter_stats_snapshot(stats_rows) -> List[dict]:
+    snapshot: List[dict] = []
+    for row in stats_rows:
+        snapshot.append(
+            {
+                "name": row.name,
+                "unit": row.unit,
+                "min_val": float(row.min_val) if row.min_val is not None else None,
+                "max_val": float(row.max_val) if row.max_val is not None else None,
+                "avg_val": float(row.avg_val) if row.avg_val is not None else None,
+                "std_val": float(row.std_val) if row.std_val is not None else None,
+                "sample_count": int(row.sample_count) if row.sample_count is not None else 0,
+            }
+        )
+    return snapshot
 
 
 def _analysis_job_to_response(
     *,
     job: AnalysisJob,
     flight_test_name: str,
-    parameters_analysed: int,
 ) -> AIAnalysisResponse:
     source_ids = _safe_json_load(job.retrieved_source_ids_json, [])
     if not isinstance(source_ids, list):
@@ -1818,7 +1826,7 @@ def _analysis_job_to_response(
     return AIAnalysisResponse(
         analysis=job.analysis_text,
         flight_test_name=flight_test_name,
-        parameters_analysed=parameters_analysed,
+        parameters_analysed=job.parameters_analysed,
         analysis_job_id=job.id,
         model_name=job.model_name,
         model_version=job.model_version,
@@ -1862,12 +1870,15 @@ def get_ai_analysis_job(
     retrieved_sources_snapshot = _safe_json_load(job.retrieved_sources_snapshot_json, [])
     if not isinstance(retrieved_sources_snapshot, list):
         retrieved_sources_snapshot = []
+    parameter_stats_snapshot = _safe_json_load(job.parameter_stats_snapshot_json, [])
+    if not isinstance(parameter_stats_snapshot, list):
+        parameter_stats_snapshot = []
 
     return AnalysisJobResponse(
         id=job.id,
         flight_test_id=job.flight_test_id,
         flight_test_name=ft.test_name,
-        parameters_analysed=_count_flight_test_parameters(db, ft.id),
+        parameters_analysed=job.parameters_analysed,
         status=job.status,
         model_name=job.model_name,
         model_version=job.model_version,
@@ -1878,6 +1889,7 @@ def get_ai_analysis_job(
         updated_at=job.updated_at.isoformat() if job.updated_at else None,
         retrieved_source_ids=[str(item) for item in retrieved_source_ids if item],
         retrieved_sources_snapshot=retrieved_sources_snapshot,
+        parameter_stats_snapshot=parameter_stats_snapshot,
     )
 
 
@@ -2118,6 +2130,7 @@ def ai_analysis(
         if source.get("source_id")
     ]
     retrieved_sources_snapshot = _serialize_retrieval_snapshot(sources)
+    parameter_stats_snapshot = _serialize_parameter_stats_snapshot(stats_rows)
     output_sha256 = hashlib.sha256(final_analysis.encode("utf-8")).hexdigest()
 
     analysis_job = AnalysisJob(
@@ -2126,6 +2139,8 @@ def ai_analysis(
         status="completed",
         model_name=analysis_model,
         model_version=os.getenv("ANALYSIS_MODEL_VERSION"),
+        parameters_analysed=len(stats_rows),
+        parameter_stats_snapshot_json=json.dumps(parameter_stats_snapshot),
         prompt_text=user_prompt,
         retrieved_source_ids_json=json.dumps(retrieved_source_ids),
         retrieved_sources_snapshot_json=json.dumps(retrieved_sources_snapshot),
@@ -2139,7 +2154,6 @@ def ai_analysis(
     return _analysis_job_to_response(
         job=analysis_job,
         flight_test_name=ft.test_name,
-        parameters_analysed=len(stats_rows),
     )
 
 

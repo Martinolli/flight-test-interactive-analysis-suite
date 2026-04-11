@@ -9,18 +9,18 @@ import io
 import logging
 import os
 import re
+import json
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_superuser, get_password_hash
 from app.database import get_db
-from app.models import AnalysisJob, DataPoint, Document, FlightTest, TestParameter, User
+from app.models import AnalysisJob, Document, FlightTest, User
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,17 @@ def _sanitize_pdf_text(text: str) -> str:
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
+
+def _load_parameter_stats_snapshot(analysis_job: AnalysisJob) -> List[dict]:
+    raw = analysis_job.parameter_stats_snapshot_json or "[]"
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -256,26 +267,9 @@ def export_ai_analysis_pdf(
     if not analysis_job:
         raise HTTPException(status_code=404, detail="Analysis job not found for this flight test.")
 
-    # Compute parameter statistics
-    stats_rows = (
-        db.query(
-            TestParameter.name,
-            TestParameter.unit,
-            func.min(DataPoint.value).label("min_val"),
-            func.max(DataPoint.value).label("max_val"),
-            func.avg(DataPoint.value).label("avg_val"),
-            func.stddev(DataPoint.value).label("std_val"),
-            func.count(DataPoint.id).label("sample_count"),
-        )
-        .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
-        .filter(DataPoint.flight_test_id == flight_test_id)
-        .group_by(TestParameter.name, TestParameter.unit)
-        .all()
-    )
-
     pdf_bytes = _build_pdf(
         flight_test=ft,
-        stats_rows=stats_rows,
+        stats_snapshot=_load_parameter_stats_snapshot(analysis_job),
         analysis_text=analysis_job.analysis_text,
         generated_by=current_user.full_name or current_user.username,
         analysis_job=analysis_job,
@@ -326,25 +320,9 @@ def export_ai_analysis_pdf_post(
     if not analysis_job:
         raise HTTPException(status_code=404, detail="Analysis job not found for this flight test.")
 
-    stats_rows = (
-        db.query(
-            TestParameter.name,
-            TestParameter.unit,
-            func.min(DataPoint.value).label("min_val"),
-            func.max(DataPoint.value).label("max_val"),
-            func.avg(DataPoint.value).label("avg_val"),
-            func.stddev(DataPoint.value).label("std_val"),
-            func.count(DataPoint.id).label("sample_count"),
-        )
-        .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
-        .filter(DataPoint.flight_test_id == flight_test_id)
-        .group_by(TestParameter.name, TestParameter.unit)
-        .all()
-    )
-
     pdf_bytes = _build_pdf(
         flight_test=ft,
-        stats_rows=stats_rows,
+        stats_snapshot=_load_parameter_stats_snapshot(analysis_job),
         analysis_text=analysis_job.analysis_text,
         generated_by=current_user.full_name or current_user.username,
         analysis_job=analysis_job,
@@ -367,7 +345,7 @@ def export_ai_analysis_pdf_post(
 
 def _build_pdf(
     flight_test: FlightTest,
-    stats_rows,
+    stats_snapshot: List[dict],
     analysis_text: str,
     generated_by: str,
     analysis_job: Optional[AnalysisJob] = None,
@@ -558,17 +536,17 @@ def _build_pdf(
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#c8d6e5")))
     story.append(Paragraph("Annex A — Parameter Statistics", annex_title_style))
 
-    if stats_rows:
+    if stats_snapshot:
         table_data = [["Parameter", "Unit", "Min", "Max", "Mean", "Std Dev", "Samples"]]
-        for row in stats_rows:
+        for row in stats_snapshot:
             table_data.append([
-                _sanitize_pdf_text(row.name),
-                _sanitize_pdf_text(row.unit or "—"),
-                f"{row.min_val:.3f}",
-                f"{row.max_val:.3f}",
-                f"{row.avg_val:.3f}",
-                f"{(row.std_val or 0):.3f}",
-                str(row.sample_count),
+                _sanitize_pdf_text(str(row.get("name") or "—")),
+                _sanitize_pdf_text(str(row.get("unit") or "—")),
+                f"{float(row.get('min_val') or 0):.3f}",
+                f"{float(row.get('max_val') or 0):.3f}",
+                f"{float(row.get('avg_val') or 0):.3f}",
+                f"{float(row.get('std_val') or 0):.3f}",
+                str(int(row.get("sample_count") or 0)),
             ])
 
         # Use Paragraph cells so long parameter names wrap instead of overflow

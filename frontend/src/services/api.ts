@@ -163,6 +163,15 @@ export interface AnalysisJobResponse {
   created_at: string;
   updated_at?: string | null;
   retrieved_source_ids: string[];
+  parameter_stats_snapshot: Array<{
+    name: string;
+    unit?: string | null;
+    min_val?: number | null;
+    max_val?: number | null;
+    avg_val?: number | null;
+    std_val?: number | null;
+    sample_count: number;
+  }>;
   retrieved_sources_snapshot: Array<{
     source_id?: string;
     filename?: string;

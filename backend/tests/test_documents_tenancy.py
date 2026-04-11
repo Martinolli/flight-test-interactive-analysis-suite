@@ -1,6 +1,7 @@
 """Tests for document tenancy isolation on /api/documents endpoints."""
 
 from datetime import datetime
+import json
 
 from fastapi import status
 
@@ -265,6 +266,12 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     assert persisted_job.flight_test_id == flight_test.id
     assert persisted_job.created_by_id == test_user["id"]
     assert persisted_job.output_sha256 == body["output_sha256"]
+    assert persisted_job.parameters_analysed == 1
+    stats_snapshot = json.loads(persisted_job.parameter_stats_snapshot_json)
+    assert len(stats_snapshot) == 1
+    assert stats_snapshot[0]["name"] == "TEST_SPEED"
+    assert stats_snapshot[0]["sample_count"] == 1
+    assert stats_snapshot[0]["avg_val"] == 100.0
 
 
 def test_get_ai_analysis_job_is_tenant_scoped(client, db_session, test_user, auth_headers):
@@ -311,3 +318,71 @@ def test_get_ai_analysis_job_is_tenant_scoped(client, db_session, test_user, aut
         headers=auth_headers,
     )
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_get_ai_analysis_job_returns_persisted_snapshot_not_live_recompute(
+    client, db_session, test_user, auth_headers
+):
+    flight_test = FlightTest(
+        test_name="Snapshot Persisted",
+        aircraft_type="F-16",
+        created_by_id=test_user["id"],
+    )
+    db_session.add(flight_test)
+    db_session.commit()
+    db_session.refresh(flight_test)
+
+    # Persisted job says 2 parameters with predefined snapshot values.
+    persisted_snapshot = [
+        {
+            "name": "PARAM_A",
+            "unit": "kt",
+            "min_val": 10.0,
+            "max_val": 20.0,
+            "avg_val": 15.0,
+            "std_val": 5.0,
+            "sample_count": 2,
+        }
+    ]
+    analysis_job = AnalysisJob(
+        flight_test_id=flight_test.id,
+        created_by_id=test_user["id"],
+        status="completed",
+        model_name="gpt-4o-mini",
+        model_version=None,
+        parameters_analysed=1,
+        parameter_stats_snapshot_json=json.dumps(persisted_snapshot),
+        prompt_text="prompt",
+        retrieved_source_ids_json='["S1"]',
+        retrieved_sources_snapshot_json="[]",
+        output_sha256="c" * 64,
+        analysis_text="analysis text",
+    )
+    db_session.add(analysis_job)
+    db_session.commit()
+    db_session.refresh(analysis_job)
+
+    # Add mutable datapoints that do not match persisted snapshot.
+    param_live = TestParameter(name="LIVE_PARAM_001", unit="g")
+    db_session.add(param_live)
+    db_session.commit()
+    db_session.refresh(param_live)
+    db_session.add(
+        DataPoint(
+            flight_test_id=flight_test.id,
+            parameter_id=param_live.id,
+            timestamp=datetime(2026, 4, 11, 12, 0, 0),
+            value=999.0,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis/jobs/{analysis_job.id}",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["parameters_analysed"] == 1
+    assert body["parameter_stats_snapshot"] == persisted_snapshot

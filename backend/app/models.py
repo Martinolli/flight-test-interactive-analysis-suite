@@ -268,6 +268,8 @@ class AnalysisJob(Base):
     status = Column(String(32), nullable=False, default="completed")
     model_name = Column(String(128), nullable=False)
     model_version = Column(String(128), nullable=True)
+    parameters_analysed = Column(Integer, nullable=False, default=0)
+    parameter_stats_snapshot_json = Column(Text, nullable=False, default="[]")
     prompt_text = Column(Text, nullable=False)
     retrieved_source_ids_json = Column(Text, nullable=False, default="[]")
     retrieved_sources_snapshot_json = Column(Text, nullable=False, default="[]")

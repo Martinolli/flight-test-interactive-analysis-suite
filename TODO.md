@@ -69,17 +69,22 @@
     - prompt text
     - model name/version string
     - retrieved source snapshot / IDs
+    - `parameters_analysed`
+    - parameter statistics snapshot (for immutable annex/report metadata)
     - output hash
     - timestamps
     - flight test linkage
   - Eliminate ad hoc report generation from mutable in-memory text.
   - PDF export must use immutable persisted analysis artifact, not freeform current-page text.
+  - Re-open endpoint and PDF annex/statistics must be served from persisted `analysis_jobs` snapshot fields, not live `DataPoint` recomputation.
   - Required acceptance:
     - analysis can be re-opened by ID
     - PDF export uses saved analysis job
     - provenance is inspectable
     - existing UI flow remains usable
-  - Implemented with persisted `analysis_jobs` model + migration, `GET` by analysis job ID, and immutable PDF export keyed by `analysis_job_id`.
+    - reopened job metadata remains reproducible after later dataset changes
+    - PDF annex/statistics remain reproducible after later dataset changes
+  - Implemented with persisted `analysis_jobs` model + migrations, `GET` by analysis job ID, immutable snapshot-backed metadata, and immutable PDF export keyed by `analysis_job_id`.
 
 ---
 

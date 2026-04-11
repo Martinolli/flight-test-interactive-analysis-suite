@@ -1189,6 +1189,69 @@ npm run build
 - `test_flight_tests_comprehensive`: `28 passed`
 - Frontend build: successful (`tsc -b && vite build`)
 
+## P0.4 Hardening Update (2026-04-11)
+
+### Completed: full immutability for parameter metadata snapshot
+
+**Goal:** ensure reopened analysis jobs and PDF annex/statistics remain reproducible after later mutable dataset changes in the same flight test.
+
+**Files changed:**
+
+- `backend/app/models.py`
+- `backend/migrations/20260411_harden_analysis_jobs_snapshot.sql`
+- `backend/app/routers/documents.py`
+- `backend/app/routers/admin.py`
+- `backend/tests/test_documents_tenancy.py`
+- `backend/tests/test_admin_report_export.py`
+- `frontend/src/services/api.ts`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- `AnalysisJob` now persists:
+  - `parameters_analysed`
+  - `parameter_stats_snapshot_json`
+- `POST /api/documents/flight-tests/{id}/ai-analysis` now saves:
+  - immutable parameter count at analysis generation time
+  - immutable parameter statistics snapshot (`min/max/avg/std/sample_count`) for report annex use
+- `GET /api/documents/flight-tests/{flight_test_id}/ai-analysis/jobs/{analysis_job_id}` now returns persisted job values for:
+  - `parameters_analysed`
+  - `parameter_stats_snapshot`
+  - no live recomputation from current `DataPoint` rows for these fields
+- Admin PDF export now uses persisted job snapshot only for Annex A statistics:
+  - removed live `DataPoint` aggregation dependency from export path
+  - annex/statistics are reproducible by `analysis_job_id`
+- Existing behavior preserved for:
+  - `analysis_job_id` usage
+  - provenance metadata
+  - saved analysis text
+  - reopen-by-ID flow
+  - immutable PDF export by job ID
+
+### Acceptance Check (immutability)
+
+- [x] analysis job stores `parameters_analysed`
+- [x] analysis job stores parameter statistics snapshot
+- [x] reopened job returns persisted snapshot values
+- [x] PDF export uses persisted snapshot values even if current flight-test data changes later
+- [x] saved analysis job remains reproducible after later dataset mutation
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_documents_tenancy.py -q
+pytest backend/tests/test_admin_report_export.py -q
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- `test_documents_tenancy`: `7 passed`
+- `test_admin_report_export`: `3 passed`
+- Frontend build: successful (`tsc -b && vite build`)
+
 ## P0.3a Implementation Update (2026-04-11)
 
 ### Completed: clarify active-dataset behavior in UI (no backend behavior change)

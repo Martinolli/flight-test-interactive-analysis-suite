@@ -25,6 +25,8 @@
   - Store/display `analysis_job_id` context in analysis/export flows.
   - Export actions now target persisted backend artifacts via immutable `analysis_job_id`.
   - Added "Re-open Saved Analysis by ID" input flow in `Analyze with AI`.
+  - Frontend API contract now includes persisted `parameter_stats_snapshot` and `parameters_analysed` for immutable job reopen metadata.
+  - Behavior expectation: reopened analysis metadata and export-driven annex values come from persisted job snapshots, not current mutable flight-test points.
 
 ---
 
