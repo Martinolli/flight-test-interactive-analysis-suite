@@ -6,7 +6,15 @@ import json
 from fastapi import status
 
 from app.auth import get_password_hash
-from app.models import AnalysisJob, DataPoint, Document, FlightTest, TestParameter, User
+from app.models import (
+    AnalysisJob,
+    DataPoint,
+    DatasetVersion,
+    Document,
+    FlightTest,
+    TestParameter,
+    User,
+)
 from app.routers import documents as documents_router
 
 
@@ -237,7 +245,11 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda db, flight_test_id: {"distance_ft": 1234.5, "distance_m": 376.3},
+        lambda db, flight_test_id, dataset_version_id=None: {
+            "distance_ft": 1234.5,
+            "distance_m": 376.3,
+            "dataset_version_id": dataset_version_id,
+        },
     )
     monkeypatch.setattr(
         documents_router,
@@ -272,6 +284,144 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     assert stats_snapshot[0]["name"] == "TEST_SPEED"
     assert stats_snapshot[0]["sample_count"] == 1
     assert stats_snapshot[0]["avg_val"] == 100.0
+
+
+def test_ai_analysis_uses_requested_dataset_version_and_persists_dataset_version_id(
+    client, db_session, test_user, auth_headers, monkeypatch
+):
+    flight_test = FlightTest(
+        test_name="AI Dataset Version Test",
+        aircraft_type="F-16",
+        created_by_id=test_user["id"],
+    )
+    db_session.add(flight_test)
+    db_session.commit()
+    db_session.refresh(flight_test)
+
+    v1 = DatasetVersion(
+        flight_test_id=flight_test.id,
+        version_number=1,
+        label="v1",
+        status="success",
+        created_by_id=test_user["id"],
+    )
+    v2 = DatasetVersion(
+        flight_test_id=flight_test.id,
+        version_number=2,
+        label="v2",
+        status="success",
+        created_by_id=test_user["id"],
+    )
+    db_session.add(v1)
+    db_session.add(v2)
+    db_session.commit()
+    db_session.refresh(v1)
+    db_session.refresh(v2)
+    flight_test.active_dataset_version_id = v2.id
+    db_session.add(flight_test)
+    db_session.commit()
+
+    parameter = TestParameter(name="TEST_SPEED_DATASET", unit="kt")
+    db_session.add(parameter)
+    db_session.commit()
+    db_session.refresh(parameter)
+
+    db_session.add(
+        DataPoint(
+            flight_test_id=flight_test.id,
+            dataset_version_id=v1.id,
+            parameter_id=parameter.id,
+            timestamp=datetime(2026, 4, 11, 10, 0, 0),
+            value=111.0,
+        )
+    )
+    db_session.add(
+        DataPoint(
+            flight_test_id=flight_test.id,
+            dataset_version_id=v2.id,
+            parameter_id=parameter.id,
+            timestamp=datetime(2026, 4, 11, 10, 0, 1),
+            value=222.0,
+        )
+    )
+    db_session.commit()
+
+    def fake_retrieve_hybrid_sources(*, db, question, requested_top_k, owner_user_id):
+        return (
+            [
+                {
+                    "source_id": "S1",
+                    "filename": "std.pdf",
+                    "title": "Standard",
+                    "page_numbers": "12",
+                    "section_title": "Section A",
+                    "similarity": 0.98,
+                    "text": "sample standards chunk",
+                }
+            ],
+            "[S1] sample context",
+        )
+
+    class _FakeMessage:
+        content = "Standards cross-check result [S1]"
+
+    class _FakeChoice:
+        message = _FakeMessage()
+
+    class _FakeCompletion:
+        choices = [_FakeChoice()]
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs):
+            return _FakeCompletion()
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        chat = _FakeChat()
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router, "_retrieve_hybrid_sources", fake_retrieve_hybrid_sources)
+    monkeypatch.setattr(documents_router, "get_openai_client", lambda: _FakeClient())
+    monkeypatch.setattr(documents_router.func, "stddev", lambda col: documents_router.func.avg(col))
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_takeoff_metrics",
+        lambda db, flight_test_id, dataset_version_id=None: {
+            "distance_ft": 1234.5,
+            "distance_m": 376.3,
+            "dataset_version_id": dataset_version_id,
+        },
+    )
+    monkeypatch.setattr(
+        documents_router,
+        "_build_deterministic_takeoff_section",
+        lambda metrics: "### Deterministic Takeoff Computation\n- value [DATA]",
+    )
+
+    response = client.post(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
+        json={
+            "user_prompt": "Analyse dataset specific performance",
+            "dataset_version_id": v1.id,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["dataset_version_id"] == v1.id
+
+    persisted_job = (
+        db_session.query(AnalysisJob)
+        .filter(AnalysisJob.id == payload["analysis_job_id"])
+        .first()
+    )
+    assert persisted_job is not None
+    assert persisted_job.dataset_version_id == v1.id
+    stats_snapshot = json.loads(persisted_job.parameter_stats_snapshot_json)
+    assert stats_snapshot[0]["avg_val"] == 111.0
 
 
 def test_get_ai_analysis_job_is_tenant_scoped(client, db_session, test_user, auth_headers):

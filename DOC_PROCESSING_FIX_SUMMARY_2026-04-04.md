@@ -1343,3 +1343,69 @@ npm run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`)
+
+## P1.0 Implementation Update (2026-04-12)
+
+### Completed: dataset versioning + active dataset selection per flight test
+
+**Goal:** remove hidden overwrite behavior and make analysis scope explicit/selectable across Upload, Parameters, and Analyze with AI.
+
+**Files changed:**
+
+- `backend/app/models.py`
+- `backend/migrations/20260412_add_dataset_versions.sql`
+- `backend/app/schemas.py`
+- `backend/app/routers/flight_tests.py`
+- `backend/app/routers/documents.py`
+- `backend/app/routers/admin.py`
+- `backend/tests/test_flight_tests_comprehensive.py`
+- `backend/tests/test_documents_tenancy.py`
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/Upload.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `frontend/src/components/UploadHistoryTable.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Added persisted `dataset_versions` entity and active-pointer field on `flight_tests`:
+  - `flight_tests.active_dataset_version_id`
+  - `data_points.dataset_version_id`
+  - `ingestion_sessions.dataset_version_id`
+  - `analysis_jobs.dataset_version_id`
+- CSV upload now creates immutable dataset versions (`vN`) instead of deleting prior data points.
+- Added dataset-version endpoints:
+  - `GET /api/flight-tests/{id}/dataset-versions`
+  - `POST /api/flight-tests/{id}/dataset-versions/{dataset_version_id}/activate`
+- Read/query endpoints now support optional dataset scoping:
+  - flight-test parameters/data APIs
+  - AI analysis generation (`dataset_version_id`)
+- AI analysis jobs now persist the dataset version used, preserving provenance for reopen/export flows.
+- Frontend now exposes dataset-version selection and activation in Upload, Parameters, and Flight Test Detail.
+- API contracts updated so frontend can display and use active/selected dataset state consistently.
+
+### Acceptance Check
+
+- [x] user can identify active dataset version
+- [x] user can select and activate prior dataset versions
+- [x] Parameters and Analyze with AI run on selected dataset version (or active by default)
+- [x] re-upload no longer silently overwrites historical dataset versions
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+pytest backend/tests/test_documents_tenancy.py -q
+pytest backend/tests/test_admin_report_export.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- `test_flight_tests_comprehensive`: `30 passed`
+- `test_documents_tenancy`: `8 passed`
+- `test_admin_report_export`: `3 passed`
+- Frontend build: successful (`tsc -b && vite build`)
+- Note: Vite printed a Node warning (`20.18.1` detected; recommends `20.19+`), but build output is successful.

@@ -60,6 +60,12 @@ class FlightTest(Base):
     test_date = Column(DateTime(timezone=True), nullable=True)
     duration_seconds = Column(Float, nullable=True)
     description = Column(Text, nullable=True)
+    active_dataset_version_id = Column(
+        Integer,
+        ForeignKey("dataset_versions.id"),
+        nullable=True,
+        index=True,
+    )
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -75,6 +81,18 @@ class FlightTest(Base):
         "IngestionSession",
         back_populates="flight_test",
         cascade="all, delete-orphan",
+    )
+    dataset_versions = relationship(
+        "DatasetVersion",
+        back_populates="flight_test",
+        cascade="all, delete-orphan",
+        foreign_keys="DatasetVersion.flight_test_id",
+        order_by="DatasetVersion.version_number.desc()",
+    )
+    active_dataset_version = relationship(
+        "DatasetVersion",
+        foreign_keys=[active_dataset_version_id],
+        post_update=True,
     )
     analysis_jobs = relationship(
         "AnalysisJob",
@@ -130,6 +148,12 @@ class IngestionSession(Base):
     filename = Column(String(512), nullable=False)
     file_type = Column(String(32), nullable=False, default="csv")
     source_format = Column(String(32), nullable=False, default="csv")
+    dataset_version_id = Column(
+        Integer,
+        ForeignKey("dataset_versions.id"),
+        nullable=True,
+        index=True,
+    )
     row_count = Column(Integer, nullable=True)
     status = Column(String(32), nullable=False, default="pending")
     error_message = Column(Text, nullable=True)
@@ -141,6 +165,16 @@ class IngestionSession(Base):
     # Relationships
     flight_test = relationship("FlightTest", back_populates="ingestion_sessions")
     uploaded_by = relationship("User", backref="ingestion_sessions")
+    dataset_version = relationship(
+        "DatasetVersion",
+        back_populates="ingestion_sessions",
+        foreign_keys=[dataset_version_id],
+    )
+    source_dataset_versions = relationship(
+        "DatasetVersion",
+        back_populates="source_session",
+        foreign_keys="DatasetVersion.source_session_id",
+    )
 
     def __repr__(self):
         return (
@@ -167,6 +201,12 @@ class DataPoint(Base):
         nullable=False,
         index=True,
     )
+    dataset_version_id = Column(
+        Integer,
+        ForeignKey("dataset_versions.id"),
+        nullable=True,
+        index=True,
+    )
     timestamp = Column(
         DateTime(timezone=True), nullable=False, index=True
     )
@@ -176,6 +216,7 @@ class DataPoint(Base):
     # Relationships
     flight_test = relationship("FlightTest", back_populates="data_points")
     parameter = relationship("TestParameter", back_populates="data_points")
+    dataset_version = relationship("DatasetVersion", back_populates="data_points")
 
     def __repr__(self):
         return (
@@ -265,6 +306,12 @@ class AnalysisJob(Base):
         index=True,
     )
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    dataset_version_id = Column(
+        Integer,
+        ForeignKey("dataset_versions.id"),
+        nullable=True,
+        index=True,
+    )
     status = Column(String(32), nullable=False, default="completed")
     model_name = Column(String(128), nullable=False)
     model_version = Column(String(128), nullable=True)
@@ -281,9 +328,59 @@ class AnalysisJob(Base):
     # Relationships
     flight_test = relationship("FlightTest", back_populates="analysis_jobs")
     created_by = relationship("User", backref="analysis_jobs")
+    dataset_version = relationship("DatasetVersion", back_populates="analysis_jobs")
 
     def __repr__(self):
         return (
             f"<AnalysisJob(id={self.id}, flight_test_id={self.flight_test_id}, "
             f"model_name={self.model_name}, status={self.status})>"
+        )
+
+
+class DatasetVersion(Base):
+    """Immutable uploaded dataset version under a flight test."""
+
+    __tablename__ = "dataset_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flight_test_id = Column(
+        Integer,
+        ForeignKey("flight_tests.id"),
+        nullable=False,
+        index=True,
+    )
+    version_number = Column(Integer, nullable=False)
+    label = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, default="processing")
+    row_count = Column(Integer, nullable=True)
+    data_points_count = Column(Integer, nullable=True)
+    source_session_id = Column(Integer, ForeignKey("ingestion_sessions.id"), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    flight_test = relationship(
+        "FlightTest",
+        back_populates="dataset_versions",
+        foreign_keys=[flight_test_id],
+    )
+    created_by = relationship("User", backref="created_dataset_versions")
+    data_points = relationship("DataPoint", back_populates="dataset_version")
+    source_session = relationship(
+        "IngestionSession",
+        back_populates="source_dataset_versions",
+        foreign_keys=[source_session_id],
+    )
+    ingestion_sessions = relationship(
+        "IngestionSession",
+        back_populates="dataset_version",
+        foreign_keys="IngestionSession.dataset_version_id",
+    )
+    analysis_jobs = relationship("AnalysisJob", back_populates="dataset_version")
+
+    def __repr__(self):
+        return (
+            f"<DatasetVersion(id={self.id}, flight_test_id={self.flight_test_id}, "
+            f"version_number={self.version_number}, status={self.status})>"
         )

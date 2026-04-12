@@ -15,7 +15,14 @@ from sqlalchemy.orm import Session
 
 from app import auth, schemas
 from app.database import get_db
-from app.models import DataPoint, FlightTest, IngestionSession, TestParameter, User
+from app.models import (
+    DataPoint,
+    DatasetVersion,
+    FlightTest,
+    IngestionSession,
+    TestParameter,
+    User,
+)
 
 router = APIRouter()
 
@@ -24,6 +31,7 @@ def _persist_ingestion_failure(
     db: Session,
     *,
     session_id: int | None,
+    dataset_version_id: int | None,
     error_message: str,
     row_count: int | None = None,
 ) -> None:
@@ -43,7 +51,41 @@ def _persist_ingestion_failure(
     if row_count is not None and row_count >= 0:
         session.row_count = row_count
     db.add(session)
+    if dataset_version_id:
+        dataset_version = (
+            db.query(DatasetVersion)
+            .filter(DatasetVersion.id == dataset_version_id)
+            .first()
+        )
+        if dataset_version:
+            dataset_version.status = "failed"
+            db.add(dataset_version)
     db.commit()
+
+
+def _resolve_dataset_version_id(
+    *,
+    db: Session,
+    flight_test: FlightTest,
+    dataset_version_id: int | None,
+) -> int | None:
+    """Resolve requested dataset version or default to active dataset version."""
+    if dataset_version_id is not None:
+        dataset_version = (
+            db.query(DatasetVersion)
+            .filter(
+                DatasetVersion.id == dataset_version_id,
+                DatasetVersion.flight_test_id == flight_test.id,
+            )
+            .first()
+        )
+        if not dataset_version:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dataset version not found for this flight test",
+            )
+        return dataset_version.id
+    return flight_test.active_dataset_version_id
 
 
 @router.post("/", response_model=schemas.FlightTestResponse, status_code=status.HTTP_201_CREATED)
@@ -160,6 +202,103 @@ async def list_ingestion_sessions(
         .all()
     )
     return sessions
+
+
+@router.get(
+    "/{test_id}/dataset-versions",
+    response_model=List[schemas.DatasetVersionResponse],
+)
+async def list_dataset_versions(
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """List dataset versions for a flight test, newest first."""
+    flight_test = (
+        db.query(FlightTest)
+        .filter(
+            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
+        )
+        .first()
+    )
+    if not flight_test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
+        )
+
+    versions = (
+        db.query(DatasetVersion)
+        .filter(DatasetVersion.flight_test_id == test_id)
+        .order_by(DatasetVersion.version_number.desc(), DatasetVersion.id.desc())
+        .all()
+    )
+
+    return [
+        schemas.DatasetVersionResponse(
+            id=v.id,
+            flight_test_id=v.flight_test_id,
+            version_number=v.version_number,
+            label=v.label,
+            status=v.status,
+            row_count=v.row_count,
+            data_points_count=v.data_points_count,
+            source_session_id=v.source_session_id,
+            created_by_id=v.created_by_id,
+            created_at=v.created_at,
+            updated_at=v.updated_at,
+            is_active=(flight_test.active_dataset_version_id == v.id),
+        )
+        for v in versions
+    ]
+
+
+@router.post(
+    "/{test_id}/dataset-versions/{dataset_version_id}/activate",
+    response_model=schemas.FlightTestResponse,
+)
+async def activate_dataset_version(
+    test_id: int,
+    dataset_version_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """Set active dataset version for a flight test."""
+    flight_test = (
+        db.query(FlightTest)
+        .filter(
+            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
+        )
+        .first()
+    )
+    if not flight_test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
+        )
+
+    dataset_version = (
+        db.query(DatasetVersion)
+        .filter(
+            DatasetVersion.id == dataset_version_id,
+            DatasetVersion.flight_test_id == test_id,
+        )
+        .first()
+    )
+    if not dataset_version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dataset version not found for this flight test",
+        )
+    if dataset_version.status != "success":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only successful dataset versions can be activated.",
+        )
+
+    flight_test.active_dataset_version_id = dataset_version.id
+    db.add(flight_test)
+    db.commit()
+    db.refresh(flight_test)
+    return flight_test
 
 
 @router.get(
@@ -313,6 +452,7 @@ async def upload_flight_data_csv(
         )
 
     ingestion_session = IngestionSession(
+        dataset_version_id=None,
         flight_test_id=test_id,
         filename=file.filename,
         file_type="csv",
@@ -323,22 +463,33 @@ async def upload_flight_data_csv(
         error_log=None,
         uploaded_by_id=current_user.id,
     )
+    latest_version_number = (
+        db.query(func.max(DatasetVersion.version_number))
+        .filter(DatasetVersion.flight_test_id == test_id)
+        .scalar()
+        or 0
+    )
+    next_version_number = int(latest_version_number) + 1
+    dataset_version = DatasetVersion(
+        flight_test_id=test_id,
+        version_number=next_version_number,
+        label=f"v{next_version_number}",
+        status="processing",
+        row_count=None,
+        data_points_count=None,
+        created_by_id=current_user.id,
+    )
+    db.add(dataset_version)
+    db.flush()
+    ingestion_session.dataset_version_id = dataset_version.id
     db.add(ingestion_session)
     db.commit()
     db.refresh(ingestion_session)
+    db.refresh(dataset_version)
 
     row_count = 0
 
     try:
-        # ── Delete all existing data points for this flight test ─────────────
-        # This ensures re-uploads replace data rather than appending to it.
-        deleted = (
-            db.query(DataPoint)
-            .filter(DataPoint.flight_test_id == test_id)
-            .delete(synchronize_session=False)
-        )
-        db.flush()
-
         contents = await file.read()
         try:
             text = contents.decode("utf-8")
@@ -502,6 +653,7 @@ async def upload_flight_data_csv(
                 batch.append(
                     DataPoint(
                         flight_test_id=test_id,
+                        dataset_version_id=dataset_version.id,
                         parameter_id=param.id,
                         timestamp=parsed_ts,
                         value=value,
@@ -534,7 +686,14 @@ async def upload_flight_data_csv(
         ingestion_session.row_count = row_count
         ingestion_session.error_message = None
         ingestion_session.error_log = None
+        dataset_version.status = "success"
+        dataset_version.row_count = row_count
+        dataset_version.data_points_count = total_data_points
+        dataset_version.source_session_id = ingestion_session.id
+        flight_test.active_dataset_version_id = dataset_version.id
         db.add(ingestion_session)
+        db.add(dataset_version)
+        db.add(flight_test)
         db.commit()
 
         return {
@@ -542,8 +701,11 @@ async def upload_flight_data_csv(
             "filename": file.filename,
             "rows_processed": row_count,
             "data_points_created": total_data_points,
-            "previous_data_points_deleted": deleted,
+            "previous_data_points_deleted": 0,
             "session_id": ingestion_session.id,
+            "dataset_version_id": dataset_version.id,
+            "dataset_version_label": dataset_version.label,
+            "active_dataset_version_id": dataset_version.id,
         }
 
     except HTTPException as exc:
@@ -551,6 +713,7 @@ async def upload_flight_data_csv(
         _persist_ingestion_failure(
             db,
             session_id=ingestion_session.id,
+            dataset_version_id=dataset_version.id,
             error_message=str(exc.detail),
             row_count=row_count,
         )
@@ -560,6 +723,7 @@ async def upload_flight_data_csv(
         _persist_ingestion_failure(
             db,
             session_id=ingestion_session.id,
+            dataset_version_id=dataset_version.id,
             error_message=f"Error processing CSV file: {str(e)}",
             row_count=row_count,
         )
@@ -573,6 +737,7 @@ async def upload_flight_data_csv(
 async def get_flight_test_data(
     test_id: int,
     parameter_id: Optional[int] = None,
+    dataset_version_id: Optional[int] = Query(default=None),
     skip: int = 0,
     limit: int = 1000,
     db: Session = Depends(get_db),
@@ -594,7 +759,15 @@ async def get_flight_test_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
+    effective_dataset_version_id = _resolve_dataset_version_id(
+        db=db,
+        flight_test=flight_test,
+        dataset_version_id=dataset_version_id,
+    )
+
     query = db.query(DataPoint).filter(DataPoint.flight_test_id == test_id)
+    if effective_dataset_version_id is not None:
+        query = query.filter(DataPoint.dataset_version_id == effective_dataset_version_id)
 
     if parameter_id:
         query = query.filter(DataPoint.parameter_id == parameter_id)
@@ -606,6 +779,7 @@ async def get_flight_test_data(
 @router.get("/{test_id}/parameters")
 async def get_flight_test_parameters(
     test_id: int,
+    dataset_version_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(auth.get_current_active_user),
 ):
@@ -625,8 +799,14 @@ async def get_flight_test_parameters(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
+    effective_dataset_version_id = _resolve_dataset_version_id(
+        db=db,
+        flight_test=flight_test,
+        dataset_version_id=dataset_version_id,
+    )
+
     # One aggregation query: group data_points by parameter_id
-    rows = (
+    stats_query = (
         db.query(
             TestParameter.name,
             TestParameter.unit,
@@ -638,6 +818,13 @@ async def get_flight_test_parameters(
         )
         .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
         .filter(DataPoint.flight_test_id == test_id)
+    )
+    if effective_dataset_version_id is not None:
+        stats_query = stats_query.filter(
+            DataPoint.dataset_version_id == effective_dataset_version_id
+        )
+    rows = (
+        stats_query
         .group_by(TestParameter.id, TestParameter.name, TestParameter.unit, TestParameter.description)
         .order_by(TestParameter.name)
         .all()
@@ -661,6 +848,7 @@ async def get_flight_test_parameters(
 async def get_flight_test_parameter_data(
     test_id: int,
     parameters: Optional[List[str]] = Query(default=None),
+    dataset_version_id: Optional[int] = Query(default=None),
     limit: int = 50000,
     db: Session = Depends(get_db),
     current_user: User = Depends(auth.get_current_active_user),
@@ -686,6 +874,12 @@ async def get_flight_test_parameter_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
+    effective_dataset_version_id = _resolve_dataset_version_id(
+        db=db,
+        flight_test=flight_test,
+        dataset_version_id=dataset_version_id,
+    )
+
     if not parameters:
         return []
 
@@ -695,12 +889,19 @@ async def get_flight_test_parameter_data(
         if not param:
             continue
 
-        points = (
+        points_query = (
             db.query(DataPoint)
             .filter(
                 DataPoint.flight_test_id == test_id,
                 DataPoint.parameter_id == param.id,
             )
+        )
+        if effective_dataset_version_id is not None:
+            points_query = points_query.filter(
+                DataPoint.dataset_version_id == effective_dataset_version_id
+            )
+        points = (
+            points_query
             .order_by(DataPoint.timestamp)
             .limit(limit)
             .all()

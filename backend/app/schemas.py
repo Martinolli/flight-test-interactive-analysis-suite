@@ -152,6 +152,7 @@ class FlightTestResponse(FlightTestBase):
     """Schema for flight test response"""
 
     id: int
+    active_dataset_version_id: Optional[int] = None
     created_by_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -168,6 +169,7 @@ class IngestionSessionResponse(BaseModel):
     filename: str
     file_type: str
     source_format: str
+    dataset_version_id: Optional[int] = None
     row_count: Optional[int] = None
     status: str
     error_message: Optional[str] = None
@@ -175,6 +177,26 @@ class IngestionSessionResponse(BaseModel):
     uploaded_by_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DatasetVersionResponse(BaseModel):
+    """Schema for persisted dataset versions under a flight test."""
+
+    id: int
+    flight_test_id: int
+    version_number: int
+    label: str
+    status: str
+    row_count: Optional[int] = None
+    data_points_count: Optional[int] = None
+    source_session_id: Optional[int] = None
+    created_by_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_active: bool = False
 
     class Config:
         from_attributes = True

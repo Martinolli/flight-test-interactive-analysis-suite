@@ -17,7 +17,13 @@ import TimeSeriesChart from '../components/TimeSeriesChart';
 import CorrelationChart from '../components/CorrelationChart';
 import StatCard from '../components/StatCard';
 import { ToastContainer, useToast } from '../components/ui/toast';
-import { ApiService, FlightTest, ParameterInfo, ParameterSeries } from '../services/api';
+import {
+  ApiService,
+  DatasetVersion,
+  FlightTest,
+  ParameterInfo,
+  ParameterSeries,
+} from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +36,10 @@ export default function Parameters() {
   const [flightTests, setFlightTests] = useState<FlightTest[]>([]);
   const [selectedTestId, setSelectedTestId] = useState<number | ''>('');
   const [loadingTests, setLoadingTests] = useState(true);
+  const [datasetVersions, setDatasetVersions] = useState<DatasetVersion[]>([]);
+  const [loadingDatasetVersions, setLoadingDatasetVersions] = useState(false);
+  const [selectedDatasetVersionId, setSelectedDatasetVersionId] = useState<number | ''>('');
+  const [activatingDataset, setActivatingDataset] = useState(false);
 
   // Parameter list
   const [parameters, setParameters] = useState<ParameterInfo[]>([]);
@@ -73,12 +83,46 @@ export default function Parameters() {
       .finally(() => setLoadingTests(false));
   }, []);
 
-  // Load parameters when flight test changes
+  // Load dataset versions when flight test changes.
   useEffect(() => {
     if (!selectedTestId) {
+      setDatasetVersions([]);
+      setSelectedDatasetVersionId('');
       setParameters([]);
       setSelectedParams(new Set());
       setSeriesData([]);
+      return;
+    }
+    setLoadingDatasetVersions(true);
+    setParamsError('');
+    setParameters([]);
+    setSelectedParams(new Set());
+    setSeriesData([]);
+    setCorrX('');
+    setCorrY('');
+    setCorrSeriesData([]);
+
+    ApiService.getDatasetVersions(Number(selectedTestId))
+      .then((versions) => {
+        setDatasetVersions(versions);
+        const preferred =
+          versions.find((v) => v.is_active)?.id ?? versions.find((v) => v.status === 'success')?.id;
+        setSelectedDatasetVersionId(preferred ?? '');
+      })
+      .catch((err) => {
+        setDatasetVersions([]);
+        setSelectedDatasetVersionId('');
+        toast.error(
+          'Could not load dataset versions',
+          err instanceof Error ? err.message : 'Failed to load dataset versions'
+        );
+      })
+      .finally(() => setLoadingDatasetVersions(false));
+  }, [selectedTestId]);
+
+  // Load parameters when selected flight test or dataset version changes.
+  useEffect(() => {
+    if (!selectedTestId) {
       return;
     }
     setLoadingParams(true);
@@ -87,10 +131,11 @@ export default function Parameters() {
     setSelectedParams(new Set());
     setSeriesData([]);
 
-    ApiService.getParameters(Number(selectedTestId))
+    const datasetVersionId =
+      selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId);
+    ApiService.getParametersForDataset(Number(selectedTestId), datasetVersionId)
       .then((params) => {
         setParameters(params);
-        // Auto-select first parameter if available
         if (params.length > 0) {
           setSelectedParams(new Set([params[0].name]));
         }
@@ -99,7 +144,7 @@ export default function Parameters() {
         setParamsError(err instanceof Error ? err.message : 'Failed to load parameters');
       })
       .finally(() => setLoadingParams(false));
-  }, [selectedTestId]);
+  }, [selectedTestId, selectedDatasetVersionId]);
 
   // Fetch chart data whenever selected parameters change
   useEffect(() => {
@@ -110,13 +155,19 @@ export default function Parameters() {
     setLoadingChart(true);
     setChartError('');
 
-    ApiService.getParameterData(Number(selectedTestId), Array.from(selectedParams))
+    const datasetVersionId =
+      selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId);
+    ApiService.getParameterData(
+      Number(selectedTestId),
+      Array.from(selectedParams),
+      datasetVersionId
+    )
       .then(setSeriesData)
       .catch((err) => {
         setChartError(err instanceof Error ? err.message : 'Failed to load chart data');
       })
       .finally(() => setLoadingChart(false));
-  }, [selectedTestId, selectedParams]);
+  }, [selectedTestId, selectedParams, selectedDatasetVersionId]);
 
   const toggleParam = (name: string) => {
     setSelectedParams((prev) => {
@@ -143,11 +194,13 @@ export default function Parameters() {
     // Avoid duplicate fetch if both are the same
     const toFetch = corrX === corrY ? [corrX] : [corrX, corrY];
     setLoadingCorr(true);
-    ApiService.getParameterData(Number(selectedTestId), toFetch)
+    const datasetVersionId =
+      selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId);
+    ApiService.getParameterData(Number(selectedTestId), toFetch, datasetVersionId)
       .then(setCorrSeriesData)
       .catch(() => setCorrSeriesData([]))
       .finally(() => setLoadingCorr(false));
-  }, [selectedTestId, corrX, corrY]);
+  }, [selectedTestId, corrX, corrY, selectedDatasetVersionId]);
 
   // Correlation: x and y series from independently-fetched data
   const corrXSeries = useMemo(
@@ -164,6 +217,35 @@ export default function Parameters() {
     () => seriesData.filter((s) => selectedParams.has(s.parameter_name)),
     [seriesData, selectedParams]
   );
+
+  const selectedDatasetVersion = useMemo(() => {
+    if (selectedDatasetVersionId === '') return undefined;
+    return datasetVersions.find((v) => v.id === Number(selectedDatasetVersionId));
+  }, [datasetVersions, selectedDatasetVersionId]);
+
+  const activeDatasetVersion = useMemo(
+    () => datasetVersions.find((v) => v.is_active),
+    [datasetVersions]
+  );
+
+  async function handleActivateSelectedDataset() {
+    if (!selectedTestId || selectedDatasetVersionId === '') return;
+    const versionId = Number(selectedDatasetVersionId);
+    setActivatingDataset(true);
+    try {
+      await ApiService.activateDatasetVersion(Number(selectedTestId), versionId);
+      const versions = await ApiService.getDatasetVersions(Number(selectedTestId));
+      setDatasetVersions(versions);
+      toast.success(`Active dataset set to ${selectedDatasetVersion?.label ?? `v${versionId}`}`);
+    } catch (err) {
+      toast.error(
+        'Failed to activate dataset',
+        err instanceof Error ? err.message : 'Failed to activate dataset version'
+      );
+    } finally {
+      setActivatingDataset(false);
+    }
+  }
 
   return (
     <Sidebar>
@@ -211,6 +293,70 @@ export default function Parameters() {
         </Card>
 
         {selectedTestId && (
+          <Card className="mb-6">
+            <CardContent className="pt-5">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Dataset Version
+                    </label>
+                    <select
+                      value={selectedDatasetVersionId}
+                      onChange={(e) =>
+                        setSelectedDatasetVersionId(
+                          e.target.value === '' ? '' : Number(e.target.value)
+                        )
+                      }
+                      disabled={loadingDatasetVersions || datasetVersions.length === 0}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {loadingDatasetVersions
+                          ? 'Loading dataset versions…'
+                          : datasetVersions.length === 0
+                            ? 'No dataset versions available'
+                            : '— Select dataset version —'}
+                      </option>
+                      {datasetVersions.map((version) => (
+                        <option key={version.id} value={version.id}>
+                          {`${version.label} · ${version.status} · ${version.data_points_count ?? 0} points`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleActivateSelectedDataset}
+                    disabled={
+                      activatingDataset ||
+                      selectedDatasetVersionId === '' ||
+                      selectedDatasetVersion?.status !== 'success' ||
+                      !!selectedDatasetVersion?.is_active
+                    }
+                    className={cn(
+                      'inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                      'border-blue-200 text-blue-700 hover:bg-blue-50',
+                      'disabled:cursor-not-allowed disabled:opacity-50'
+                    )}
+                  >
+                    {activatingDataset ? 'Setting Active…' : 'Set as Active'}
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  {activeDatasetVersion
+                    ? `Active dataset: ${activeDatasetVersion.label} (${activeDatasetVersion.data_points_count ?? 0} points)`
+                    : 'No active dataset is set yet for this flight test.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {selectedTestId && (
           <Card className="mb-6 border-amber-200 bg-amber-50/60">
             <CardContent className="pt-5">
               <div className="flex gap-3">
@@ -218,10 +364,13 @@ export default function Parameters() {
                 <div className="space-y-1 text-sm text-amber-900">
                   <p className="font-semibold">Dataset scope</p>
                   <p>
-                    This page visualizes the <strong>active dataset</strong> only (latest
-                    successful upload for the selected flight test).
+                    This page visualizes the <strong>selected dataset version</strong>.
                   </p>
-                  <p>Upload History records ingestion events and does not switch dataset versions.</p>
+                  <p>
+                    Current selection:{' '}
+                    <strong>{selectedDatasetVersion?.label ?? 'None selected'}</strong>.
+                    Activate a version to make it the default dataset for other analysis surfaces.
+                  </p>
                 </div>
               </div>
             </CardContent>

@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 02
 
-**Last updated:** 2026-04-11
+**Last updated:** 2026-04-12
 **Scope:** Backend + Frontend + LLM/RAG + Reporting
 **Plan basis:** aligned to `TODO_REV_01.md`, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, current `TODO.md`, and post-P0.3 audit findings
 
@@ -90,7 +90,7 @@
 
 ## P1 — Engineering Usability + Report Professionalism
 
-- [ ] P1.0 Introduce dataset versioning / active dataset selection per flight test
+- [x] P1.0 Introduce dataset versioning / active dataset selection per flight test
   - **Reason:** current history is persisted, but only the last uploaded dataset is active and analyzable.
   - Evolve Upload History from audit-only history to dataset-version awareness.
   - Define and implement one of these models explicitly:
@@ -101,7 +101,12 @@
     - user can select prior dataset versions
     - Dashboard / Parameters / AI Analysis operate on the selected version
     - no hidden overwrite behavior
-  - This is a larger product/data-model task and should not be merged as a UI-only patch.
+  - Implemented:
+    - Added immutable `dataset_versions` model + migration with active version pointer on `flight_tests`.
+    - CSV uploads now create new dataset versions (`vN`) without deleting historical datapoints.
+    - Added activation + listing endpoints for dataset versions.
+    - Dashboard/Parameters/AI Analysis now support selected `dataset_version_id` (defaulting to active version).
+    - Added regression coverage for version creation, activation behavior, and dataset-scoped AI analysis persistence.
 
 - [x] P1.1 Standardize page framing and adaptive layout across main work pages
   - Align `Upload Data` and `Document Library` with the adaptive framing used in:
@@ -169,15 +174,14 @@
 
 ## Immediate Execution Order
 
-1. P1.0 — Dataset versioning / active dataset selection  
-2. P1.2 — Scale parameter exploration for large channel sets  
+1. P1.2 — Scale parameter exploration for large channel sets  
+2. P1.3 — Upgrade chart workflow for engineering review  
 
 - **Reason for this order**
 
-- P0.3a is completed and user-facing dataset-scope behavior is now explicit.
-- P0.4 is completed: analysis artifacts are now persisted and exported by immutable job ID.
-- P1.1 is now completed.
-- P1.0 remains the highest-impact product/data-model change and should be implemented deliberately.
+- P0.3a and P0.4 are completed and stable (explicit scope + immutable analysis artifacts).
+- P1.0 is now completed with backend-truth dataset versioning and active-version control.
+- Highest next impact is parameter scalability and chart workflow for large engineering datasets.
 
 ---
 
@@ -222,7 +226,7 @@ These baseline controls should be protected by regression tests.
 
 ## Notes from Latest Audit
 
-- Upload History is now truthful and persisted, but it currently tracks ingestion sessions rather than selectable dataset versions.
-- Current re-upload behavior replaces the active dataset for the flight test while keeping prior ingestion sessions visible in history.
-- `AI Standards Query` and `Analyze with AI` are now much closer in UX behavior, but shared rendering components are still a future refactor opportunity.
-- `Upload Data` and `Document Library` still need page-framing/layout standardization to match the stronger work surfaces.
+- Upload history and dataset versions are now both persisted and explicit: history is audit trail, dataset versions are selectable analysis scope.
+- Re-upload now creates new immutable dataset versions and updates active version on successful ingestion; historical versions remain selectable.
+- `AI Standards Query` and `Analyze with AI` are aligned on core UX behavior, but shared rendering-component extraction is still a future refactor opportunity.
+- `Upload Data` and `Document Library` framing/layout standardization is complete; next UX bottleneck is parameter/chart scale handling.

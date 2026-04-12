@@ -38,6 +38,7 @@ from app.database import SessionLocal, get_db
 from app.models import (
     AnalysisJob,
     DataPoint,
+    DatasetVersion,
     Document,
     DocumentChunk,
     FlightTest,
@@ -200,6 +201,7 @@ class QueryResponse(BaseModel):
 class AIAnalysisResponse(BaseModel):
     analysis: str
     flight_test_name: str
+    dataset_version_id: Optional[int] = None
     parameters_analysed: int
     analysis_job_id: int
     model_name: str
@@ -213,6 +215,7 @@ class AnalysisJobResponse(BaseModel):
     id: int
     flight_test_id: int
     flight_test_name: str
+    dataset_version_id: Optional[int] = None
     parameters_analysed: int
     status: str
     model_name: str
@@ -805,15 +808,22 @@ def _score_longitudinal_accel(name: str, unit: Optional[str]) -> float:
     return score
 
 
-def _compute_takeoff_metrics(db: Session, flight_test_id: int) -> dict:
+def _compute_takeoff_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+) -> dict:
     """Compute takeoff run metrics from time-series data (deterministic)."""
-    param_rows = (
+    param_query = (
         db.query(TestParameter.id, TestParameter.name, TestParameter.unit)
         .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
         .filter(DataPoint.flight_test_id == flight_test_id)
-        .distinct()
-        .all()
     )
+    if dataset_version_id is not None:
+        param_query = param_query.filter(
+            DataPoint.dataset_version_id == dataset_version_id
+        )
+    param_rows = param_query.distinct().all()
     params = [{"id": r.id, "name": r.name, "unit": r.unit} for r in param_rows]
     if not params:
         return {"available": False, "reason": "No parameters found for flight test."}
@@ -831,15 +841,18 @@ def _compute_takeoff_metrics(db: Session, flight_test_id: int) -> dict:
     if accel_id is not None:
         selected_ids.add(accel_id)
 
-    rows = (
+    points_query = (
         db.query(DataPoint.timestamp, DataPoint.parameter_id, DataPoint.value)
         .filter(
             DataPoint.flight_test_id == flight_test_id,
             DataPoint.parameter_id.in_(selected_ids),
         )
-        .order_by(DataPoint.timestamp.asc())
-        .all()
     )
+    if dataset_version_id is not None:
+        points_query = points_query.filter(
+            DataPoint.dataset_version_id == dataset_version_id
+        )
+    rows = points_query.order_by(DataPoint.timestamp.asc()).all()
     if not rows:
         return {"available": False, "reason": "No datapoints found for required parameters."}
 
@@ -1826,6 +1839,7 @@ def _analysis_job_to_response(
     return AIAnalysisResponse(
         analysis=job.analysis_text,
         flight_test_name=flight_test_name,
+        dataset_version_id=job.dataset_version_id,
         parameters_analysed=job.parameters_analysed,
         analysis_job_id=job.id,
         model_name=job.model_name,
@@ -1834,6 +1848,39 @@ def _analysis_job_to_response(
         created_at=job.created_at.isoformat() if job.created_at else "",
         retrieved_source_ids=[str(item) for item in source_ids if item],
     )
+
+
+def _resolve_dataset_version_for_analysis(
+    *,
+    db: Session,
+    flight_test: FlightTest,
+    requested_dataset_version_id: Optional[int],
+) -> Optional[DatasetVersion]:
+    if requested_dataset_version_id is not None:
+        dataset_version = (
+            db.query(DatasetVersion)
+            .filter(
+                DatasetVersion.id == requested_dataset_version_id,
+                DatasetVersion.flight_test_id == flight_test.id,
+            )
+            .first()
+        )
+        if not dataset_version:
+            raise HTTPException(status_code=404, detail="Dataset version not found.")
+        return dataset_version
+
+    if flight_test.active_dataset_version_id is None:
+        return None
+
+    dataset_version = (
+        db.query(DatasetVersion)
+        .filter(
+            DatasetVersion.id == flight_test.active_dataset_version_id,
+            DatasetVersion.flight_test_id == flight_test.id,
+        )
+        .first()
+    )
+    return dataset_version
 
 
 @router.get(
@@ -1878,6 +1925,7 @@ def get_ai_analysis_job(
         id=job.id,
         flight_test_id=job.flight_test_id,
         flight_test_name=ft.test_name,
+        dataset_version_id=job.dataset_version_id,
         parameters_analysed=job.parameters_analysed,
         status=job.status,
         model_name=job.model_name,
@@ -1899,6 +1947,7 @@ def get_ai_analysis_job(
 
 class AIAnalysisRequest(BaseModel):
     user_prompt: str | None = None
+    dataset_version_id: Optional[int] = None
 
 
 @router.post(
@@ -1928,9 +1977,15 @@ def ai_analysis(
         flight_test_id=flight_test_id,
         current_user=current_user,
     )
+    dataset_version = _resolve_dataset_version_for_analysis(
+        db=db,
+        flight_test=ft,
+        requested_dataset_version_id=body.dataset_version_id,
+    )
+    dataset_version_id = dataset_version.id if dataset_version else None
 
     # Compute statistics per parameter
-    stats_rows = (
+    stats_query = (
         db.query(
             TestParameter.name,
             TestParameter.unit,
@@ -1942,9 +1997,12 @@ def ai_analysis(
         )
         .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
         .filter(DataPoint.flight_test_id == flight_test_id)
-        .group_by(TestParameter.name, TestParameter.unit)
-        .all()
     )
+    if dataset_version_id is not None:
+        stats_query = stats_query.filter(
+            DataPoint.dataset_version_id == dataset_version_id
+        )
+    stats_rows = stats_query.group_by(TestParameter.name, TestParameter.unit).all()
 
     if not stats_rows:
         raise HTTPException(
@@ -1975,7 +2033,11 @@ def ai_analysis(
         )
 
     # Deterministic takeoff metrics from time-series data (authoritative section)
-    takeoff_metrics = _compute_takeoff_metrics(db=db, flight_test_id=flight_test_id)
+    takeoff_metrics = _compute_takeoff_metrics(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+    )
     deterministic_section = _build_deterministic_takeoff_section(takeoff_metrics)
 
     # Hybrid document retrieval with stable source IDs
@@ -2136,6 +2198,7 @@ def ai_analysis(
     analysis_job = AnalysisJob(
         flight_test_id=ft.id,
         created_by_id=current_user.id,
+        dataset_version_id=dataset_version_id,
         status="completed",
         model_name=analysis_model,
         model_version=os.getenv("ANALYSIS_MODEL_VERSION"),

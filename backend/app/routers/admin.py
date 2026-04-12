@@ -484,6 +484,15 @@ def _build_pdf(
                 analysis_job.output_sha256[:16] + "…",
             ]
         )
+        if analysis_job.dataset_version_id is not None:
+            meta_data.append(
+                [
+                    "Dataset Version",
+                    f"#{analysis_job.dataset_version_id}",
+                    "",
+                    "",
+                ]
+            )
 
     meta_table = Table(meta_data, colWidths=[3 * cm, 7 * cm, 3 * cm, 4 * cm])
     meta_table.setStyle(TableStyle([

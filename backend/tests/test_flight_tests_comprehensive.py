@@ -9,7 +9,14 @@ from datetime import datetime
 from fastapi import status
 
 from app.auth import get_password_hash
-from app.models import DataPoint, FlightTest, IngestionSession, TestParameter, User
+from app.models import (
+    DataPoint,
+    DatasetVersion,
+    FlightTest,
+    IngestionSession,
+    TestParameter,
+    User,
+)
 
 
 class TestFlightTestCRUD:
@@ -529,8 +536,134 @@ s,ft,kt
         assert session.status == "success"
         assert session.flight_test_id == flight_test.id
         assert session.filename == "session_success.csv"
+        assert session.dataset_version_id is not None
         assert session.row_count == 2
         assert session.error_message is None
+
+    def test_csv_upload_creates_dataset_version_and_sets_active(
+        self, client, test_user, auth_headers, db_session
+    ):
+        flight_test = FlightTest(
+            test_name="Dataset Version CSV Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        csv_content = """timestamp,ALT
+s,ft
+0.0,5000.0
+0.1,5050.0"""
+        files = {"file": ("dataset_v1.csv", io.BytesIO(csv_content.encode()), "text/csv")}
+        response = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files=files,
+            headers=auth_headers,
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        payload = response.json()
+        assert payload["dataset_version_id"] > 0
+        assert payload["active_dataset_version_id"] == payload["dataset_version_id"]
+
+        db_session.refresh(flight_test)
+        assert flight_test.active_dataset_version_id == payload["dataset_version_id"]
+
+        version = (
+            db_session.query(DatasetVersion)
+            .filter(DatasetVersion.id == payload["dataset_version_id"])
+            .first()
+        )
+        assert version is not None
+        assert version.version_number == 1
+        assert version.status == "success"
+
+        versions_response = client.get(
+            f"/api/flight-tests/{flight_test.id}/dataset-versions",
+            headers=auth_headers,
+        )
+        assert versions_response.status_code == status.HTTP_200_OK
+        versions = versions_response.json()
+        assert len(versions) == 1
+        assert versions[0]["is_active"] is True
+        assert versions[0]["version_number"] == 1
+
+    def test_dataset_versions_preserve_history_and_activation_switches_default(
+        self, client, test_user, auth_headers, db_session
+    ):
+        flight_test = FlightTest(
+            test_name="Dataset History Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        first_csv = """timestamp,ALT
+s,ft
+0.0,100.0"""
+        second_csv = """timestamp,ALT
+s,ft
+0.0,200.0"""
+
+        r1 = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files={"file": ("v1.csv", io.BytesIO(first_csv.encode()), "text/csv")},
+            headers=auth_headers,
+        )
+        assert r1.status_code == status.HTTP_201_CREATED
+        v1_id = r1.json()["dataset_version_id"]
+
+        r2 = client.post(
+            f"/api/flight-tests/{flight_test.id}/upload-csv",
+            files={"file": ("v2.csv", io.BytesIO(second_csv.encode()), "text/csv")},
+            headers=auth_headers,
+        )
+        assert r2.status_code == status.HTTP_201_CREATED
+        v2_id = r2.json()["dataset_version_id"]
+        assert v2_id != v1_id
+
+        all_points = (
+            db_session.query(DataPoint)
+            .filter(DataPoint.flight_test_id == flight_test.id)
+            .all()
+        )
+        assert len(all_points) == 2  # no overwrite; both versions are retained
+        assert {p.dataset_version_id for p in all_points} == {v1_id, v2_id}
+
+        # Default read follows active dataset (latest upload = v2)
+        default_series = client.get(
+            f"/api/flight-tests/{flight_test.id}/parameters/data?parameters=ALT",
+            headers=auth_headers,
+        )
+        assert default_series.status_code == status.HTTP_200_OK
+        default_payload = default_series.json()
+        assert default_payload[0]["data"][0]["value"] == 200.0
+
+        # Explicit read of v1 retrieves historical data.
+        v1_series = client.get(
+            f"/api/flight-tests/{flight_test.id}/parameters/data?parameters=ALT&dataset_version_id={v1_id}",
+            headers=auth_headers,
+        )
+        assert v1_series.status_code == status.HTTP_200_OK
+        v1_payload = v1_series.json()
+        assert v1_payload[0]["data"][0]["value"] == 100.0
+
+        # Switch active dataset back to v1 and verify default read follows it.
+        activate = client.post(
+            f"/api/flight-tests/{flight_test.id}/dataset-versions/{v1_id}/activate",
+            headers=auth_headers,
+        )
+        assert activate.status_code == status.HTTP_200_OK
+        switched_default = client.get(
+            f"/api/flight-tests/{flight_test.id}/parameters/data?parameters=ALT",
+            headers=auth_headers,
+        )
+        assert switched_default.status_code == status.HTTP_200_OK
+        switched_payload = switched_default.json()
+        assert switched_payload[0]["data"][0]["value"] == 100.0
 
     def test_csv_upload_failure_persists_failed_ingestion_session(
         self, client, test_user, auth_headers, db_session

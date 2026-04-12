@@ -5,7 +5,7 @@ import DropZone from '../components/DropZone';
 import UploadProgress, { UploadStatus } from '../components/UploadProgress';
 import UploadHistoryTable from '../components/UploadHistoryTable';
 import { ToastContainer, useToast } from '../components/ui/toast';
-import { ApiService, FlightTest, UploadRecord } from '../services/api';
+import { ApiService, DatasetVersion, FlightTest, UploadRecord } from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 
@@ -27,6 +27,10 @@ export default function Upload() {
   // History
   const [history, setHistory] = useState<UploadRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [datasetVersions, setDatasetVersions] = useState<DatasetVersion[]>([]);
+  const [loadingDatasetVersions, setLoadingDatasetVersions] = useState(false);
+  const [selectedDatasetVersionId, setSelectedDatasetVersionId] = useState<number | ''>('');
+  const [activatingDataset, setActivatingDataset] = useState(false);
 
   const hasActiveIngestion = history.some(
     (record) => record.status === 'pending' || record.status === 'processing'
@@ -44,6 +48,8 @@ export default function Upload() {
   useEffect(() => {
     if (!selectedTestId) {
       setHistory([]);
+      setDatasetVersions([]);
+      setSelectedDatasetVersionId('');
       return;
     }
     let active = true;
@@ -60,7 +66,26 @@ export default function Upload() {
       }
     };
 
+    const refreshDatasetVersions = async () => {
+      setLoadingDatasetVersions(true);
+      try {
+        const versions = await ApiService.getDatasetVersions(Number(selectedTestId));
+        if (!active) return;
+        setDatasetVersions(versions);
+        const preferred =
+          versions.find((v) => v.is_active)?.id ?? versions.find((v) => v.status === 'success')?.id;
+        setSelectedDatasetVersionId(preferred ?? '');
+      } catch {
+        if (!active) return;
+        setDatasetVersions([]);
+        setSelectedDatasetVersionId('');
+      } finally {
+        if (active) setLoadingDatasetVersions(false);
+      }
+    };
+
     refreshHistory(true);
+    refreshDatasetVersions();
 
     return () => {
       active = false;
@@ -115,6 +140,14 @@ export default function Upload() {
       // Refresh history
       const updated = await ApiService.getUploadHistory(Number(selectedTestId)).catch(() => []);
       setHistory(updated);
+      const versions = await ApiService.getDatasetVersions(Number(selectedTestId)).catch(() => []);
+      setDatasetVersions(versions);
+      if (result.dataset_version_id) {
+        setSelectedDatasetVersionId(result.dataset_version_id);
+      } else {
+        const activeVersionId = versions.find((v) => v.is_active)?.id;
+        setSelectedDatasetVersionId(activeVersionId ?? '');
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
       setUploadStatus('error');
@@ -133,6 +166,31 @@ export default function Upload() {
 
   const canUpload =
     !!selectedFile && !!selectedTestId && uploadStatus !== 'uploading';
+
+  const selectedDatasetVersion =
+    selectedDatasetVersionId === ''
+      ? undefined
+      : datasetVersions.find((v) => v.id === Number(selectedDatasetVersionId));
+  const activeDatasetVersion = datasetVersions.find((v) => v.is_active);
+
+  const handleActivateDatasetVersion = async () => {
+    if (!selectedTestId || selectedDatasetVersionId === '') return;
+    setActivatingDataset(true);
+    const versionId = Number(selectedDatasetVersionId);
+    try {
+      await ApiService.activateDatasetVersion(Number(selectedTestId), versionId);
+      const versions = await ApiService.getDatasetVersions(Number(selectedTestId));
+      setDatasetVersions(versions);
+      toast.success(`Active dataset set to ${selectedDatasetVersion?.label ?? `v${versionId}`}`);
+    } catch (err) {
+      toast.error(
+        'Failed to activate dataset',
+        err instanceof Error ? err.message : 'Could not activate dataset version'
+      );
+    } finally {
+      setActivatingDataset(false);
+    }
+  };
 
   return (
     <Sidebar>
@@ -265,6 +323,69 @@ export default function Upload() {
               </div>
             </CardContent>
           </Card>
+
+          {selectedTestId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Dataset Versions</CardTitle>
+                <CardDescription>
+                  Select a historical version and optionally mark it as active.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Selected Version
+                    </label>
+                    <select
+                      value={selectedDatasetVersionId}
+                      onChange={(e) =>
+                        setSelectedDatasetVersionId(
+                          e.target.value === '' ? '' : Number(e.target.value)
+                        )
+                      }
+                      disabled={loadingDatasetVersions || datasetVersions.length === 0}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">
+                        {loadingDatasetVersions
+                          ? 'Loading dataset versions…'
+                          : datasetVersions.length === 0
+                            ? 'No dataset versions available'
+                            : '— Select dataset version —'}
+                      </option>
+                      {datasetVersions.map((version) => (
+                        <option key={version.id} value={version.id}>
+                          {`${version.label} · ${version.status} · ${version.data_points_count ?? 0} points`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleActivateDatasetVersion}
+                    disabled={
+                      activatingDataset ||
+                      selectedDatasetVersionId === '' ||
+                      selectedDatasetVersion?.status !== 'success' ||
+                      !!selectedDatasetVersion?.is_active
+                    }
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  >
+                    {activatingDataset ? 'Setting Active…' : 'Set as Active'}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {activeDatasetVersion
+                    ? `Active dataset: ${activeDatasetVersion.label}`
+                    : 'No active dataset is set yet.'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Upload history */}
           {selectedTestId && (

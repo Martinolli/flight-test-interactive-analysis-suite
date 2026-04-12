@@ -24,7 +24,14 @@ import FlightTestModal from '../components/FlightTestModal';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ToastContainer, useToast } from '../components/ui/toast';
-import { ApiService, FlightTest, AIAnalysisResponse, ParameterInfo, ParameterSeries } from '../services/api';
+import {
+  AIAnalysisResponse,
+  ApiService,
+  DatasetVersion,
+  FlightTest,
+  ParameterInfo,
+  ParameterSeries,
+} from '../services/api';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -102,7 +109,13 @@ function parseAnalysisContent(analysisMarkdown: string): ParsedAnalysisContent {
 
 // ─── Parameters & Data Panel ─────────────────────────────────────────────────
 
-function ParametersPanel({ flightTestId }: { flightTestId: number }) {
+function ParametersPanel({
+  flightTestId,
+  datasetVersionId,
+}: {
+  flightTestId: number;
+  datasetVersionId?: number;
+}) {
   const [parameters, setParameters] = useState<ParameterInfo[]>([]);
   const [selectedParams, setSelectedParams] = useState<Set<string>>(new Set());
   const [seriesData, setSeriesData] = useState<ParameterSeries[]>([]);
@@ -113,7 +126,7 @@ function ParametersPanel({ flightTestId }: { flightTestId: number }) {
   useEffect(() => {
     setLoadingParams(true);
     setParamsError('');
-    ApiService.getParameters(flightTestId)
+    ApiService.getParametersForDataset(flightTestId, datasetVersionId)
       .then((params) => {
         setParameters(params);
         if (params.length > 0) {
@@ -122,16 +135,16 @@ function ParametersPanel({ flightTestId }: { flightTestId: number }) {
       })
       .catch((err) => setParamsError(err instanceof Error ? err.message : 'Failed to load parameters'))
       .finally(() => setLoadingParams(false));
-  }, [flightTestId]);
+  }, [flightTestId, datasetVersionId]);
 
   useEffect(() => {
     if (selectedParams.size === 0) { setSeriesData([]); return; }
     setLoadingChart(true);
-    ApiService.getParameterData(flightTestId, Array.from(selectedParams))
+    ApiService.getParameterData(flightTestId, Array.from(selectedParams), datasetVersionId)
       .then(setSeriesData)
       .catch(() => setSeriesData([]))
       .finally(() => setLoadingChart(false));
-  }, [flightTestId, selectedParams]);
+  }, [flightTestId, selectedParams, datasetVersionId]);
 
   function toggleParam(name: string) {
     setSelectedParams((prev) => {
@@ -215,9 +228,13 @@ function ParametersPanel({ flightTestId }: { flightTestId: number }) {
 
 function AIAnalysisPanel({
   flightTestId,
+  datasetVersionId,
+  datasetVersionLabel,
   toast,
 }: {
   flightTestId: number;
+  datasetVersionId?: number;
+  datasetVersionLabel?: string;
   toast: ReturnType<typeof useToast>;
 }) {
   const [result, setResult] = useState<AIAnalysisResponse | null>(null);
@@ -306,7 +323,11 @@ function AIAnalysisPanel({
     setError('');
     setResult(null);
     try {
-      const data = await ApiService.getAIAnalysis(flightTestId, userPrompt.trim() || undefined);
+      const data = await ApiService.getAIAnalysis(
+        flightTestId,
+        userPrompt.trim() || undefined,
+        datasetVersionId
+      );
       setResult(data);
       setShowSources(false);
     } catch (err) {
@@ -469,6 +490,8 @@ function AIAnalysisPanel({
               <span>·</span>
               <span>Flight test: {result.flight_test_name}</span>
               <span>·</span>
+              <span>Dataset: {datasetVersionLabel ?? 'active/legacy'}</span>
+              <span>·</span>
               <span>Analysis Job #{result.analysis_job_id}</span>
             </div>
 
@@ -610,10 +633,36 @@ export default function FlightTestDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [datasetVersions, setDatasetVersions] = useState<DatasetVersion[]>([]);
+  const [loadingDatasetVersions, setLoadingDatasetVersions] = useState(false);
+  const [selectedDatasetVersionId, setSelectedDatasetVersionId] = useState<number | ''>('');
+  const [activatingDataset, setActivatingDataset] = useState(false);
 
   useEffect(() => {
     if (id) loadFlightTest(Number(id));
   }, [id]);
+
+  const loadDatasetVersions = async (testId: number, activeDatasetVersionId?: number | null) => {
+    setLoadingDatasetVersions(true);
+    try {
+      const versions = await ApiService.getDatasetVersions(testId);
+      setDatasetVersions(versions);
+      const preferred =
+        versions.find((v) => v.id === activeDatasetVersionId)?.id ??
+        versions.find((v) => v.is_active)?.id ??
+        versions.find((v) => v.status === 'success')?.id;
+      setSelectedDatasetVersionId(preferred ?? '');
+    } catch (err) {
+      setDatasetVersions([]);
+      setSelectedDatasetVersionId('');
+      toast.warning(
+        'Could not load dataset versions',
+        err instanceof Error ? err.message : 'Dataset versions are unavailable'
+      );
+    } finally {
+      setLoadingDatasetVersions(false);
+    }
+  };
 
   const loadFlightTest = async (testId: number) => {
     try {
@@ -621,6 +670,7 @@ export default function FlightTestDetail() {
       setError('');
       const test = await ApiService.getFlightTest(testId);
       setFlightTest(test);
+      await loadDatasetVersions(testId, test.active_dataset_version_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load flight test');
     } finally {
@@ -647,6 +697,33 @@ export default function FlightTestDetail() {
       );
       setIsDeleting(false);
       setShowDeleteConfirm(false);
+    }
+  };
+
+  const selectedDatasetVersion =
+    selectedDatasetVersionId === ''
+      ? undefined
+      : datasetVersions.find((v) => v.id === Number(selectedDatasetVersionId));
+  const activeDatasetVersion = datasetVersions.find((v) => v.is_active);
+
+  const handleActivateDatasetVersion = async () => {
+    if (!flightTest || selectedDatasetVersionId === '') return;
+    const versionId = Number(selectedDatasetVersionId);
+    setActivatingDataset(true);
+    try {
+      const updated = await ApiService.activateDatasetVersion(flightTest.id, versionId);
+      setFlightTest(updated);
+      await loadDatasetVersions(flightTest.id, updated.active_dataset_version_id);
+      toast.success(
+        `Active dataset set to ${selectedDatasetVersion?.label ?? `v${versionId}`}`
+      );
+    } catch (err) {
+      toast.error(
+        'Failed to activate dataset',
+        err instanceof Error ? err.message : 'Could not set active dataset version.'
+      );
+    } finally {
+      setActivatingDataset(false);
     }
   };
 
@@ -806,20 +883,78 @@ export default function FlightTestDetail() {
               </CardContent>
             </Card>
 
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="text-base">Dataset Version</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Selected Version
+                    </label>
+                    <select
+                      value={selectedDatasetVersionId}
+                      onChange={(e) =>
+                        setSelectedDatasetVersionId(
+                          e.target.value === '' ? '' : Number(e.target.value)
+                        )
+                      }
+                      disabled={loadingDatasetVersions || datasetVersions.length === 0}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">
+                        {loadingDatasetVersions
+                          ? 'Loading dataset versions…'
+                          : datasetVersions.length === 0
+                            ? 'No dataset versions available'
+                            : '— Select dataset version —'}
+                      </option>
+                      {datasetVersions.map((version) => (
+                        <option key={version.id} value={version.id}>
+                          {`${version.label} · ${version.status} · ${version.data_points_count ?? 0} points`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleActivateDatasetVersion}
+                    disabled={
+                      activatingDataset ||
+                      selectedDatasetVersionId === '' ||
+                      selectedDatasetVersion?.status !== 'success' ||
+                      !!selectedDatasetVersion?.is_active
+                    }
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  >
+                    {activatingDataset ? 'Setting Active…' : 'Set as Active'}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {activeDatasetVersion
+                    ? `Active dataset: ${activeDatasetVersion.label}`
+                    : 'No active dataset set yet for this flight test.'}
+                </p>
+              </CardContent>
+            </Card>
+
             <Card className="mt-4 border-amber-200 bg-amber-50/60">
               <CardContent className="pt-5">
                 <div className="flex gap-3">
                   <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div className="space-y-1 text-sm text-amber-900">
-                    <p className="font-semibold">Active dataset scope</p>
+                    <p className="font-semibold">Dataset scope</p>
                     <p>
                       Parameters & Data and Analyze with AI use the{' '}
-                      <strong>active dataset</strong> only (latest successful upload for this
-                      flight test).
+                      <strong>selected dataset version</strong>.
                     </p>
                     <p>
-                      Upload History is retained for audit/tracking and does not select historical
-                      dataset versions.
+                      Current selection:{' '}
+                      <strong>{selectedDatasetVersion?.label ?? 'none'}</strong>. Activate a
+                      selected version to make it the default dataset for this flight test.
                     </p>
                   </div>
                 </div>
@@ -835,12 +970,24 @@ export default function FlightTestDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ParametersPanel flightTestId={flightTest.id} />
+                <ParametersPanel
+                  flightTestId={flightTest.id}
+                  datasetVersionId={
+                    selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId)
+                  }
+                />
               </CardContent>
             </Card>
 
             {/* AI Analysis panel */}
-            <AIAnalysisPanel flightTestId={flightTest.id} toast={toast} />
+            <AIAnalysisPanel
+              flightTestId={flightTest.id}
+              datasetVersionId={
+                selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId)
+              }
+              datasetVersionLabel={selectedDatasetVersion?.label}
+              toast={toast}
+            />
           </>
         )}
       </div>

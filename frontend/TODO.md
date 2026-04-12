@@ -1,6 +1,6 @@
 # FTIAS Frontend — TODO (Execution Alignment)
 
-**Last updated:** 2026-04-11  
+**Last updated:** 2026-04-12  
 **Alignment:** mirrors root execution plan (`TODO.md`) and REV02 review.
 
 ---
@@ -32,6 +32,14 @@
 
 ## P1 — Engineering Usability and Report Quality
 
+- [x] P1.0 Dataset versioning and active dataset selection UX
+  - Added dataset-version selector + active-version controls in:
+    - `Upload Data`
+    - `Parameters`
+    - `Flight Test Detail`
+  - Dashboard/Parameters/AI Analysis calls now pass `dataset_version_id` when selected.
+  - Flight-test API contract now surfaces `active_dataset_version_id`.
+  - Upload response and history contracts now include dataset-version linkage fields.
 - [x] P1.1 Standardize page framing and adaptive layout for Upload/Data Library
   - `Upload Data` and `Document Library` now use the adaptive page shell pattern (`max-w`, full-height flex, internal content scroll).
   - Added bounded internal scroll regions for long tables/history blocks to keep controls visible.

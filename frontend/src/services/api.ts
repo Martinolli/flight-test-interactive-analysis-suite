@@ -11,6 +11,7 @@ export interface FlightTest {
   test_date: string;
   duration_seconds: number | null;
   description: string | null;
+  active_dataset_version_id?: number | null;
   created_by_id: number;
   created_at: string;
   updated_at: string | null;
@@ -26,6 +27,7 @@ export interface CreateFlightTestData {
 export interface UploadRecord {
   id: number;
   flight_test_id: number;
+  dataset_version_id?: number | null;
   filename: string;
   file_type: 'csv';
   source_format?: string;
@@ -45,8 +47,26 @@ export interface UploadResponse {
   data_points_created: number;
   previous_data_points_deleted?: number;
   session_id?: number;
+  dataset_version_id?: number;
+  dataset_version_label?: string;
+  active_dataset_version_id?: number;
   // convenience alias so callers can use row_count uniformly
   row_count?: number;
+}
+
+export interface DatasetVersion {
+  id: number;
+  flight_test_id: number;
+  version_number: number;
+  label: string;
+  status: 'processing' | 'success' | 'failed' | string;
+  row_count: number | null;
+  data_points_count: number | null;
+  source_session_id: number | null;
+  created_by_id: number;
+  created_at: string;
+  updated_at?: string | null;
+  is_active: boolean;
 }
 
 export interface ParameterInfo {
@@ -140,6 +160,7 @@ export interface QueryResponse {
 export interface AIAnalysisResponse {
   analysis: string;
   flight_test_name: string;
+  dataset_version_id?: number | null;
   parameters_analysed: number;
   analysis_job_id: number;
   model_name: string;
@@ -153,6 +174,7 @@ export interface AnalysisJobResponse {
   id: number;
   flight_test_id: number;
   flight_test_name: string;
+  dataset_version_id?: number | null;
   parameters_analysed: number;
   status: string;
   model_name: string;
@@ -252,6 +274,22 @@ export class ApiService {
     return this.request<FlightTest>(`/api/flight-tests/${id}`);
   }
 
+  static async getDatasetVersions(flightTestId: number): Promise<DatasetVersion[]> {
+    return this.request<DatasetVersion[]>(
+      `/api/flight-tests/${flightTestId}/dataset-versions`
+    );
+  }
+
+  static async activateDatasetVersion(
+    flightTestId: number,
+    datasetVersionId: number
+  ): Promise<FlightTest> {
+    return this.request<FlightTest>(
+      `/api/flight-tests/${flightTestId}/dataset-versions/${datasetVersionId}/activate`,
+      { method: 'POST' }
+    );
+  }
+
   static async createFlightTest(data: CreateFlightTestData): Promise<FlightTest> {
     return this.request<FlightTest>('/api/flight-tests', {
       method: 'POST',
@@ -347,11 +385,27 @@ export class ApiService {
    */
   static async getParameterData(
     flightTestId: number,
-    paramNames: string[]
+    paramNames: string[],
+    datasetVersionId?: number
   ): Promise<ParameterSeries[]> {
-    const query = paramNames.map((n) => `parameters=${encodeURIComponent(n)}`).join('&');
+    const queryParts = paramNames.map((n) => `parameters=${encodeURIComponent(n)}`);
+    if (datasetVersionId !== undefined) {
+      queryParts.push(`dataset_version_id=${datasetVersionId}`);
+    }
+    const query = queryParts.join('&');
     return this.request<ParameterSeries[]>(
       `/api/flight-tests/${flightTestId}/parameters/data?${query}`
+    );
+  }
+
+  static async getParametersForDataset(
+    flightTestId: number,
+    datasetVersionId?: number
+  ): Promise<ParameterInfo[]> {
+    const suffix =
+      datasetVersionId !== undefined ? `?dataset_version_id=${datasetVersionId}` : '';
+    return this.request<ParameterInfo[]>(
+      `/api/flight-tests/${flightTestId}/parameters${suffix}`
     );
   }
 
@@ -420,14 +474,18 @@ export class ApiService {
 
   static async getAIAnalysis(
     flightTestId: number,
-    userPrompt?: string
+    userPrompt?: string,
+    datasetVersionId?: number
   ): Promise<AIAnalysisResponse> {
     return this.request<AIAnalysisResponse>(
       `/api/documents/flight-tests/${flightTestId}/ai-analysis`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_prompt: userPrompt ?? null }),
+        body: JSON.stringify({
+          user_prompt: userPrompt ?? null,
+          dataset_version_id: datasetVersionId ?? null,
+        }),
       }
     );
   }

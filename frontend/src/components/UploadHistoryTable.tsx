@@ -86,6 +86,9 @@ export default function UploadHistoryTable({ records, isLoading }: UploadHistory
               File
             </th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Dataset
+            </th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
               Type
             </th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -111,6 +114,9 @@ export default function UploadHistoryTable({ records, isLoading }: UploadHistory
                     {record.error_message}
                   </span>
                 )}
+              </td>
+              <td className="px-4 py-3 text-gray-600 text-xs font-medium">
+                {record.dataset_version_id ? `v${record.dataset_version_id}` : '—'}
               </td>
               <td className="px-4 py-3">
                 <span className="uppercase text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
