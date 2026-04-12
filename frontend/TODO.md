@@ -32,13 +32,17 @@
 
 ## P1 — Engineering Usability and Report Quality
 
-- [ ] P1.1 Parameter exploration at scale
+- [x] P1.1 Standardize page framing and adaptive layout for Upload/Data Library
+  - `Upload Data` and `Document Library` now use the adaptive page shell pattern (`max-w`, full-height flex, internal content scroll).
+  - Added bounded internal scroll regions for long tables/history blocks to keep controls visible.
+  - No behavior/API contract changes in upload or document workflows.
+- [ ] P1.2 Parameter exploration at scale
   - Search/filter, grouping, favorites, saved plot sets.
-- [ ] P1.2 Chart workflow upgrades
+- [ ] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
-- [ ] P1.3 Report UX quality improvements
+- [ ] P1.4 Report UX quality improvements
   - Better figure selection/preview and clearer professional formatting expectations.
-- [ ] P1.4 Capability-catalog-aware UI preparation
+- [ ] P1.5 Capability-catalog-aware UI preparation
   - Support capability/mode applicability hints once backend catalog is defined.
 
 ---

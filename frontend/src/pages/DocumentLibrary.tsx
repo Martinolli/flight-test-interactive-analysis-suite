@@ -186,254 +186,256 @@ export default function DocumentLibrary() {
         onChange={handleFileSelect}
       />
 
-      <div className="p-8 max-w-6xl">
+      <div className="mx-auto flex h-[100dvh] w-full max-w-[1400px] flex-col p-3 sm:p-4 md:p-6 lg:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex shrink-0 items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Document Library</h1>
-            <p className="text-gray-600 mt-1">
+            <p className="mt-1 text-gray-600">
               Upload flight test standards, handbooks, and procedures for AI-powered analysis
             </p>
           </div>
-          <Button onClick={() => setShowUploadPanel(true)} className="flex items-center gap-2">
+          <Button onClick={() => setShowUploadPanel(true)} className="flex items-center gap-2 shrink-0">
             <Plus className="w-4 h-4" />
             Add Document
           </Button>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <Card className="p-4">
-            <p className="text-sm text-gray-500">Total Documents</p>
-            <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-sm text-gray-500">Ready for Queries</p>
-            <p className="text-2xl font-bold text-green-600">{readyCount}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-sm text-gray-500">Processing</p>
-            <p className="text-2xl font-bold text-blue-600">{processingCount}</p>
-          </Card>
-        </div>
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+          {/* Stats bar */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+            <Card className="p-4">
+              <p className="text-sm text-gray-500">Total Documents</p>
+              <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-sm text-gray-500">Ready for Queries</p>
+              <p className="text-2xl font-bold text-green-600">{readyCount}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-sm text-gray-500">Processing</p>
+              <p className="text-2xl font-bold text-blue-600">{processingCount}</p>
+            </Card>
+          </div>
 
-        {/* Upload panel */}
-        {showUploadPanel && (
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-blue-600" />
-                  Upload Document
-                </CardTitle>
-                <button
-                  onClick={resetUploadForm}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* File drop zone */}
-              <div
-                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  dragging ? 'border-blue-500 bg-blue-100' : 'border-gray-300 hover:border-blue-400'
-                } ${uploadFile ? 'bg-green-50 border-green-400' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {uploadFile ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <FileText className="w-5 h-5 text-green-600" />
-                    <span className="font-medium text-green-700">{uploadFile.name}</span>
-                    <span className="text-gray-500 text-sm">({formatBytes(uploadFile.size)})</span>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 font-medium">Drop a PDF here or click to browse</p>
-                    <p className="text-gray-400 text-sm mt-1">PDF files only, up to 50 MB</p>
-                  </>
-                )}
-              </div>
-
-              {/* Metadata fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                  <input
-                    type="text"
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    placeholder="e.g. MIL-STD-1797A Flying Qualities"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
-                  <select
-                    value={uploadDocType}
-                    onChange={(e) => setUploadDocType(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          {/* Upload panel */}
+          {showUploadPanel && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Upload className="w-5 h-5 text-blue-600" />
+                    Upload Document
+                  </CardTitle>
+                  <button
+                    onClick={resetUploadForm}
+                    className="text-gray-400 hover:text-gray-600"
                   >
-                    {DOC_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* File drop zone */}
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                    dragging ? 'border-blue-500 bg-blue-100' : 'border-gray-300 hover:border-blue-400'
+                  } ${uploadFile ? 'bg-green-50 border-green-400' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadFile ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FileText className="w-5 h-5 text-green-600" />
+                      <span className="font-medium text-green-700">{uploadFile.name}</span>
+                      <span className="text-gray-500 text-sm">({formatBytes(uploadFile.size)})</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-600 font-medium">Drop a PDF here or click to browse</p>
+                      <p className="text-gray-400 text-sm mt-1">PDF files only, up to 50 MB</p>
+                    </>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
-                <textarea
-                  value={uploadDescription}
-                  onChange={(e) => setUploadDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Brief description of the document content…"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              {/* Progress bar */}
-              {uploading && (
-                <div>
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Uploading & processing…</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
+                {/* Metadata fields */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      placeholder="e.g. MIL-STD-1797A Flying Qualities"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
+                    <select
+                      value={uploadDocType}
+                      onChange={(e) => setUploadDocType(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {DOC_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                  <textarea
+                    value={uploadDescription}
+                    onChange={(e) => setUploadDescription(e.target.value)}
+                    rows={2}
+                    placeholder="Brief description of the document content…"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+
+                {/* Progress bar */}
+                {uploading && (
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Uploading & processing…</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end flex-wrap">
+                  <Button variant="outline" onClick={resetUploadForm} disabled={uploading}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpload} disabled={!uploadFile || uploading}>
+                    {uploading ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-2" /> Upload & Index</>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Info banner */}
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <Info className="w-4 h-4 mt-0.5 shrink-0" />
+            <p>
+              Documents are parsed with <strong>Docling</strong> (IBM), which preserves tables,
+              section numbering, and cross-references. Large documents (200+ pages) may take 1–3 minutes
+              to process. Indexing runs in the background and this table auto-refreshes while status is
+              <strong> Processing</strong>. Once status shows <strong>Ready</strong>, documents are
+              available for AI queries and flight test analysis.
+            </p>
+          </div>
+
+          {/* Document table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Indexed Documents
+              </CardTitle>
+              <CardDescription>
+                Standards, handbooks, and procedures available for AI-powered analysis
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                  <span className="text-gray-500">Loading library…</span>
+                </div>
+              ) : documents.length === 0 ? (
+                <div
+                  className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-blue-400 transition-colors"
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => { setShowUploadPanel(true); fileInputRef.current?.click(); }}
+                >
+                  <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No documents in the library yet</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Drop a PDF here or click <strong>Add Document</strong> to get started
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10 bg-white">
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-2 font-medium text-gray-600">Document</th>
+                        <th className="text-left py-3 px-2 font-medium text-gray-600">Type</th>
+                        <th className="text-right py-3 px-2 font-medium text-gray-600">Pages</th>
+                        <th className="text-right py-3 px-2 font-medium text-gray-600">Chunks</th>
+                        <th className="text-right py-3 px-2 font-medium text-gray-600">Size</th>
+                        <th className="text-center py-3 px-2 font-medium text-gray-600">Status</th>
+                        <th className="text-left py-3 px-2 font-medium text-gray-600">Added</th>
+                        <th className="py-3 px-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {documents.map((doc) => (
+                        <tr key={doc.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-2">
+                            <div className="flex items-start gap-2">
+                              <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                              <div>
+                                <p className="font-medium text-gray-900">{doc.title || doc.filename}</p>
+                                {doc.title && (
+                                  <p className="text-xs text-gray-400">{doc.filename}</p>
+                                )}
+                                {doc.description && (
+                                  <p className="text-xs text-gray-500 mt-0.5">{doc.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-gray-600 capitalize">{doc.doc_type || '—'}</td>
+                          <td className="py-3 px-2 text-right text-gray-600">{doc.total_pages ?? '—'}</td>
+                          <td className="py-3 px-2 text-right text-gray-600">{doc.total_chunks ?? '—'}</td>
+                          <td className="py-3 px-2 text-right text-gray-600">{formatBytes(doc.file_size_bytes)}</td>
+                          <td className="py-3 px-2 text-center">
+                            <StatusBadge status={doc.status} />
+                            {doc.error_message && (
+                              <p className="text-xs text-red-500 mt-1">{doc.error_message}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-gray-500 text-xs">
+                            {new Date(doc.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-2">
+                            <button
+                              onClick={() => setDeleteTarget(doc)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                              title="Remove document"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={resetUploadForm} disabled={uploading}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpload} disabled={!uploadFile || uploading}>
-                  {uploading ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
-                  ) : (
-                    <><Upload className="w-4 h-4 mr-2" /> Upload & Index</>
-                  )}
-                </Button>
-              </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Info banner */}
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-6 text-sm text-amber-800">
-          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <p>
-            Documents are parsed with <strong>Docling</strong> (IBM), which preserves tables,
-            section numbering, and cross-references. Large documents (200+ pages) may take 1–3 minutes
-            to process. Indexing runs in the background and this table auto-refreshes while status is
-            <strong> Processing</strong>. Once status shows <strong>Ready</strong>, documents are
-            available for AI queries and flight test analysis.
-          </p>
         </div>
-
-        {/* Document table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              Indexed Documents
-            </CardTitle>
-            <CardDescription>
-              Standards, handbooks, and procedures available for AI-powered analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-                <span className="text-gray-500">Loading library…</span>
-              </div>
-            ) : documents.length === 0 ? (
-              <div
-                className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-blue-400 transition-colors"
-                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => { setShowUploadPanel(true); fileInputRef.current?.click(); }}
-              >
-                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No documents in the library yet</p>
-                <p className="text-gray-400 text-sm mt-1">
-                  Drop a PDF here or click <strong>Add Document</strong> to get started
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2 font-medium text-gray-600">Document</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-600">Type</th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-600">Pages</th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-600">Chunks</th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-600">Size</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-600">Status</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-600">Added</th>
-                      <th className="py-3 px-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documents.map((doc) => (
-                      <tr key={doc.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-2">
-                          <div className="flex items-start gap-2">
-                            <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <p className="font-medium text-gray-900">{doc.title || doc.filename}</p>
-                              {doc.title && (
-                                <p className="text-xs text-gray-400">{doc.filename}</p>
-                              )}
-                              {doc.description && (
-                                <p className="text-xs text-gray-500 mt-0.5">{doc.description}</p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2 text-gray-600 capitalize">{doc.doc_type || '—'}</td>
-                        <td className="py-3 px-2 text-right text-gray-600">{doc.total_pages ?? '—'}</td>
-                        <td className="py-3 px-2 text-right text-gray-600">{doc.total_chunks ?? '—'}</td>
-                        <td className="py-3 px-2 text-right text-gray-600">{formatBytes(doc.file_size_bytes)}</td>
-                        <td className="py-3 px-2 text-center">
-                          <StatusBadge status={doc.status} />
-                          {doc.error_message && (
-                            <p className="text-xs text-red-500 mt-1">{doc.error_message}</p>
-                          )}
-                        </td>
-                        <td className="py-3 px-2 text-gray-500 text-xs">
-                          {new Date(doc.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-2">
-                          <button
-                            onClick={() => setDeleteTarget(doc)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                            title="Remove document"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </Sidebar>
   );

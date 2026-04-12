@@ -1124,6 +1124,55 @@ npm run build
 
 - Frontend build: successful (`tsc -b && vite build`)
 
+## P1.1 Implementation Update (2026-04-12)
+
+### Completed: standardize adaptive page framing for Upload/Data Library
+
+**Goal:** align `Upload Data` and `Document Library` with the adaptive page-shell behavior already used by core analysis pages.
+
+**Files changed:**
+
+- `frontend/src/pages/Upload.tsx`
+- `frontend/src/pages/DocumentLibrary.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+
+**What changed:**
+
+- Both pages now use a consistent adaptive shell:
+  - `max-w` constrained container
+  - full-height flex layout (`h-[100dvh]`)
+  - internal content scroll (`min-h-0` + `overflow-y-auto`)
+- `Upload Data`:
+  - standardized spacing rhythm and card stacking under an adaptive shell
+  - upload history panel now uses a bounded internal vertical scroll region for long histories
+- `Document Library`:
+  - standardized spacing/card framing and responsive stats row
+  - indexed-documents table now uses bounded internal scroll with sticky table header
+  - upload panel remains functionally unchanged, but responsive layout was tightened for smaller widths
+- Behavioral contracts intentionally unchanged:
+  - upload/session APIs unchanged
+  - document upload/delete/index polling behavior unchanged
+
+### Acceptance Check
+
+- [x] max-width container aligned with adaptive pages
+- [x] vertical layout behavior standardized
+- [x] internal scroll regions added for long content blocks
+- [x] empty/loading states preserved and kept readable inside new frame
+- [x] no backend/API behavior changes
+
+**Validation run:**
+
+```powershell
+cd frontend
+npm run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`)
+
 ## P0.4 Implementation Update (2026-04-11)
 
 ### Completed: persist analysis jobs + export PDF from immutable artifacts

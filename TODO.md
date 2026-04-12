@@ -103,7 +103,7 @@
     - no hidden overwrite behavior
   - This is a larger product/data-model task and should not be merged as a UI-only patch.
 
-- [ ] P1.1 Standardize page framing and adaptive layout across main work pages
+- [x] P1.1 Standardize page framing and adaptive layout across main work pages
   - Align `Upload Data` and `Document Library` with the adaptive framing used in:
     - `AI Standards Query`
     - `Flight Test Detail`
@@ -115,6 +115,10 @@
     - empty/loading/error states
     - spacing rhythm and card framing
   - Keep behavior changes minimal; this task is primarily visual and UX consistency work.
+  - Implemented:
+    - `Upload Data` and `Document Library` now use a shared adaptive page shell pattern (`max-w`, full-height flex, internal content scroll).
+    - Large tabular/history areas use bounded internal scroll regions to keep page framing stable on smaller screens.
+    - Existing upload/library behavior and API interactions are unchanged.
 
 - [ ] P1.2 Scale parameter exploration for large channel sets
   - Search, grouping, favorites, saved views/sets.
@@ -165,15 +169,15 @@
 
 ## Immediate Execution Order
 
-1. P1.1 — Standardize Upload/Data Library framing  
-2. P1.0 — Dataset versioning / active dataset selection  
+1. P1.0 — Dataset versioning / active dataset selection  
+2. P1.2 — Scale parameter exploration for large channel sets  
 
 - **Reason for this order**
 
 - P0.3a is completed and user-facing dataset-scope behavior is now explicit.
 - P0.4 is completed: analysis artifacts are now persisted and exported by immutable job ID.
-- P1.1 improves visual consistency with low technical risk.
-- P1.0 is important, but larger and should be implemented deliberately as a model/workflow change.
+- P1.1 is now completed.
+- P1.0 remains the highest-impact product/data-model change and should be implemented deliberately.
 
 ---
 
