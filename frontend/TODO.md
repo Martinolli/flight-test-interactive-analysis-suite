@@ -40,6 +40,7 @@
   - Dashboard/Parameters/AI Analysis calls now pass `dataset_version_id` when selected.
   - Flight-test API contract now surfaces `active_dataset_version_id`.
   - Upload response and history contracts now include dataset-version linkage fields.
+  - Reopened analysis jobs in `Analyze with AI` now render the saved job dataset label from persisted provenance, with explicit mismatch notice versus current page selection.
 - [x] P1.1 Standardize page framing and adaptive layout for Upload/Data Library
   - `Upload Data` and `Document Library` now use the adaptive page shell pattern (`max-w`, full-height flex, internal content scroll).
   - Added bounded internal scroll regions for long tables/history blocks to keep controls visible.

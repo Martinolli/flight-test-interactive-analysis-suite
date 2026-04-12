@@ -106,6 +106,7 @@
     - CSV uploads now create new dataset versions (`vN`) without deleting historical datapoints.
     - Added activation + listing endpoints for dataset versions.
     - Dashboard/Parameters/AI Analysis now support selected `dataset_version_id` (defaulting to active version).
+    - Reopened saved analysis jobs now display their own persisted dataset provenance in the AI panel (with mismatch notice if current selection differs).
     - Added regression coverage for version creation, activation behavior, and dataset-scoped AI analysis persistence.
 
 - [x] P1.1 Standardize page framing and adaptive layout across main work pages

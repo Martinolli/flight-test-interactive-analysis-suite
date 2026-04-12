@@ -230,11 +230,13 @@ function AIAnalysisPanel({
   flightTestId,
   datasetVersionId,
   datasetVersionLabel,
+  datasetVersions,
   toast,
 }: {
   flightTestId: number;
   datasetVersionId?: number;
   datasetVersionLabel?: string;
+  datasetVersions: DatasetVersion[];
   toast: ReturnType<typeof useToast>;
 }) {
   const [result, setResult] = useState<AIAnalysisResponse | null>(null);
@@ -248,6 +250,20 @@ function AIAnalysisPanel({
   const [userPrompt, setUserPrompt] = useState('');
   const { user } = useAuth();
   const parsedAnalysis = result ? parseAnalysisContent(result.analysis) : null;
+  const analysisDatasetVersion =
+    result?.dataset_version_id == null
+      ? undefined
+      : datasetVersions.find((v) => v.id === result.dataset_version_id);
+  const analysisDatasetLabel =
+    result?.dataset_version_id == null
+      ? 'active/legacy'
+      : (analysisDatasetVersion?.label ?? `v${result.dataset_version_id}`);
+  const selectedDatasetLabel =
+    datasetVersionLabel ?? (datasetVersionId == null ? 'none' : `v${datasetVersionId}`);
+  const analysisDatasetDiffersFromSelection =
+    result?.dataset_version_id != null &&
+    datasetVersionId != null &&
+    result.dataset_version_id !== datasetVersionId;
 
   // Quick-prompt chips — click to pre-fill the prompt box
   const QUICK_PROMPTS = [
@@ -350,6 +366,7 @@ function AIAnalysisPanel({
       setResult({
         analysis: job.analysis,
         flight_test_name: job.flight_test_name,
+        dataset_version_id: job.dataset_version_id ?? null,
         parameters_analysed: job.parameters_analysed,
         analysis_job_id: job.id,
         model_name: job.model_name,
@@ -490,10 +507,16 @@ function AIAnalysisPanel({
               <span>·</span>
               <span>Flight test: {result.flight_test_name}</span>
               <span>·</span>
-              <span>Dataset: {datasetVersionLabel ?? 'active/legacy'}</span>
+              <span>Analysis dataset: {analysisDatasetLabel}</span>
               <span>·</span>
               <span>Analysis Job #{result.analysis_job_id}</span>
             </div>
+            {analysisDatasetDiffersFromSelection && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Reopened analysis provenance uses <strong>{analysisDatasetLabel}</strong>, while
+                current page selection is <strong>{selectedDatasetLabel}</strong>.
+              </div>
+            )}
 
             <div className="max-h-[65vh] min-h-[240px] overflow-y-auto rounded-xl border border-purple-100 bg-purple-50/40 p-3 pr-1">
               <div className="flex justify-start">
@@ -986,6 +1009,7 @@ export default function FlightTestDetail() {
                 selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId)
               }
               datasetVersionLabel={selectedDatasetVersion?.label}
+              datasetVersions={datasetVersions}
               toast={toast}
             />
           </>

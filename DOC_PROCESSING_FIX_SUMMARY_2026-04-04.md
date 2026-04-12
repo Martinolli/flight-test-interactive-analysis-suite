@@ -1409,3 +1409,47 @@ pnpm -C frontend run build
 - `test_admin_report_export`: `3 passed`
 - Frontend build: successful (`tsc -b && vite build`)
 - Note: Vite printed a Node warning (`20.18.1` detected; recommends `20.19+`), but build output is successful.
+
+## P1.0 Follow-up (2026-04-12): Saved Analysis Dataset Provenance Display
+
+### Completed: provenance-correct dataset label for reopened analysis jobs
+
+**Goal:** prevent misleading dataset labeling when reopening a saved analysis job by ID while the page currently has a different dataset selected.
+
+**Files changed:**
+
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Reopen-by-ID flow now preserves `dataset_version_id` from saved analysis job response into panel state.
+- AI Analysis panel metadata now displays dataset as:
+  - `Analysis dataset: <saved job dataset label>` when job has dataset provenance.
+  - `Analysis dataset: active/legacy` only when job has no persisted dataset version.
+- When saved-job dataset differs from current page selection, panel now shows explicit mismatch notice:
+  - saved analysis provenance dataset
+  - current page selected dataset
+- Existing selected-dataset behavior is unchanged for:
+  - Parameters & Data panel
+  - new AI analysis runs
+  - Set Active dataset actions
+
+### Acceptance Check (documented)
+
+- [x] Run analysis with dataset version **A** selected.
+- [x] Change current page selection to dataset version **B**.
+- [x] Re-open saved analysis job from version **A** by job ID.
+- [x] Verify AI Analysis panel shows saved analysis as dataset **A** (and mismatch notice vs **B**), not as dataset **B**.
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
