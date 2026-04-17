@@ -146,7 +146,7 @@
     - Fixed write-before-hydration lifecycle issue so favorites and saved sets are never overwritten by initial empty state during remount.
     - Added explicit hydration-complete guards for key-scoped read/write flow before localStorage updates are allowed.
 
-- [ ] P1.3 Upgrade chart workflow for engineering review
+- [x] P1.3 Upgrade chart workflow for engineering review
   - Linked crosshair, event markers, threshold bands, compare-runs mode, better export quality.
   - Progress (2026-04-17, step 1):
     - Added synchronized time-cursor/crosshair readout wiring in time-series charts on both `Parameters` and `Flight Test Detail`.
@@ -155,7 +155,11 @@
     - Added threshold overlays in `Parameters` timeseries workflow (upper/lower lines + optional shaded band).
     - Added event-marker overlay support (initial demo/manual baseline markers: start/mid/end + WOW transition when available).
     - Upgraded PNG export quality path (`scale=3`) and enabled container capture for timeseries export so engineering overlay context/readout is preserved.
-    - Remaining in P1.3: compare-runs / compare-dataset mode.
+  - Progress (2026-04-17, step 3):
+    - Added compare-dataset mode in `Parameters` timeseries workflow with a second dataset-version selector.
+    - Compare mode overlays the same selected parameters from the secondary dataset as distinct compare traces.
+    - Compare traces are visually differentiated in chart legend/line style and retain linked crosshair behavior.
+    - Compare flow reports missing parameters from the secondary dataset without breaking primary analysis flow.
 
 - [ ] P1.4 Improve PDF/report professional quality
   - Structured template, figure quality, cleaner references, provenance footer.
@@ -200,14 +204,13 @@
 
 ## Immediate Execution Order
 
-1. P1.3 — Upgrade chart workflow for engineering review  
-2. P1.4 — Improve PDF/report professional quality  
+1. P1.4 — Improve PDF/report professional quality  
+2. P1.5 — Define capability catalog before deeper domain branching  
 
 - **Reason for this order**
 
-- P0.3a and P0.4 are completed and stable (explicit scope + immutable analysis artifacts).
-- P1.0 and P1.2 are now completed with dataset-version truth and scalable parameter selection controls.
-- Highest next impact is engineering chart workflow quality, then report professionalism.
+- P1.3 is now completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
+- Highest next impact is report professionalism, then capability-catalog definition before deeper domain branching.
 
 ---
 

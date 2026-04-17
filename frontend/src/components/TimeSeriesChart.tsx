@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   ComposedChart,
   Line,
@@ -32,6 +33,7 @@ interface TimeSeriesChartProps {
   onHoverPoint?: (snapshot: TimeSeriesHoverSnapshot | null) => void;
   thresholdOverlay?: TimeSeriesThresholdOverlay;
   eventMarkers?: TimeSeriesEventMarker[];
+  compareSeriesKeys?: string[];
 }
 
 interface MergedPoint {
@@ -187,15 +189,18 @@ function CustomTooltip({
 function CustomLegend({
   payload,
   seriesMeta,
+  compareSeriesKeys,
 }: {
   payload?: { value: string; color: string }[];
   seriesMeta: Map<string, { unit: string; axis: 'left' | 'right' }>;
+  compareSeriesKeys: Set<string>;
 }) {
   if (!payload?.length) return null;
   return (
     <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 pt-2">
       {payload.map((entry) => {
         const meta = seriesMeta.get(entry.value);
+        const isCompare = compareSeriesKeys.has(entry.value);
         return (
           <span
             key={entry.value}
@@ -211,6 +216,9 @@ function CustomLegend({
             ) : null}
             {meta?.axis === 'right' ? (
               <span className="text-gray-400 italic text-[10px]">→ right</span>
+            ) : null}
+            {isCompare ? (
+              <span className="text-indigo-500 italic text-[10px]">compare</span>
             ) : null}
           </span>
         );
@@ -228,6 +236,7 @@ export default function TimeSeriesChart({
   onHoverPoint,
   thresholdOverlay,
   eventMarkers = [],
+  compareSeriesKeys = [],
 }: TimeSeriesChartProps) {
   if (!series.length) return null;
 
@@ -254,6 +263,10 @@ export default function TimeSeriesChart({
   const rightHasBinary = rightSeries.some((s) => binaryNames.has(s.parameter_name));
 
   const rightMargin = hasDualAxis ? 64 : 16;
+  const compareSeriesKeySet = useMemo(
+    () => new Set(compareSeriesKeys),
+    [compareSeriesKeys]
+  );
   const thresholdAxis =
     thresholdOverlay?.axis === 'right' && hasDualAxis ? 'right' : 'left';
   const hasLowerLimit =
@@ -400,7 +413,7 @@ export default function TimeSeriesChart({
           />
 
           <Legend
-            content={<CustomLegend seriesMeta={seriesMeta} />}
+            content={<CustomLegend seriesMeta={seriesMeta} compareSeriesKeys={compareSeriesKeySet} />}
           />
 
           {showThresholdBand && (
@@ -465,6 +478,7 @@ export default function TimeSeriesChart({
 
           {/* Lines for left axis */}
           {leftSeries.map((s) => (
+            // Compare series are rendered with a lighter dashed style.
             <Line
               key={s.parameter_name}
               yAxisId="left"
@@ -472,6 +486,12 @@ export default function TimeSeriesChart({
               dataKey={s.parameter_name}
               stroke={COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]}
               strokeWidth={binaryNames.has(s.parameter_name) ? 2.5 : 2}
+              strokeDasharray={
+                compareSeriesKeySet.has(s.parameter_name)
+                  ? (binaryNames.has(s.parameter_name) ? '3 2' : '6 4')
+                  : undefined
+              }
+              strokeOpacity={compareSeriesKeySet.has(s.parameter_name) ? 0.75 : 1}
               dot={false}
               activeDot={{ r: 4 }}
               connectNulls
@@ -487,7 +507,12 @@ export default function TimeSeriesChart({
               dataKey={s.parameter_name}
               stroke={COLORS[colorIndex.get(s.parameter_name)! % COLORS.length]}
               strokeWidth={binaryNames.has(s.parameter_name) ? 2.5 : 2}
-              strokeDasharray={binaryNames.has(s.parameter_name) ? undefined : '5 3'}
+              strokeDasharray={
+                compareSeriesKeySet.has(s.parameter_name)
+                  ? (binaryNames.has(s.parameter_name) ? '3 2' : '6 4')
+                  : (binaryNames.has(s.parameter_name) ? undefined : '5 3')
+              }
+              strokeOpacity={compareSeriesKeySet.has(s.parameter_name) ? 0.75 : 1}
               dot={false}
               activeDot={{ r: 4 }}
               connectNulls

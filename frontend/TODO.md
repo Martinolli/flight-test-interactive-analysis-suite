@@ -67,7 +67,7 @@
   - Final persistence correction (2026-04-17):
     - Fixed write-before-hydration ordering bug so favorites and saved sets are not clobbered by initial empty arrays on remount.
     - Added hydration guards to defer localStorage writes until key hydration is complete.
-- [ ] P1.3 Chart workflow upgrades
+- [x] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
   - Progress (2026-04-17, step 1):
     - Implemented synchronized hover cursor readout for time-series charts in both explorer surfaces.
@@ -82,7 +82,13 @@
       - configurable export options in chart download hook
       - `scale=3` high-resolution PNG export
       - container-capture export for timeseries to retain overlay/readout context.
-    - Remaining in P1.3: compare-runs / compare-dataset mode.
+  - Progress (2026-04-17, step 3):
+    - Added compare-dataset mode on `Parameters` timeseries workflow:
+      - optional enable/disable compare toggle
+      - secondary dataset-version selector (same flight test)
+      - overlay of selected parameters from compare dataset
+    - Added compare-trace visual differentiation (legend tag + dashed/lighter lines) while preserving linked hover/cursor behavior.
+    - Added compare-missing-parameter warning when selected parameters are absent in the secondary dataset.
 - [ ] P1.4 Report UX quality improvements
   - Better figure selection/preview and clearer professional formatting expectations.
 - [ ] P1.5 Capability-catalog-aware UI preparation

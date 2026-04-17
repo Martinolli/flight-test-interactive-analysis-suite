@@ -1454,6 +1454,54 @@ pnpm -C frontend run build
 
 - Frontend build: successful (`tsc -b && vite build`).
 
+## P1.3 Step 3 Update (2026-04-17): Compare-Dataset Mode
+
+### Completed: compare-runs/dataset slice for engineering review
+
+**Goal:** finalize P1.3 by enabling same-parameter comparison across two dataset versions of the same flight test in the `Parameters` timeseries workflow.
+
+**Files changed:**
+
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/components/TimeSeriesChart.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Added compare-dataset workflow controls on `Parameters` page:
+  - compare-mode enable toggle
+  - compare dataset-version selector (same flight test)
+  - clear primary vs compare dataset labeling
+- Implemented compare overlay in timeseries chart:
+  - selected parameters from compare dataset are fetched and plotted with the primary dataset
+  - compare traces are visually distinct (dashed/lighter style + legend compare tag)
+  - linked hover/crosshair behavior remains active with overlays
+- Added compare robustness:
+  - candidate dataset guard (excludes currently selected primary dataset)
+  - missing-parameter warning if compare dataset lacks some selected channels
+  - no change to saved sets/favorites behavior
+
+### Acceptance Check (documented)
+
+- [x] compare-dataset mode selectable on Parameters page
+- [x] same parameters can be overlaid across primary + compare dataset versions
+- [x] compare traces remain readable and distinguishable
+- [x] no regression in dataset selection, saved sets, favorites, or chart loading behavior
+- [x] linked crosshair, markers, thresholds, and export improvements remain intact
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
+- P1.3 chart-workflow scope is now complete.
+
 ## P1.3 Step 2 Update (2026-04-17): Thresholds + Event Markers + Export Quality
 
 ### Completed: next incremental slice for engineering chart review

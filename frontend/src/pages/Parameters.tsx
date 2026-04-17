@@ -114,8 +114,10 @@ export default function Parameters() {
 
   // Chart data
   const [seriesData, setSeriesData] = useState<ParameterSeries[]>([]);
+  const [compareSeriesData, setCompareSeriesData] = useState<ParameterSeries[]>([]);
   const [hoverSnapshot, setHoverSnapshot] = useState<TimeSeriesHoverSnapshot | null>(null);
   const [loadingChart, setLoadingChart] = useState(false);
+  const [loadingCompareChart, setLoadingCompareChart] = useState(false);
   const [chartError, setChartError] = useState('');
 
   // UI state
@@ -126,6 +128,8 @@ export default function Parameters() {
   const [thresholdUpperInput, setThresholdUpperInput] = useState('');
   const [showThresholdBand, setShowThresholdBand] = useState(true);
   const [thresholdAxis, setThresholdAxis] = useState<'left' | 'right'>('left');
+  const [compareModeEnabled, setCompareModeEnabled] = useState(false);
+  const [compareDatasetVersionId, setCompareDatasetVersionId] = useState<number | ''>('');
 
   // Chart download
   const { chartRef, downloadChart, downloading } = useChartDownload();
@@ -161,9 +165,12 @@ export default function Parameters() {
     if (!selectedTestId) {
       setDatasetVersions([]);
       setSelectedDatasetVersionId('');
+      setCompareDatasetVersionId('');
+      setCompareModeEnabled(false);
       setParameters([]);
       setSelectedParams(new Set());
       setSeriesData([]);
+      setCompareSeriesData([]);
       return;
     }
     setLoadingDatasetVersions(true);
@@ -171,6 +178,9 @@ export default function Parameters() {
     setParameters([]);
     setSelectedParams(new Set());
     setSeriesData([]);
+    setCompareSeriesData([]);
+    setCompareModeEnabled(false);
+    setCompareDatasetVersionId('');
     setCorrX('');
     setCorrY('');
     setCorrSeriesData([]);
@@ -243,8 +253,42 @@ export default function Parameters() {
   }, [selectedTestId, selectedParams, selectedDatasetVersionId]);
 
   useEffect(() => {
+    if (
+      !compareModeEnabled ||
+      !selectedTestId ||
+      compareDatasetVersionId === '' ||
+      selectedParams.size === 0
+    ) {
+      setCompareSeriesData([]);
+      return;
+    }
+    setLoadingCompareChart(true);
+
+    ApiService.getParameterData(
+      Number(selectedTestId),
+      Array.from(selectedParams),
+      Number(compareDatasetVersionId)
+    )
+      .then(setCompareSeriesData)
+      .catch(() => setCompareSeriesData([]))
+      .finally(() => setLoadingCompareChart(false));
+  }, [
+    compareModeEnabled,
+    selectedTestId,
+    selectedParams,
+    compareDatasetVersionId,
+  ]);
+
+  useEffect(() => {
     setHoverSnapshot(null);
-  }, [selectedTestId, selectedDatasetVersionId, selectedParams, activeTab]);
+  }, [
+    selectedTestId,
+    selectedDatasetVersionId,
+    compareDatasetVersionId,
+    compareModeEnabled,
+    selectedParams,
+    activeTab,
+  ]);
 
   const toggleParam = (name: string) => {
     setSelectedParams((prev) => {
@@ -344,10 +388,78 @@ export default function Parameters() {
     return datasetVersions.find((v) => v.id === Number(selectedDatasetVersionId));
   }, [datasetVersions, selectedDatasetVersionId]);
 
+  const compareDatasetCandidates = useMemo(
+    () =>
+      datasetVersions.filter(
+        (version) =>
+          version.status === 'success' &&
+          (selectedDatasetVersionId === '' || version.id !== Number(selectedDatasetVersionId))
+      ),
+    [datasetVersions, selectedDatasetVersionId]
+  );
+
+  const compareDatasetVersion = useMemo(() => {
+    if (compareDatasetVersionId === '') return undefined;
+    return datasetVersions.find((v) => v.id === Number(compareDatasetVersionId));
+  }, [datasetVersions, compareDatasetVersionId]);
+
   const activeDatasetVersion = useMemo(
     () => datasetVersions.find((v) => v.is_active),
     [datasetVersions]
   );
+
+  useEffect(() => {
+    if (!compareModeEnabled) {
+      setCompareSeriesData([]);
+      return;
+    }
+    const selectedId =
+      compareDatasetVersionId === '' ? null : Number(compareDatasetVersionId);
+    const isStillValid =
+      selectedId != null &&
+      compareDatasetCandidates.some((version) => version.id === selectedId);
+    if (isStillValid) return;
+
+    const fallback = compareDatasetCandidates[0]?.id;
+    setCompareDatasetVersionId(fallback ?? '');
+    if (!fallback) {
+      setCompareSeriesData([]);
+    }
+  }, [compareModeEnabled, compareDatasetCandidates, compareDatasetVersionId]);
+
+  const compareDatasetLabel =
+    compareDatasetVersion?.label ??
+    (compareDatasetVersionId === '' ? 'none' : `v${compareDatasetVersionId}`);
+
+  const compareSeriesForChart = useMemo(() => {
+    if (!compareModeEnabled || compareDatasetVersionId === '') return [];
+    return compareSeriesData.map((series) => ({
+      ...series,
+      parameter_name: `${series.parameter_name} [${compareDatasetLabel}]`,
+    }));
+  }, [compareModeEnabled, compareDatasetVersionId, compareSeriesData, compareDatasetLabel]);
+
+  const compareSeriesKeys = useMemo(
+    () => compareSeriesForChart.map((series) => series.parameter_name),
+    [compareSeriesForChart]
+  );
+
+  const combinedTimeSeriesData = useMemo(
+    () =>
+      compareModeEnabled
+        ? [...seriesData, ...compareSeriesForChart]
+        : seriesData,
+    [compareModeEnabled, seriesData, compareSeriesForChart]
+  );
+
+  const compareMissingParameters = useMemo(() => {
+    if (!compareModeEnabled || compareDatasetVersionId === '') return [];
+    const returned = new Set(compareSeriesData.map((series) => series.parameter_name));
+    return Array.from(selectedParams).filter((name) => !returned.has(name));
+  }, [compareModeEnabled, compareDatasetVersionId, compareSeriesData, selectedParams]);
+
+  const chartBusy =
+    loadingChart || (activeTab === 'timeseries' && compareModeEnabled && loadingCompareChart);
   const parameterExplorerNamespace =
     selectedTestId === ''
       ? 'parameter-explorer:parameters-page:no-test'
@@ -476,6 +588,58 @@ export default function Parameters() {
                     ? `Active dataset: ${activeDatasetVersion.label} (${activeDatasetVersion.data_points_count ?? 0} points)`
                     : 'No active dataset is set yet for this flight test.'}
                 </p>
+
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 space-y-2">
+                  <label className="flex items-center gap-2 text-xs text-indigo-800">
+                    <input
+                      type="checkbox"
+                      checked={compareModeEnabled}
+                      onChange={(e) => setCompareModeEnabled(e.target.checked)}
+                      className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Enable compare dataset overlay (same parameters, second dataset version)
+                  </label>
+                  {compareModeEnabled && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                      <div>
+                        <label className="block text-xs font-medium text-indigo-700 mb-1">
+                          Compare Against Dataset
+                        </label>
+                        <select
+                          value={compareDatasetVersionId}
+                          onChange={(e) =>
+                            setCompareDatasetVersionId(
+                              e.target.value === '' ? '' : Number(e.target.value)
+                            )
+                          }
+                          disabled={compareDatasetCandidates.length === 0}
+                          className="w-full rounded-md border border-indigo-200 bg-white px-2.5 py-1.5 text-xs text-gray-900
+                                     focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed
+                                     disabled:opacity-50"
+                        >
+                          <option value="">
+                            {compareDatasetCandidates.length === 0
+                              ? 'No alternate successful dataset versions'
+                              : '— Select compare dataset —'}
+                          </option>
+                          {compareDatasetCandidates.map((version) => (
+                            <option key={version.id} value={version.id}>
+                              {`${version.label} · ${version.data_points_count ?? 0} points`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <p className="text-xs text-indigo-700">
+                        Primary: <strong>{selectedDatasetVersion?.label ?? 'none'}</strong>
+                        {compareDatasetVersionId !== '' ? (
+                          <>
+                            {' '}vs Compare: <strong>{compareDatasetLabel}</strong>
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -600,7 +764,7 @@ export default function Parameters() {
                       )}
 
                       {/* Download chart button — shown when chart has data */}
-                      {!loadingChart && !chartError &&
+                      {!chartBusy && !chartError &&
                         ((activeTab === 'timeseries' && seriesData.length > 0) ||
                           (activeTab === 'correlation' && corrXSeries && corrYSeries)) && (
                         <button
@@ -651,6 +815,14 @@ export default function Parameters() {
                           Shade band between lower/upper limits
                         </label>
                       </div>
+
+                      {compareModeEnabled && compareDatasetVersionId !== '' && compareMissingParameters.length > 0 && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          Compare dataset is missing {compareMissingParameters.length} selected parameter(s):{' '}
+                          <strong>{compareMissingParameters.slice(0, 4).join(', ')}</strong>
+                          {compareMissingParameters.length > 4 ? ' ...' : ''}
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
@@ -712,16 +884,20 @@ export default function Parameters() {
                   )}
 
                   {/* Loading chart */}
-                  {loadingChart && selectedParams.size > 0 && (
+                  {chartBusy && selectedParams.size > 0 && (
                     <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
                       <RefreshCw className="w-5 h-5 animate-spin" />
-                      <span className="text-sm">Loading chart data…</span>
+                      <span className="text-sm">
+                        {compareModeEnabled && loadingCompareChart
+                          ? 'Loading chart comparison data…'
+                          : 'Loading chart data…'}
+                      </span>
                       <span className="text-xs text-gray-300">Large datasets may take a few seconds</span>
                     </div>
                   )}
 
                   {/* Chart error */}
-                  {chartError && !loadingChart && (
+                  {chartError && !chartBusy && (
                     <div className="flex items-center justify-center h-64 gap-3 text-red-500 text-sm">
                       <AlertCircle className="w-5 h-5 shrink-0" />
                       {chartError}
@@ -729,7 +905,7 @@ export default function Parameters() {
                   )}
 
                   {/* Time series chart */}
-                  {!loadingChart && !chartError && seriesData.length > 0 && activeTab === 'timeseries' && (
+                  {!chartBusy && !chartError && combinedTimeSeriesData.length > 0 && activeTab === 'timeseries' && (
                     <div ref={chartRef} className="bg-white space-y-2">
                       <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
                         {hoverSnapshot ? (
@@ -750,13 +926,14 @@ export default function Parameters() {
                         )}
                       </div>
                       <TimeSeriesChart
-                        series={seriesData}
+                        series={combinedTimeSeriesData}
                         height={340}
                         showReferenceMean={showMean}
                         syncId={`parameters-timeseries-${selectedTestId}`}
                         onHoverPoint={setHoverSnapshot}
                         thresholdOverlay={thresholdOverlay}
                         eventMarkers={eventMarkers}
+                        compareSeriesKeys={compareSeriesKeys}
                       />
                     </div>
                   )}
@@ -833,7 +1010,7 @@ export default function Parameters() {
               </Card>
 
               {/* Statistics panel */}
-              {stats.length > 0 && !loadingChart && (
+              {stats.length > 0 && !chartBusy && (
                 <div className="space-y-4">
                   {stats.map((s) => (
                     <Card key={s.parameter_name}>
