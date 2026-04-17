@@ -64,6 +64,9 @@
       - `Parameters` page explorer
       - `FlightTestDetail` explorer
     - Added missing/truncation warnings on `FlightTestDetail` apply flow for parity.
+  - Final persistence correction (2026-04-17):
+    - Fixed write-before-hydration ordering bug so favorites and saved sets are not clobbered by initial empty arrays on remount.
+    - Added hydration guards to defer localStorage writes until key hydration is complete.
 - [ ] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
 - [ ] P1.4 Report UX quality improvements

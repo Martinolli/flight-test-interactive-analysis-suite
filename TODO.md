@@ -142,6 +142,9 @@
       - `Parameters` page
       - `FlightTestDetail` parameters explorer
     - Saved sets now persist across navigation/refresh and are recoverable from both surfaces for the same flight test.
+  - Final persistence correction (2026-04-17):
+    - Fixed write-before-hydration lifecycle issue so favorites and saved sets are never overwritten by initial empty state during remount.
+    - Added explicit hydration-complete guards for key-scoped read/write flow before localStorage updates are allowed.
 
 - [ ] P1.3 Upgrade chart workflow for engineering review
   - Linked crosshair, event markers, threshold bands, compare-runs mode, better export quality.

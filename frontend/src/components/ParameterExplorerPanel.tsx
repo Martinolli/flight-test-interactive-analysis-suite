@@ -58,11 +58,17 @@ export default function ParameterExplorerPanel({
   const [selectedSetName, setSelectedSetName] = useState('');
   const loadedFavoritesKeyRef = useRef<string | null>(null);
   const loadedSetsKeyRef = useRef<string | null>(null);
+  const [favoritesHydrated, setFavoritesHydrated] = useState(false);
+  const [savedSetsHydrated, setSavedSetsHydrated] = useState(false);
 
   const favoritesStorageKey = `ftias:param-explorer:${storageNamespace}:favorites`;
   const setsStorageKey = `ftias:param-explorer:${storageNamespace}:sets`;
 
   useEffect(() => {
+    // Reset hydration guards whenever key scope changes.
+    setFavoritesHydrated(false);
+    setSavedSetsHydrated(false);
+
     try {
       const rawFavorites = localStorage.getItem(favoritesStorageKey);
       const parsedFavorites = rawFavorites ? JSON.parse(rawFavorites) : [];
@@ -74,6 +80,9 @@ export default function ParameterExplorerPanel({
       setFavorites([]);
     } finally {
       loadedFavoritesKeyRef.current = favoritesStorageKey;
+      // Hydration completes in this render cycle; write effects must wait until
+      // the next render to avoid clobbering persisted data with initial [] state.
+      setFavoritesHydrated(true);
     }
 
     try {
@@ -105,22 +114,24 @@ export default function ParameterExplorerPanel({
       setSelectedSetName('');
     } finally {
       loadedSetsKeyRef.current = setsStorageKey;
+      // Same guard rationale as favorites.
+      setSavedSetsHydrated(true);
     }
   }, [favoritesStorageKey, setsStorageKey]);
 
   useEffect(() => {
-    if (loadedFavoritesKeyRef.current !== favoritesStorageKey) {
+    if (!favoritesHydrated || loadedFavoritesKeyRef.current !== favoritesStorageKey) {
       return;
     }
     localStorage.setItem(favoritesStorageKey, JSON.stringify(favorites));
-  }, [favorites, favoritesStorageKey]);
+  }, [favorites, favoritesStorageKey, favoritesHydrated]);
 
   useEffect(() => {
-    if (loadedSetsKeyRef.current !== setsStorageKey) {
+    if (!savedSetsHydrated || loadedSetsKeyRef.current !== setsStorageKey) {
       return;
     }
     localStorage.setItem(setsStorageKey, JSON.stringify(savedSets));
-  }, [savedSets, setsStorageKey]);
+  }, [savedSets, setsStorageKey, savedSetsHydrated]);
 
   const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
 

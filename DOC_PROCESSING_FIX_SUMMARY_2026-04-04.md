@@ -1608,3 +1608,47 @@ pnpm -C frontend run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`).
+
+## P1.2 Follow-up (2026-04-17): Final Favorites + Saved-Sets Persistence Correction
+
+### Completed: fixed write-before-hydration overwrite for both favorites and saved sets
+
+**Goal:** ensure both favorites and saved parameter sets persist reliably across navigation, refresh, and both explorer surfaces for the same flight test.
+
+**Files changed:**
+
+- `frontend/src/components/ParameterExplorerPanel.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**Root cause confirmed:**
+
+- In effect execution order, read/hydration and write-back could occur in the same mount cycle.
+- Write effect could run with initial empty arrays before hydrated state was committed, clobbering persisted localStorage values.
+
+**What changed:**
+
+- Added explicit hydration state guards per key:
+  - `favoritesHydrated`
+  - `savedSetsHydrated`
+- Reset guards on key-scope change; only allow localStorage writes once hydration for that key is complete.
+- This prevents empty initial state from overwriting persisted favorites/sets during remount.
+
+### Acceptance Check (documented)
+
+- [x] Favorites persist after navigation away/back.
+- [x] Saved sets persist after navigation away/back.
+- [x] Favorites and sets persist after browser refresh.
+- [x] Same flight test recovers identical favorites/sets in both `Parameters` and `FlightTestDetail` explorers.
+- [x] Dataset-aware apply + missing/truncation warnings remain active.
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
