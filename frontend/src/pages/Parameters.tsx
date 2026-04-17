@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   BarChart3,
   TrendingUp,
@@ -44,9 +44,14 @@ function formatCursorValue(value: number | undefined): string {
 }
 
 function buildDemoEventMarkers(seriesData: ParameterSeries[]): TimeSeriesEventMarker[] {
-  if (seriesData.length === 0 || seriesData[0].data.length === 0) return [];
+  if (seriesData.length === 0) return [];
 
-  const base = [...seriesData[0].data].sort(
+  const baseSeries = [...seriesData]
+    .filter((series) => series.data.length > 0)
+    .sort((a, b) => b.data.length - a.data.length)[0];
+  if (!baseSeries) return [];
+
+  const base = [...baseSeries.data].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
   if (base.length === 0) return [];
@@ -131,19 +136,36 @@ export default function Parameters() {
   const [compareModeEnabled, setCompareModeEnabled] = useState(false);
   const [compareDatasetVersionId, setCompareDatasetVersionId] = useState<number | ''>('');
 
+  const handleHoverSnapshot = useCallback((snapshot: TimeSeriesHoverSnapshot | null) => {
+    setHoverSnapshot((prev) => {
+      if (snapshot === null) return prev === null ? prev : null;
+      if (prev?.timestamp === snapshot.timestamp) return prev;
+      return snapshot;
+    });
+  }, []);
+
   // Chart download
   const { chartRef, downloadChart, downloading } = useChartDownload();
 
   const selectedTestName = flightTests.find((t) => t.id === selectedTestId)?.test_name ?? 'chart';
 
-  function handleDownloadChart() {
+  async function handleDownloadChart() {
     const paramNames = Array.from(selectedParams).join('_').replace(/\s+/g, '-').slice(0, 40);
     const label = activeTab === 'timeseries' ? paramNames : `${corrX}_vs_${corrY}`;
-    downloadChart(`FTIAS_${label}_${selectedTestName.replace(/\s+/g, '_')}`, {
-      scale: 3,
-      includeContainer: activeTab === 'timeseries',
-      backgroundColor: '#ffffff',
-    });
+    try {
+      await downloadChart(`FTIAS_${label}_${selectedTestName.replace(/\s+/g, '_')}`, {
+        scale: 3,
+        // SVG-first path is the most reliable for Recharts exports.
+        includeContainer: false,
+        backgroundColor: '#ffffff',
+      });
+      toast.success('Chart PNG downloaded.');
+    } catch (err) {
+      toast.error(
+        'Chart export failed',
+        err instanceof Error ? err.message : 'Could not export the chart as PNG.'
+      );
+    }
   }
 
   // Correlation axis selections
@@ -930,7 +952,7 @@ export default function Parameters() {
                         height={340}
                         showReferenceMean={showMean}
                         syncId={`parameters-timeseries-${selectedTestId}`}
-                        onHoverPoint={setHoverSnapshot}
+                        onHoverPoint={handleHoverSnapshot}
                         thresholdOverlay={thresholdOverlay}
                         eventMarkers={eventMarkers}
                         compareSeriesKeys={compareSeriesKeys}

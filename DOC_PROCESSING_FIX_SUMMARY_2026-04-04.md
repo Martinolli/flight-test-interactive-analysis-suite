@@ -1502,6 +1502,59 @@ pnpm -C frontend run build
 - Frontend build: successful (`tsc -b && vite build`).
 - P1.3 chart-workflow scope is now complete.
 
+## P1.3 Hardening Update (2026-04-17): Marker Visibility, Export Reliability, Hover Responsiveness
+
+### Completed: stabilization pass for delivered P1.3 features
+
+**Goal:** address manual-test issues without reopening P1.3 scope:
+
+1. event markers not visibly rendering
+2. PNG export regression
+3. sluggish hover/crosshair interaction
+
+**Files changed:**
+
+- `frontend/src/components/TimeSeriesChart.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/hooks/useChartDownload.ts`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Event marker reliability and visibility:
+  - marker timestamps now resolve to the nearest available chart sample timestamp when exact x-key match is missing
+  - increased marker stroke prominence and improved overflow handling for visibility
+  - strengthened demo marker generation baseline by using the densest available series for Start/Midpoint/End markers
+- PNG export reliability:
+  - restored SVG-first export as primary path for Recharts charts
+  - retained html2canvas fallback when SVG rendering fails
+  - removed silent failure behavior by surfacing export errors to the UI (toast)
+- Hover/crosshair responsiveness:
+  - memoized heavy chart derivations (`groupByUnit`, merged data, metadata maps, binary checks)
+  - throttled redundant hover updates by suppressing repeated callbacks for identical cursor timestamp
+  - reduced unnecessary state churn in `Parameters` hover snapshot handler
+
+### Acceptance Check (documented)
+
+- [x] event markers render visibly when enabled
+- [x] Start/Midpoint/End markers render when timeseries data exists
+- [x] WOW transition marker still renders when detected
+- [x] PNG download works and failures are surfaced to user
+- [x] hover remains accurate with smoother interaction
+- [x] compare mode / thresholds / saved sets / favorites flows unchanged
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
+
 ## P1.3 Step 2 Update (2026-04-17): Thresholds + Event Markers + Export Quality
 
 ### Completed: next incremental slice for engineering chart review

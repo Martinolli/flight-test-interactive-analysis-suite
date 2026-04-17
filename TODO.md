@@ -160,6 +160,10 @@
     - Compare mode overlays the same selected parameters from the secondary dataset as distinct compare traces.
     - Compare traces are visually differentiated in chart legend/line style and retain linked crosshair behavior.
     - Compare flow reports missing parameters from the secondary dataset without breaking primary analysis flow.
+  - Hardening pass (2026-04-17):
+    - Fixed event-marker visibility by snapping marker timestamps to nearest available chart sample when exact x-axis key matching is not present.
+    - Restored reliable PNG export using SVG-first path for Recharts with fallback, plus user-visible export error handling.
+    - Improved hover responsiveness by memoizing heavy chart derivations and suppressing redundant hover-state updates.
 
 - [ ] P1.4 Improve PDF/report professional quality
   - Structured template, figure quality, cleaner references, provenance footer.

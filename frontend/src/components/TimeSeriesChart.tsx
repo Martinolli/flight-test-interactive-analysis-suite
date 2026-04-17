@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   ComposedChart,
   Line,
@@ -240,33 +240,56 @@ export default function TimeSeriesChart({
 }: TimeSeriesChartProps) {
   if (!series.length) return null;
 
-  const { leftSeries, rightSeries, leftUnit, rightUnit } = groupByUnit(series);
+  const { leftSeries, rightSeries, leftUnit, rightUnit } = useMemo(
+    () => groupByUnit(series),
+    [series]
+  );
+  const data = useMemo(() => mergeSeries(series), [series]);
   const hasDualAxis = rightSeries.length > 0;
-  const data = mergeSeries(series);
+  const dataTimesSet = useMemo(() => new Set(data.map((point) => point.time)), [data]);
+  const sortedTimes = useMemo(
+    () =>
+      data
+        .map((point) => ({ raw: point.time, ms: new Date(point.time).getTime() }))
+        .filter((entry) => !Number.isNaN(entry.ms)),
+    [data]
+  );
 
   // Build a lookup map for tooltip / legend enrichment
-  const seriesMeta = new Map<string, { unit: string; axis: 'left' | 'right' }>();
-  leftSeries.forEach((s) =>
-    seriesMeta.set(s.parameter_name, { unit: s.unit ?? '', axis: 'left' })
-  );
-  rightSeries.forEach((s) =>
-    seriesMeta.set(s.parameter_name, { unit: s.unit ?? '', axis: 'right' })
-  );
+  const seriesMeta = useMemo(() => {
+    const map = new Map<string, { unit: string; axis: 'left' | 'right' }>();
+    leftSeries.forEach((s) =>
+      map.set(s.parameter_name, { unit: s.unit ?? '', axis: 'left' })
+    );
+    rightSeries.forEach((s) =>
+      map.set(s.parameter_name, { unit: s.unit ?? '', axis: 'right' })
+    );
+    return map;
+  }, [leftSeries, rightSeries]);
 
   // Global color index so colors are consistent regardless of axis assignment
-  const colorIndex = new Map<string, number>();
-  series.forEach((s, i) => colorIndex.set(s.parameter_name, i));
+  const colorIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    series.forEach((s, i) => map.set(s.parameter_name, i));
+    return map;
+  }, [series]);
 
   // Binary series detection — used to adjust Y-axis domain and line type
-  const binaryNames = new Set(series.filter(isBinarySeries).map((s) => s.parameter_name));
-  const leftHasBinary = leftSeries.some((s) => binaryNames.has(s.parameter_name));
-  const rightHasBinary = rightSeries.some((s) => binaryNames.has(s.parameter_name));
+  const binaryNames = useMemo(
+    () => new Set(series.filter(isBinarySeries).map((s) => s.parameter_name)),
+    [series]
+  );
+  const leftHasBinary = useMemo(
+    () => leftSeries.some((s) => binaryNames.has(s.parameter_name)),
+    [leftSeries, binaryNames]
+  );
+  const rightHasBinary = useMemo(
+    () => rightSeries.some((s) => binaryNames.has(s.parameter_name)),
+    [rightSeries, binaryNames]
+  );
 
   const rightMargin = hasDualAxis ? 64 : 16;
-  const compareSeriesKeySet = useMemo(
-    () => new Set(compareSeriesKeys),
-    [compareSeriesKeys]
-  );
+  const compareSeriesKeySet = useMemo(() => new Set(compareSeriesKeys), [compareSeriesKeys]);
   const thresholdAxis =
     thresholdOverlay?.axis === 'right' && hasDualAxis ? 'right' : 'left';
   const hasLowerLimit =
@@ -280,14 +303,38 @@ export default function TimeSeriesChart({
     hasLowerLimit &&
     hasUpperLimit &&
     thresholdOverlay.lowerLimit! < thresholdOverlay.upperLimit!;
-  const normalizedEventMarkers = eventMarkers
-    .filter((marker) => !!marker.timestamp && !!marker.label)
-    .reduce<TimeSeriesEventMarker[]>((acc, marker) => {
-      if (acc.some((existing) => existing.timestamp === marker.timestamp)) return acc;
-      acc.push(marker);
-      return acc;
-    }, [])
-    .slice(0, 8);
+  const normalizedEventMarkers = useMemo(
+    () =>
+      eventMarkers
+        .filter((marker) => !!marker.timestamp && !!marker.label)
+        .reduce<TimeSeriesEventMarker[]>((acc, marker) => {
+          let resolvedTimestamp = marker.timestamp;
+          if (!dataTimesSet.has(resolvedTimestamp) && sortedTimes.length > 0) {
+            const markerMs = new Date(marker.timestamp).getTime();
+            if (!Number.isNaN(markerMs)) {
+              let nearest = sortedTimes[0];
+              let minDistance = Math.abs(sortedTimes[0].ms - markerMs);
+              for (let i = 1; i < sortedTimes.length; i += 1) {
+                const distance = Math.abs(sortedTimes[i].ms - markerMs);
+                if (distance < minDistance) {
+                  minDistance = distance;
+                  nearest = sortedTimes[i];
+                }
+              }
+              resolvedTimestamp = nearest.raw;
+            } else {
+              resolvedTimestamp = sortedTimes[0].raw;
+            }
+          }
+
+          if (acc.some((existing) => existing.timestamp === resolvedTimestamp)) return acc;
+          acc.push({ ...marker, timestamp: resolvedTimestamp });
+          return acc;
+        }, [])
+        .slice(0, 8),
+    [eventMarkers, dataTimesSet, sortedTimes]
+  );
+  const lastHoverTimestampRef = useRef<string | null>(null);
 
   return (
     <div>
@@ -321,15 +368,23 @@ export default function TimeSeriesChart({
                   ? Number(indexRaw)
                   : Number.NaN;
             if (Number.isNaN(index) || index < 0 || index >= data.length) {
-              onHoverPoint(null);
+              if (lastHoverTimestampRef.current !== null) {
+                lastHoverTimestampRef.current = null;
+                onHoverPoint(null);
+              }
               return;
             }
 
             const point = data[index];
             if (!point || typeof point.time !== 'string') {
-              onHoverPoint(null);
+              if (lastHoverTimestampRef.current !== null) {
+                lastHoverTimestampRef.current = null;
+                onHoverPoint(null);
+              }
               return;
             }
+            if (lastHoverTimestampRef.current === point.time) return;
+            lastHoverTimestampRef.current = point.time;
             const values: Record<string, number> = {};
             for (const parameter of series) {
               const value = point[parameter.parameter_name];
@@ -339,7 +394,10 @@ export default function TimeSeriesChart({
             onHoverPoint({ timestamp: point.time, values });
           }}
           onMouseLeave={() => {
-            onHoverPoint?.(null);
+            if (lastHoverTimestampRef.current !== null) {
+              lastHoverTimestampRef.current = null;
+              onHoverPoint?.(null);
+            }
           }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -464,12 +522,13 @@ export default function TimeSeriesChart({
               key={`event-marker-${marker.timestamp}-${marker.label}`}
               x={marker.timestamp}
               stroke={marker.color ?? '#7c3aed'}
-              strokeDasharray="3 3"
-              strokeOpacity={0.9}
+              strokeDasharray="5 2"
+              strokeWidth={2}
+              strokeOpacity={1}
+              ifOverflow="extendDomain"
               label={{
                 value: marker.label,
-                position: index % 2 === 0 ? 'insideTop' : 'insideBottom',
-                angle: -90,
+                position: index % 2 === 0 ? 'top' : 'insideTop',
                 fontSize: 10,
                 fill: marker.color ?? '#6d28d9',
               }}

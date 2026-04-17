@@ -24,7 +24,9 @@ export function useChartDownload() {
   const [downloading, setDownloading] = useState(false);
 
   const downloadChart = useCallback(async (filename: string, options: ChartDownloadOptions = {}) => {
-    if (!chartRef.current) return;
+    if (!chartRef.current) {
+      throw new Error('Chart container is not ready for export.');
+    }
     setDownloading(true);
     try {
       const scale = options.scale ?? 3;
@@ -34,19 +36,27 @@ export function useChartDownload() {
           scale,
           backgroundColor,
         });
-        return;
-      }
-      const svgEl = chartRef.current.querySelector('svg');
-      if (svgEl) {
-        await downloadSvgAsPng(svgEl, filename, { scale, backgroundColor });
       } else {
-        await downloadViaHtml2Canvas(chartRef.current, filename, {
-          scale,
-          backgroundColor,
-        });
+        const svgEl = chartRef.current.querySelector('svg');
+        if (svgEl) {
+          try {
+            await downloadSvgAsPng(svgEl, filename, { scale, backgroundColor });
+          } catch {
+            // Fallback when detached SVG rendering fails in specific browser/runtime combos.
+            await downloadViaHtml2Canvas(chartRef.current, filename, {
+              scale,
+              backgroundColor,
+            });
+          }
+        } else {
+          await downloadViaHtml2Canvas(chartRef.current, filename, {
+            scale,
+            backgroundColor,
+          });
+        }
       }
     } catch (err) {
-      console.error('Chart download failed:', err);
+      throw err instanceof Error ? err : new Error('Chart download failed.');
     } finally {
       setDownloading(false);
     }
