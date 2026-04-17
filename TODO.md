@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 02
 
-**Last updated:** 2026-04-12
+**Last updated:** 2026-04-17
 **Scope:** Backend + Frontend + LLM/RAG + Reporting
 **Plan basis:** aligned to `TODO_REV_01.md`, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, current `TODO.md`, and post-P0.3 audit findings
 
@@ -131,8 +131,11 @@
   - Implemented:
     - Added searchable/grouped parameter explorer for large channel inventories.
     - Added favorites toggle and favorites-only filter.
-    - Added saved parameter sets (save/apply/delete), persisted in browser local storage by test + dataset scope.
+    - Added saved parameter sets (save/apply/delete), persisted in browser local storage.
     - Applied in both `Parameters` page and `Flight Test Detail` parameters panel.
+  - Follow-up fix (2026-04-17):
+    - `Parameters` page saved sets are now scoped at flight-test level (not dataset-version level) to prevent sets appearing lost after navigation or dataset switching.
+    - Applying saved sets now warns when some parameters are unavailable in the currently selected dataset and keeps max-8 truncation behavior.
 
 - [ ] P1.3 Upgrade chart workflow for engineering review
   - Linked crosshair, event markers, threshold bands, compare-runs mode, better export quality.

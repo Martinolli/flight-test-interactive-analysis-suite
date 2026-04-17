@@ -1,6 +1,6 @@
 # FTIAS Frontend — TODO (Execution Alignment)
 
-**Last updated:** 2026-04-12  
+**Last updated:** 2026-04-17  
 **Alignment:** mirrors root execution plan (`TODO.md`) and REV02 review.
 
 ---
@@ -51,10 +51,13 @@
     - automatic grouping for large channel lists
     - favorites toggle + favorites-only filter
     - saved parameter sets (save/apply/delete)
-  - Saved sets/favorites persist in local storage per test + dataset scope.
+  - Saved sets/favorites persist in local storage.
   - Integrated into both:
     - `Parameters` page
     - `Flight Test Detail` parameters panel
+  - Follow-up persistence hardening (2026-04-17):
+    - On `Parameters` page, saved sets are scoped to `flight-test` level to survive navigation/re-entry and dataset-version switching.
+    - Apply flow now warns when set members are missing in current dataset, while preserving max-8 selection truncation.
 - [ ] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
 - [ ] P1.4 Report UX quality improvements

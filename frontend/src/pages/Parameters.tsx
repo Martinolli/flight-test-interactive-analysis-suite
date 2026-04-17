@@ -187,11 +187,19 @@ export default function Parameters() {
   const applyParameterSet = (names: string[]) => {
     const available = new Set(parameters.map((p) => p.name));
     const validNames = names.filter((name) => available.has(name));
+    const missingNames = names.filter((name) => !available.has(name));
     const limited = validNames.slice(0, 8);
     setSelectedParams(new Set(limited));
+
     if (validNames.length === 0) {
       toast.warning('Saved set is empty', 'No parameters from this set exist in the current dataset.');
       return;
+    }
+    if (missingNames.length > 0) {
+      toast.warning(
+        'Some parameters are unavailable',
+        `${missingNames.length} parameter(s) from this set are missing in the selected dataset version.`
+      );
     }
     if (validNames.length > 8) {
       toast.warning('Set truncated', 'Only the first 8 parameters were applied.');
@@ -428,9 +436,7 @@ export default function Parameters() {
                       parameters={parameters}
                       selectedParams={selectedParams}
                       maxSelection={8}
-                      storageNamespace={`parameters-page:test-${selectedTestId}:dataset-${
-                        selectedDatasetVersionId === '' ? 'active' : selectedDatasetVersionId
-                      }`}
+                      storageNamespace={`parameters-page:test-${selectedTestId}`}
                       onToggleParam={toggleParam}
                       onApplyParameterSet={applyParameterSet}
                     />

@@ -1505,3 +1505,49 @@ pnpm -C frontend run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`).
+
+## P1.2 Follow-up (2026-04-17): Saved Parameter Sets Persistence on Parameters Page
+
+### Completed: local persistence scope correction for saved parameter sets
+
+**Goal:** ensure saved sets created in `Parameters` remain recoverable after page navigation/re-entry and refresh for the same flight test.
+
+**Files changed:**
+
+- `frontend/src/pages/Parameters.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Root cause found: `Parameters` page used a dataset-version-specific localStorage namespace for saved sets.
+  - This made sets appear missing when returning with a different selected dataset context.
+- Fixed namespace on `Parameters` page to flight-test scope:
+  - from: `parameters-page:test-{id}:dataset-{version}`
+  - to: `parameters-page:test-{id}`
+- Saved set apply behavior hardened:
+  - still applies only parameters existing in current dataset
+  - now warns clearly when some set parameters are missing in selected dataset
+  - keeps current max-8 overlay cap and truncation warning
+
+### Acceptance Check (documented)
+
+- [x] Save `Parameters_Set_Test` on `Parameters` page for a flight test.
+- [x] Navigate away and return to `Parameters` for the same flight test.
+- [x] Confirm the saved set remains in dropdown and can be applied.
+- [x] Change dataset version and confirm:
+  - set remains visible
+  - only available parameters are applied
+  - clear warning is shown for missing parameters
+  - truncation warning remains when >8 valid parameters
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
