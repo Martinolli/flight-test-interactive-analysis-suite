@@ -72,7 +72,17 @@
   - Progress (2026-04-17, step 1):
     - Implemented synchronized hover cursor readout for time-series charts in both explorer surfaces.
     - Added `TimeSeriesChart` sync primitives (`syncId`, hover snapshot callback) for upcoming multi-panel compare mode.
-    - Remaining in P1.3: event markers, threshold bands, compare workflow, export polish.
+  - Progress (2026-04-17, step 2):
+    - Added threshold/limit overlay controls on `Parameters` timeseries chart:
+      - lower/upper limit lines
+      - optional shaded band between limits
+      - selectable threshold axis (left/right when dual-axis is present)
+    - Added event marker overlay controls on `Parameters` timeseries chart (initial demo/manual baseline markers).
+    - Improved report export quality:
+      - configurable export options in chart download hook
+      - `scale=3` high-resolution PNG export
+      - container-capture export for timeseries to retain overlay/readout context.
+    - Remaining in P1.3: compare-runs / compare-dataset mode.
 - [ ] P1.4 Report UX quality improvements
   - Better figure selection/preview and clearer professional formatting expectations.
 - [ ] P1.5 Capability-catalog-aware UI preparation

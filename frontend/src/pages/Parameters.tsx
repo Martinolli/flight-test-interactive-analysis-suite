@@ -11,7 +11,11 @@ import {
 } from 'lucide-react';
 import { useChartDownload } from '../hooks/useChartDownload';
 import Sidebar from '../components/Sidebar';
-import TimeSeriesChart, { TimeSeriesHoverSnapshot } from '../components/TimeSeriesChart';
+import TimeSeriesChart, {
+  TimeSeriesEventMarker,
+  TimeSeriesHoverSnapshot,
+  TimeSeriesThresholdOverlay,
+} from '../components/TimeSeriesChart';
 import CorrelationChart from '../components/CorrelationChart';
 import StatCard from '../components/StatCard';
 import ParameterExplorerPanel from '../components/ParameterExplorerPanel';
@@ -37,6 +41,55 @@ function formatTimeCursor(timestamp: string): string {
 function formatCursorValue(value: number | undefined): string {
   if (value == null || Number.isNaN(value)) return '—';
   return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function buildDemoEventMarkers(seriesData: ParameterSeries[]): TimeSeriesEventMarker[] {
+  if (seriesData.length === 0 || seriesData[0].data.length === 0) return [];
+
+  const base = [...seriesData[0].data].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+  if (base.length === 0) return [];
+
+  const markers: TimeSeriesEventMarker[] = [];
+  const start = base[0];
+  const mid = base[Math.floor((base.length - 1) / 2)];
+  const end = base[base.length - 1];
+  markers.push({ timestamp: start.timestamp, label: 'Start', color: '#1d4ed8' });
+  if (mid.timestamp !== start.timestamp && mid.timestamp !== end.timestamp) {
+    markers.push({ timestamp: mid.timestamp, label: 'Midpoint', color: '#7c3aed' });
+  }
+  if (end.timestamp !== start.timestamp) {
+    markers.push({ timestamp: end.timestamp, label: 'End', color: '#dc2626' });
+  }
+
+  const wowSeries = seriesData.find((s) => {
+    const key = s.parameter_name.toLowerCase();
+    return key.includes('weightonwheels') || key.includes('wow');
+  });
+  if (wowSeries) {
+    const wow = [...wowSeries.data].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    for (let i = 1; i < wow.length; i += 1) {
+      if (wow[i - 1].value >= 0.5 && wow[i].value < 0.5) {
+        markers.push({
+          timestamp: wow[i].timestamp,
+          label: 'WOW Transition',
+          color: '#0f766e',
+        });
+        break;
+      }
+    }
+  }
+
+  return markers
+    .reduce<TimeSeriesEventMarker[]>((acc, marker) => {
+      if (acc.some((existing) => existing.timestamp === marker.timestamp)) return acc;
+      acc.push(marker);
+      return acc;
+    }, [])
+    .slice(0, 8);
 }
 
 export default function Parameters() {
@@ -68,6 +121,11 @@ export default function Parameters() {
   // UI state
   const [activeTab, setActiveTab] = useState<ChartTab>('timeseries');
   const [showMean, setShowMean] = useState(false);
+  const [showEventMarkers, setShowEventMarkers] = useState(false);
+  const [thresholdLowerInput, setThresholdLowerInput] = useState('');
+  const [thresholdUpperInput, setThresholdUpperInput] = useState('');
+  const [showThresholdBand, setShowThresholdBand] = useState(true);
+  const [thresholdAxis, setThresholdAxis] = useState<'left' | 'right'>('left');
 
   // Chart download
   const { chartRef, downloadChart, downloading } = useChartDownload();
@@ -77,7 +135,11 @@ export default function Parameters() {
   function handleDownloadChart() {
     const paramNames = Array.from(selectedParams).join('_').replace(/\s+/g, '-').slice(0, 40);
     const label = activeTab === 'timeseries' ? paramNames : `${corrX}_vs_${corrY}`;
-    downloadChart(`FTIAS_${label}_${selectedTestName.replace(/\s+/g, '_')}`);
+    downloadChart(`FTIAS_${label}_${selectedTestName.replace(/\s+/g, '_')}`, {
+      scale: 3,
+      includeContainer: activeTab === 'timeseries',
+      backgroundColor: '#ffffff',
+    });
   }
 
   // Correlation axis selections
@@ -254,6 +316,28 @@ export default function Parameters() {
     () => seriesData.filter((s) => selectedParams.has(s.parameter_name)),
     [seriesData, selectedParams]
   );
+  const hasRightAxis = useMemo(() => {
+    const units = new Set(seriesData.map((series) => series.unit ?? 'value'));
+    return units.size > 1;
+  }, [seriesData]);
+  const eventMarkers = useMemo(
+    () => (showEventMarkers ? buildDemoEventMarkers(seriesData) : []),
+    [showEventMarkers, seriesData]
+  );
+  const thresholdOverlay = useMemo<TimeSeriesThresholdOverlay | undefined>(() => {
+    const lower = thresholdLowerInput.trim() === '' ? undefined : Number(thresholdLowerInput);
+    const upper = thresholdUpperInput.trim() === '' ? undefined : Number(thresholdUpperInput);
+    const hasValidLower = typeof lower === 'number' && !Number.isNaN(lower);
+    const hasValidUpper = typeof upper === 'number' && !Number.isNaN(upper);
+    if (!hasValidLower && !hasValidUpper) return undefined;
+    return {
+      lowerLimit: hasValidLower ? lower : undefined,
+      upperLimit: hasValidUpper ? upper : undefined,
+      showBand: showThresholdBand,
+      axis: thresholdAxis,
+      label: 'Threshold',
+    };
+  }, [thresholdLowerInput, thresholdUpperInput, showThresholdBand, thresholdAxis]);
 
   const selectedDatasetVersion = useMemo(() => {
     if (selectedDatasetVersionId === '') return undefined;
@@ -540,6 +624,81 @@ export default function Parameters() {
                 </CardHeader>
 
                 <CardContent className="pt-4">
+                  {activeTab === 'timeseries' && seriesData.length > 0 && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        Engineering Overlays
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={showEventMarkers}
+                            onChange={(e) => setShowEventMarkers(e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          Show event markers (demo/manual baseline)
+                        </label>
+
+                        <label className="flex items-center gap-2 text-xs text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={showThresholdBand}
+                            onChange={(e) => setShowThresholdBand(e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          Shade band between lower/upper limits
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Lower Limit
+                          </label>
+                          <input
+                            type="number"
+                            value={thresholdLowerInput}
+                            onChange={(e) => setThresholdLowerInput(e.target.value)}
+                            placeholder="e.g. 0"
+                            className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Upper Limit
+                          </label>
+                          <input
+                            type="number"
+                            value={thresholdUpperInput}
+                            onChange={(e) => setThresholdUpperInput(e.target.value)}
+                            placeholder="e.g. 100"
+                            className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Threshold Axis
+                          </label>
+                          <select
+                            value={thresholdAxis}
+                            onChange={(e) => setThresholdAxis(e.target.value as 'left' | 'right')}
+                            disabled={!hasRightAxis}
+                            className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50
+                                       disabled:cursor-not-allowed"
+                          >
+                            <option value="left">Left axis</option>
+                            <option value="right">Right axis</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* No parameters selected */}
                   {selectedParams.size === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
@@ -596,6 +755,8 @@ export default function Parameters() {
                         showReferenceMean={showMean}
                         syncId={`parameters-timeseries-${selectedTestId}`}
                         onHoverPoint={setHoverSnapshot}
+                        thresholdOverlay={thresholdOverlay}
+                        eventMarkers={eventMarkers}
                       />
                     </div>
                   )}

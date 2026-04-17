@@ -8,6 +8,7 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceArea,
 } from 'recharts';
 import { ParameterSeries } from '../services/api';
 
@@ -29,6 +30,8 @@ interface TimeSeriesChartProps {
   showReferenceMean?: boolean;
   syncId?: string;
   onHoverPoint?: (snapshot: TimeSeriesHoverSnapshot | null) => void;
+  thresholdOverlay?: TimeSeriesThresholdOverlay;
+  eventMarkers?: TimeSeriesEventMarker[];
 }
 
 interface MergedPoint {
@@ -39,6 +42,20 @@ interface MergedPoint {
 export interface TimeSeriesHoverSnapshot {
   timestamp: string;
   values: Record<string, number>;
+}
+
+export interface TimeSeriesThresholdOverlay {
+  lowerLimit?: number;
+  upperLimit?: number;
+  showBand?: boolean;
+  axis?: 'left' | 'right';
+  label?: string;
+}
+
+export interface TimeSeriesEventMarker {
+  timestamp: string;
+  label: string;
+  color?: string;
 }
 
 /**
@@ -209,6 +226,8 @@ export default function TimeSeriesChart({
   showReferenceMean = false,
   syncId,
   onHoverPoint,
+  thresholdOverlay,
+  eventMarkers = [],
 }: TimeSeriesChartProps) {
   if (!series.length) return null;
 
@@ -235,6 +254,27 @@ export default function TimeSeriesChart({
   const rightHasBinary = rightSeries.some((s) => binaryNames.has(s.parameter_name));
 
   const rightMargin = hasDualAxis ? 64 : 16;
+  const thresholdAxis =
+    thresholdOverlay?.axis === 'right' && hasDualAxis ? 'right' : 'left';
+  const hasLowerLimit =
+    typeof thresholdOverlay?.lowerLimit === 'number' &&
+    !Number.isNaN(thresholdOverlay.lowerLimit);
+  const hasUpperLimit =
+    typeof thresholdOverlay?.upperLimit === 'number' &&
+    !Number.isNaN(thresholdOverlay.upperLimit);
+  const showThresholdBand =
+    !!thresholdOverlay?.showBand &&
+    hasLowerLimit &&
+    hasUpperLimit &&
+    thresholdOverlay.lowerLimit! < thresholdOverlay.upperLimit!;
+  const normalizedEventMarkers = eventMarkers
+    .filter((marker) => !!marker.timestamp && !!marker.label)
+    .reduce<TimeSeriesEventMarker[]>((acc, marker) => {
+      if (acc.some((existing) => existing.timestamp === marker.timestamp)) return acc;
+      acc.push(marker);
+      return acc;
+    }, [])
+    .slice(0, 8);
 
   return (
     <div>
@@ -362,6 +402,66 @@ export default function TimeSeriesChart({
           <Legend
             content={<CustomLegend seriesMeta={seriesMeta} />}
           />
+
+          {showThresholdBand && (
+            <ReferenceArea
+              yAxisId={thresholdAxis}
+              y1={thresholdOverlay!.lowerLimit!}
+              y2={thresholdOverlay!.upperLimit!}
+              fill="#60a5fa"
+              fillOpacity={0.14}
+              strokeOpacity={0}
+            />
+          )}
+
+          {hasLowerLimit && (
+            <ReferenceLine
+              yAxisId={thresholdAxis}
+              y={thresholdOverlay!.lowerLimit!}
+              stroke="#0f766e"
+              strokeDasharray="5 4"
+              strokeWidth={1.5}
+              label={{
+                value: `${thresholdOverlay?.label ?? 'Limit'} Low: ${thresholdOverlay!.lowerLimit!.toFixed(2)}`,
+                position: 'insideBottomLeft',
+                fontSize: 10,
+                fill: '#0f766e',
+              }}
+            />
+          )}
+
+          {hasUpperLimit && (
+            <ReferenceLine
+              yAxisId={thresholdAxis}
+              y={thresholdOverlay!.upperLimit!}
+              stroke="#b91c1c"
+              strokeDasharray="5 4"
+              strokeWidth={1.5}
+              label={{
+                value: `${thresholdOverlay?.label ?? 'Limit'} High: ${thresholdOverlay!.upperLimit!.toFixed(2)}`,
+                position: 'insideTopLeft',
+                fontSize: 10,
+                fill: '#b91c1c',
+              }}
+            />
+          )}
+
+          {normalizedEventMarkers.map((marker, index) => (
+            <ReferenceLine
+              key={`event-marker-${marker.timestamp}-${marker.label}`}
+              x={marker.timestamp}
+              stroke={marker.color ?? '#7c3aed'}
+              strokeDasharray="3 3"
+              strokeOpacity={0.9}
+              label={{
+                value: marker.label,
+                position: index % 2 === 0 ? 'insideTop' : 'insideBottom',
+                angle: -90,
+                fontSize: 10,
+                fill: marker.color ?? '#6d28d9',
+              }}
+            />
+          ))}
 
           {/* Lines for left axis */}
           {leftSeries.map((s) => (

@@ -1,5 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 
+interface ChartDownloadOptions {
+  scale?: number;
+  includeContainer?: boolean;
+  backgroundColor?: string;
+}
+
 /**
  * Returns a ref to attach to the chart container div and a download function.
  *
@@ -17,15 +23,27 @@ export function useChartDownload() {
   const chartRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
-  const downloadChart = useCallback(async (filename: string) => {
+  const downloadChart = useCallback(async (filename: string, options: ChartDownloadOptions = {}) => {
     if (!chartRef.current) return;
     setDownloading(true);
     try {
+      const scale = options.scale ?? 3;
+      const backgroundColor = options.backgroundColor ?? '#ffffff';
+      if (options.includeContainer) {
+        await downloadViaHtml2Canvas(chartRef.current, filename, {
+          scale,
+          backgroundColor,
+        });
+        return;
+      }
       const svgEl = chartRef.current.querySelector('svg');
       if (svgEl) {
-        await downloadSvgAsPng(svgEl, filename);
+        await downloadSvgAsPng(svgEl, filename, { scale, backgroundColor });
       } else {
-        await downloadViaHtml2Canvas(chartRef.current, filename);
+        await downloadViaHtml2Canvas(chartRef.current, filename, {
+          scale,
+          backgroundColor,
+        });
       }
     } catch (err) {
       console.error('Chart download failed:', err);
@@ -39,7 +57,11 @@ export function useChartDownload() {
 
 // ── SVG → PNG (primary path for Recharts) ───────────────────────────────────
 
-async function downloadSvgAsPng(svgEl: SVGElement, filename: string): Promise<void> {
+async function downloadSvgAsPng(
+  svgEl: SVGElement,
+  filename: string,
+  options: { scale: number; backgroundColor: string }
+): Promise<void> {
   // Clone so we can mutate freely without affecting the live DOM
   const clone = svgEl.cloneNode(true) as SVGElement;
 
@@ -61,13 +83,15 @@ async function downloadSvgAsPng(svgEl: SVGElement, filename: string): Promise<vo
   const svgUrl  = URL.createObjectURL(svgBlob);
 
   // Draw onto a canvas at 2× for crisp export
-  const scale  = 2;
+  const scale = Math.max(1, options.scale);
   const canvas = document.createElement('canvas');
   canvas.width  = W * scale;
   canvas.height = H * scale;
   const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.scale(scale, scale);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = options.backgroundColor;
   ctx.fillRect(0, 0, W, H);
 
   await new Promise<void>((resolve, reject) => {
@@ -93,7 +117,16 @@ async function downloadSvgAsPng(svgEl: SVGElement, filename: string): Promise<vo
  * rendering when the SVG is detached from the document.
  */
 function inlineStyles(source: Element, target: Element): void {
-  const PROPS = ['fill', 'stroke', 'font-size', 'font-family', 'font-weight'];
+  const PROPS = [
+    'fill',
+    'stroke',
+    'font-size',
+    'font-family',
+    'font-weight',
+    'stroke-width',
+    'opacity',
+    'letter-spacing',
+  ];
   const srcStyle = window.getComputedStyle(source);
   const tgtEl    = target as SVGElement;
 
@@ -111,11 +144,15 @@ function inlineStyles(source: Element, target: Element): void {
 
 // ── html2canvas fallback (for non-SVG containers) ───────────────────────────
 
-async function downloadViaHtml2Canvas(el: HTMLElement, filename: string): Promise<void> {
+async function downloadViaHtml2Canvas(
+  el: HTMLElement,
+  filename: string,
+  options: { scale: number; backgroundColor: string }
+): Promise<void> {
   const html2canvas = (await import('html2canvas')).default;
   const canvas = await html2canvas(el, {
-    backgroundColor: '#ffffff',
-    scale: 2,
+    backgroundColor: options.backgroundColor,
+    scale: Math.max(1, options.scale),
     useCORS: true,
     logging: false,
   });

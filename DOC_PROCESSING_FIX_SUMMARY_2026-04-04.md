@@ -1454,6 +1454,60 @@ pnpm -C frontend run build
 
 - Frontend build: successful (`tsc -b && vite build`).
 
+## P1.3 Step 2 Update (2026-04-17): Thresholds + Event Markers + Export Quality
+
+### Completed: next incremental slice for engineering chart review
+
+**Goal:** continue P1.3 after linked cursor delivery by adding practical engineering overlays and improving report export fidelity.
+
+**Files changed:**
+
+- `frontend/src/components/TimeSeriesChart.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/hooks/useChartDownload.ts`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Threshold / limit overlays in timeseries chart:
+  - support for lower-limit line
+  - support for upper-limit line
+  - optional shaded band between limits
+  - axis targeting (`left`/`right`, with safe fallback to `left`)
+- Event marker support:
+  - vertical time-axis event markers rendered via chart overlays
+  - initial demo/manual baseline markers on `Parameters` page:
+    - Start, Midpoint, End
+    - WOW transition marker when a WOW-style parameter exists and a 1->0 transition is detected
+  - marker rendering is deduplicated and capped to avoid clutter
+- Export quality improvements:
+  - chart download hook now accepts export options
+  - high-resolution export default raised for report usage (`scale=3`)
+  - timeseries export now supports full container capture to preserve overlay/readout context in PNG output
+  - existing chart-download behavior remains backward compatible
+
+### Acceptance Check (documented)
+
+- [x] charts can display threshold/limit overlays
+- [x] charts can display event markers
+- [x] exported PNG quality improved for report usage
+- [x] linked cursor + synchronized hover readout remains functional
+- [x] dataset version selection flow unchanged
+- [x] saved parameter sets/favorites flow unchanged
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
+- Full P1.3 remains open until compare-runs / compare-dataset mode is delivered.
+
 ## P1.3 Step 1 Update (2026-04-17): Linked Cursor/Crosshair Foundation
 
 ### Completed: synchronized time-cursor readout wiring in chart surfaces

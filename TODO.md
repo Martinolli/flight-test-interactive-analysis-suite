@@ -151,7 +151,11 @@
   - Progress (2026-04-17, step 1):
     - Added synchronized time-cursor/crosshair readout wiring in time-series charts on both `Parameters` and `Flight Test Detail`.
     - Added `TimeSeriesChart` sync hooks (`syncId`, hover snapshot callback) to support upcoming multi-chart linked analysis.
-    - Remaining in P1.3: event markers, threshold bands, compare-runs mode, export-quality upgrade.
+  - Progress (2026-04-17, step 2):
+    - Added threshold overlays in `Parameters` timeseries workflow (upper/lower lines + optional shaded band).
+    - Added event-marker overlay support (initial demo/manual baseline markers: start/mid/end + WOW transition when available).
+    - Upgraded PNG export quality path (`scale=3`) and enabled container capture for timeseries export so engineering overlay context/readout is preserved.
+    - Remaining in P1.3: compare-runs / compare-dataset mode.
 
 - [ ] P1.4 Improve PDF/report professional quality
   - Structured template, figure quality, cleaner references, provenance footer.
