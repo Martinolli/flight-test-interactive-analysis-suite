@@ -1453,3 +1453,55 @@ pnpm -C frontend run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`).
+
+## P1.2 Implementation Update (2026-04-17)
+
+### Completed: parameter exploration at scale (search + grouping + favorites + saved sets)
+
+**Goal:** make large channel inventories usable in both primary analysis surfaces without changing backend contracts.
+
+**Files changed:**
+
+- `frontend/src/components/ParameterExplorerPanel.tsx` (new)
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Added reusable `ParameterExplorerPanel` component with:
+  - search field for parameter names/units
+  - automatic parameter grouping (prefix-based)
+  - favorites toggle per parameter
+  - favorites-only filter
+  - saved parameter sets (`save/apply/delete`)
+- Favorites and saved sets are persisted in local storage and namespaced by:
+  - page/surface
+  - flight test
+  - selected dataset version
+- Integrated this selector in:
+  - `Parameters` page left panel
+  - `Flight Test Detail` > `Parameters & Data` panel
+- Existing chart/data behavior remains unchanged:
+  - max 8 selected parameters for overlay
+  - dataset scoping continues to come from selected dataset version
+
+### Acceptance Check (documented)
+
+- [x] Search narrows visible channels quickly for large datasets.
+- [x] Favorites can be toggled and optionally filtered-only.
+- [x] A selected group of channels can be saved as a named set and re-applied later.
+- [x] Saved sets are scoped and persisted per test + dataset context.
+- [x] Works in both Parameters page and Flight Test Detail panel.
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).

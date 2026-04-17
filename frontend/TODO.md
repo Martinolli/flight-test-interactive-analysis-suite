@@ -45,8 +45,16 @@
   - `Upload Data` and `Document Library` now use the adaptive page shell pattern (`max-w`, full-height flex, internal content scroll).
   - Added bounded internal scroll regions for long tables/history blocks to keep controls visible.
   - No behavior/API contract changes in upload or document workflows.
-- [ ] P1.2 Parameter exploration at scale
-  - Search/filter, grouping, favorites, saved plot sets.
+- [x] P1.2 Parameter exploration at scale
+  - Added `ParameterExplorerPanel` with:
+    - search filter
+    - automatic grouping for large channel lists
+    - favorites toggle + favorites-only filter
+    - saved parameter sets (save/apply/delete)
+  - Saved sets/favorites persist in local storage per test + dataset scope.
+  - Integrated into both:
+    - `Parameters` page
+    - `Flight Test Detail` parameters panel
 - [ ] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
 - [ ] P1.4 Report UX quality improvements

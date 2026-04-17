@@ -22,6 +22,7 @@ import {
 import Sidebar from '../components/Sidebar';
 import FlightTestModal from '../components/FlightTestModal';
 import TimeSeriesChart from '../components/TimeSeriesChart';
+import ParameterExplorerPanel from '../components/ParameterExplorerPanel';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ToastContainer, useToast } from '../components/ui/toast';
 import {
@@ -149,9 +150,22 @@ function ParametersPanel({
   function toggleParam(name: string) {
     setSelectedParams((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) { next.delete(name); } else { next.add(name); }
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        if (next.size >= 8) {
+          return prev;
+        }
+        next.add(name);
+      }
       return next;
     });
+  }
+
+  function applyParameterSet(names: string[]) {
+    const available = new Set(parameters.map((p) => p.name));
+    const validNames = names.filter((name) => available.has(name)).slice(0, 8);
+    setSelectedParams(new Set(validNames));
   }
 
   if (loadingParams) {
@@ -187,23 +201,18 @@ function ParametersPanel({
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-        {parameters.length} parameter{parameters.length !== 1 ? 's' : ''} available — select to plot
+        {parameters.length} parameter{parameters.length !== 1 ? 's' : ''} available
       </p>
-      <div className="flex flex-wrap gap-2">
-        {parameters.map((p) => (
-          <button
-            key={p.name}
-            onClick={() => toggleParam(p.name)}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-              selectedParams.has(p.name)
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-            }`}
-          >
-            {p.name}{p.unit ? ` (${p.unit})` : ''}
-          </button>
-        ))}
-      </div>
+      <ParameterExplorerPanel
+        parameters={parameters}
+        selectedParams={selectedParams}
+        maxSelection={8}
+        storageNamespace={`flight-test-detail:test-${flightTestId}:dataset-${
+          datasetVersionId ?? 'active'
+        }`}
+        onToggleParam={toggleParam}
+        onApplyParameterSet={applyParameterSet}
+      />
       {selectedParams.size > 0 && (
         <div className="relative min-h-[280px]">
           {loadingChart ? (

@@ -126,8 +126,13 @@
     - Large tabular/history areas use bounded internal scroll regions to keep page framing stable on smaller screens.
     - Existing upload/library behavior and API interactions are unchanged.
 
-- [ ] P1.2 Scale parameter exploration for large channel sets
+- [x] P1.2 Scale parameter exploration for large channel sets
   - Search, grouping, favorites, saved views/sets.
+  - Implemented:
+    - Added searchable/grouped parameter explorer for large channel inventories.
+    - Added favorites toggle and favorites-only filter.
+    - Added saved parameter sets (save/apply/delete), persisted in browser local storage by test + dataset scope.
+    - Applied in both `Parameters` page and `Flight Test Detail` parameters panel.
 
 - [ ] P1.3 Upgrade chart workflow for engineering review
   - Linked crosshair, event markers, threshold bands, compare-runs mode, better export quality.
@@ -175,14 +180,14 @@
 
 ## Immediate Execution Order
 
-1. P1.2 — Scale parameter exploration for large channel sets  
-2. P1.3 — Upgrade chart workflow for engineering review  
+1. P1.3 — Upgrade chart workflow for engineering review  
+2. P1.4 — Improve PDF/report professional quality  
 
 - **Reason for this order**
 
 - P0.3a and P0.4 are completed and stable (explicit scope + immutable analysis artifacts).
-- P1.0 is now completed with backend-truth dataset versioning and active-version control.
-- Highest next impact is parameter scalability and chart workflow for large engineering datasets.
+- P1.0 and P1.2 are now completed with dataset-version truth and scalable parameter selection controls.
+- Highest next impact is engineering chart workflow quality, then report professionalism.
 
 ---
 
@@ -230,4 +235,6 @@ These baseline controls should be protected by regression tests.
 - Upload history and dataset versions are now both persisted and explicit: history is audit trail, dataset versions are selectable analysis scope.
 - Re-upload now creates new immutable dataset versions and updates active version on successful ingestion; historical versions remain selectable.
 - `AI Standards Query` and `Analyze with AI` are aligned on core UX behavior, but shared rendering-component extraction is still a future refactor opportunity.
-- `Upload Data` and `Document Library` framing/layout standardization is complete; next UX bottleneck is parameter/chart scale handling.
+- `Upload Data` and `Document Library` framing/layout standardization is complete.
+- Parameter exploration at scale now includes search, grouping, favorites, and saved parameter sets in both analysis surfaces.
+- Next UX bottleneck is chart workflow depth (linked crosshair/events/thresholds/compare mode).

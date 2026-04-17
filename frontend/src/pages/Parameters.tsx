@@ -6,8 +6,6 @@ import {
   Info,
   RefreshCw,
   AlertCircle,
-  CheckSquare,
-  Square,
   Download,
   Loader2,
 } from 'lucide-react';
@@ -16,6 +14,7 @@ import Sidebar from '../components/Sidebar';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import CorrelationChart from '../components/CorrelationChart';
 import StatCard from '../components/StatCard';
+import ParameterExplorerPanel from '../components/ParameterExplorerPanel';
 import { ToastContainer, useToast } from '../components/ui/toast';
 import {
   ApiService,
@@ -183,6 +182,20 @@ export default function Parameters() {
       }
       return next;
     });
+  };
+
+  const applyParameterSet = (names: string[]) => {
+    const available = new Set(parameters.map((p) => p.name));
+    const validNames = names.filter((name) => available.has(name));
+    const limited = validNames.slice(0, 8);
+    setSelectedParams(new Set(limited));
+    if (validNames.length === 0) {
+      toast.warning('Saved set is empty', 'No parameters from this set exist in the current dataset.');
+      return;
+    }
+    if (validNames.length > 8) {
+      toast.warning('Set truncated', 'Only the first 8 parameters were applied.');
+    }
   };
 
   // Fetch correlation data independently when X or Y axis selection changes
@@ -411,36 +424,16 @@ export default function Parameters() {
                   )}
 
                   {!loadingParams && parameters.length > 0 && (
-                    <ul className="space-y-1">
-                      {parameters.map((p) => {
-                        const isSelected = selectedParams.has(p.name);
-                        return (
-                          <li key={p.name}>
-                            <button
-                              onClick={() => toggleParam(p.name)}
-                              className={cn(
-                                'w-full flex items-start gap-2 px-2 py-2 rounded-lg text-left text-sm transition-colors',
-                                isSelected
-                                  ? 'bg-blue-50 text-blue-800'
-                                  : 'text-gray-700 hover:bg-gray-50'
-                              )}
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
-                              ) : (
-                                <Square className="w-4 h-4 shrink-0 mt-0.5 text-gray-400" />
-                              )}
-                              <div className="min-w-0">
-                                <p className="font-medium truncate">{p.name}</p>
-                                <p className="text-xs opacity-60 truncate">
-                                  {p.unit ?? 'no unit'} · {p.sample_count.toLocaleString()} pts
-                                </p>
-                              </div>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <ParameterExplorerPanel
+                      parameters={parameters}
+                      selectedParams={selectedParams}
+                      maxSelection={8}
+                      storageNamespace={`parameters-page:test-${selectedTestId}:dataset-${
+                        selectedDatasetVersionId === '' ? 'active' : selectedDatasetVersionId
+                      }`}
+                      onToggleParam={toggleParam}
+                      onApplyParameterSet={applyParameterSet}
+                    />
                   )}
                 </CardContent>
               </Card>
