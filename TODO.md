@@ -148,6 +148,10 @@
 
 - [ ] P1.3 Upgrade chart workflow for engineering review
   - Linked crosshair, event markers, threshold bands, compare-runs mode, better export quality.
+  - Progress (2026-04-17, step 1):
+    - Added synchronized time-cursor/crosshair readout wiring in time-series charts on both `Parameters` and `Flight Test Detail`.
+    - Added `TimeSeriesChart` sync hooks (`syncId`, hover snapshot callback) to support upcoming multi-chart linked analysis.
+    - Remaining in P1.3: event markers, threshold bands, compare-runs mode, export-quality upgrade.
 
 - [ ] P1.4 Improve PDF/report professional quality
   - Structured template, figure quality, cleaner references, provenance footer.

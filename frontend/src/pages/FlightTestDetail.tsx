@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import FlightTestModal from '../components/FlightTestModal';
-import TimeSeriesChart from '../components/TimeSeriesChart';
+import TimeSeriesChart, { TimeSeriesHoverSnapshot } from '../components/TimeSeriesChart';
 import ParameterExplorerPanel from '../components/ParameterExplorerPanel';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ToastContainer, useToast } from '../components/ui/toast';
@@ -70,6 +70,17 @@ function formatDuration(seconds: number | null): string {
   if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+}
+
+function formatTimeCursor(timestamp: string): string {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return timestamp;
+  return parsed.toLocaleTimeString('en-US', { hour12: false });
+}
+
+function formatCursorValue(value: number | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
 interface ParsedAnalysisContent {
@@ -122,6 +133,7 @@ function ParametersPanel({
   const [parameters, setParameters] = useState<ParameterInfo[]>([]);
   const [selectedParams, setSelectedParams] = useState<Set<string>>(new Set());
   const [seriesData, setSeriesData] = useState<ParameterSeries[]>([]);
+  const [hoverSnapshot, setHoverSnapshot] = useState<TimeSeriesHoverSnapshot | null>(null);
   const [loadingParams, setLoadingParams] = useState(true);
   const [loadingChart, setLoadingChart] = useState(false);
   const [paramsError, setParamsError] = useState('');
@@ -148,6 +160,10 @@ function ParametersPanel({
       .catch(() => setSeriesData([]))
       .finally(() => setLoadingChart(false));
   }, [flightTestId, selectedParams, datasetVersionId]);
+
+  useEffect(() => {
+    setHoverSnapshot(null);
+  }, [selectedParams, datasetVersionId, flightTestId]);
 
   function toggleParam(name: string) {
     setSelectedParams((prev) => {
@@ -238,7 +254,33 @@ function ParametersPanel({
               <span className="text-sm">Loading chart data…</span>
             </div>
           ) : seriesData.length > 0 ? (
-            <TimeSeriesChart series={seriesData} showReferenceMean={false} height={280} />
+            <div className="space-y-2">
+              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                {hoverSnapshot ? (
+                  <span>
+                    Cursor at <strong>{formatTimeCursor(hoverSnapshot.timestamp)}</strong>
+                    {': '}
+                    {seriesData.map((item, idx) => (
+                      <span key={`${item.parameter_name}-cursor`} className="inline-flex items-center">
+                        {idx > 0 ? <span className="mx-1 text-blue-300">|</span> : null}
+                        <strong>{item.parameter_name}</strong>
+                        <span className="ml-1">{formatCursorValue(hoverSnapshot.values[item.parameter_name])}</span>
+                        {item.unit ? <span className="ml-0.5 text-blue-700/70">{item.unit}</span> : null}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span>Move over the chart to inspect synchronized cursor values.</span>
+                )}
+              </div>
+              <TimeSeriesChart
+                series={seriesData}
+                showReferenceMean={false}
+                height={280}
+                syncId={`flight-test-${flightTestId}-timeseries`}
+                onHoverPoint={setHoverSnapshot}
+              />
+            </div>
           ) : (
             <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
               No data points available for selected parameters.

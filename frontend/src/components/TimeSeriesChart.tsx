@@ -27,11 +27,18 @@ interface TimeSeriesChartProps {
   series: ParameterSeries[];
   height?: number;
   showReferenceMean?: boolean;
+  syncId?: string;
+  onHoverPoint?: (snapshot: TimeSeriesHoverSnapshot | null) => void;
 }
 
 interface MergedPoint {
   time: string;
   [key: string]: string | number;
+}
+
+export interface TimeSeriesHoverSnapshot {
+  timestamp: string;
+  values: Record<string, number>;
 }
 
 /**
@@ -200,6 +207,8 @@ export default function TimeSeriesChart({
   series,
   height = 340,
   showReferenceMean = false,
+  syncId,
+  onHoverPoint,
 }: TimeSeriesChartProps) {
   if (!series.length) return null;
 
@@ -247,7 +256,38 @@ export default function TimeSeriesChart({
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart
           data={data}
+          syncId={syncId}
           margin={{ top: 8, right: rightMargin, left: 0, bottom: 8 }}
+          onMouseMove={(state) => {
+            if (!onHoverPoint) return;
+            const indexRaw = state?.activeTooltipIndex;
+            const index =
+              typeof indexRaw === 'number'
+                ? indexRaw
+                : typeof indexRaw === 'string'
+                  ? Number(indexRaw)
+                  : Number.NaN;
+            if (Number.isNaN(index) || index < 0 || index >= data.length) {
+              onHoverPoint(null);
+              return;
+            }
+
+            const point = data[index];
+            if (!point || typeof point.time !== 'string') {
+              onHoverPoint(null);
+              return;
+            }
+            const values: Record<string, number> = {};
+            for (const parameter of series) {
+              const value = point[parameter.parameter_name];
+              if (typeof value !== 'number' || Number.isNaN(value)) continue;
+              values[parameter.parameter_name] = value;
+            }
+            onHoverPoint({ timestamp: point.time, values });
+          }}
+          onMouseLeave={() => {
+            onHoverPoint?.(null);
+          }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
 
@@ -316,6 +356,7 @@ export default function TimeSeriesChart({
             content={
               <CustomTooltip seriesMeta={seriesMeta} />
             }
+            cursor={{ stroke: '#94a3b8', strokeDasharray: '4 4' }}
           />
 
           <Legend

@@ -1454,6 +1454,53 @@ pnpm -C frontend run build
 
 - Frontend build: successful (`tsc -b && vite build`).
 
+## P1.3 Step 1 Update (2026-04-17): Linked Cursor/Crosshair Foundation
+
+### Completed: synchronized time-cursor readout wiring in chart surfaces
+
+**Goal:** start P1.3 with an engineer-friendly linked crosshair workflow and prepare chart primitives for upcoming compare-mode synchronization.
+
+**Files changed:**
+
+- `frontend/src/components/TimeSeriesChart.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Extended `TimeSeriesChart` with synchronization primitives:
+  - `syncId` support (Recharts sync channel)
+  - `onHoverPoint` callback returning timestamp + per-parameter values
+- Added consistent crosshair cursor styling in chart tooltip interaction.
+- Added synchronized cursor readout panels in both chart surfaces:
+  - `Parameters` page timeseries chart
+  - `Flight Test Detail` -> `Parameters & Data` chart
+- Added per-parameter cursor value readout in `Parameters` statistics cards while hovering.
+- Kept existing behavior unchanged for:
+  - max-8 overlay limit
+  - parameter selection workflow
+  - dataset version selection and activation
+
+### Acceptance Check (documented)
+
+- [x] Hovering the timeseries chart shows synchronized cursor timestamp + values.
+- [x] Cursor readout updates for all displayed parameters on `Parameters`.
+- [x] Cursor readout updates for all displayed parameters on `Flight Test Detail`.
+- [x] Existing chart loading/error/selection behaviors remain intact.
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).
+
 ## P1.2 Implementation Update (2026-04-17)
 
 ### Completed: parameter exploration at scale (search + grouping + favorites + saved sets)

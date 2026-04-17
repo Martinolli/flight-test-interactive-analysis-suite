@@ -69,6 +69,10 @@
     - Added hydration guards to defer localStorage writes until key hydration is complete.
 - [ ] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
+  - Progress (2026-04-17, step 1):
+    - Implemented synchronized hover cursor readout for time-series charts in both explorer surfaces.
+    - Added `TimeSeriesChart` sync primitives (`syncId`, hover snapshot callback) for upcoming multi-panel compare mode.
+    - Remaining in P1.3: event markers, threshold bands, compare workflow, export polish.
 - [ ] P1.4 Report UX quality improvements
   - Better figure selection/preview and clearer professional formatting expectations.
 - [ ] P1.5 Capability-catalog-aware UI preparation

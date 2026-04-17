@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useChartDownload } from '../hooks/useChartDownload';
 import Sidebar from '../components/Sidebar';
-import TimeSeriesChart from '../components/TimeSeriesChart';
+import TimeSeriesChart, { TimeSeriesHoverSnapshot } from '../components/TimeSeriesChart';
 import CorrelationChart from '../components/CorrelationChart';
 import StatCard from '../components/StatCard';
 import ParameterExplorerPanel from '../components/ParameterExplorerPanel';
@@ -27,6 +27,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { cn } from '@/lib/utils';
 
 type ChartTab = 'timeseries' | 'correlation';
+
+function formatTimeCursor(timestamp: string): string {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return timestamp;
+  return parsed.toLocaleTimeString('en-US', { hour12: false });
+}
+
+function formatCursorValue(value: number | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
 
 export default function Parameters() {
   const toast = useToast();
@@ -50,6 +61,7 @@ export default function Parameters() {
 
   // Chart data
   const [seriesData, setSeriesData] = useState<ParameterSeries[]>([]);
+  const [hoverSnapshot, setHoverSnapshot] = useState<TimeSeriesHoverSnapshot | null>(null);
   const [loadingChart, setLoadingChart] = useState(false);
   const [chartError, setChartError] = useState('');
 
@@ -167,6 +179,10 @@ export default function Parameters() {
       })
       .finally(() => setLoadingChart(false));
   }, [selectedTestId, selectedParams, selectedDatasetVersionId]);
+
+  useEffect(() => {
+    setHoverSnapshot(null);
+  }, [selectedTestId, selectedDatasetVersionId, selectedParams, activeTab]);
 
   const toggleParam = (name: string) => {
     setSelectedParams((prev) => {
@@ -555,11 +571,31 @@ export default function Parameters() {
 
                   {/* Time series chart */}
                   {!loadingChart && !chartError && seriesData.length > 0 && activeTab === 'timeseries' && (
-                    <div ref={chartRef} className="bg-white">
+                    <div ref={chartRef} className="bg-white space-y-2">
+                      <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                        {hoverSnapshot ? (
+                          <span>
+                            Cursor at <strong>{formatTimeCursor(hoverSnapshot.timestamp)}</strong>
+                            {': '}
+                            {seriesData.map((item, idx) => (
+                              <span key={`${item.parameter_name}-cursor`} className="inline-flex items-center">
+                                {idx > 0 ? <span className="mx-1 text-blue-300">|</span> : null}
+                                <strong>{item.parameter_name}</strong>
+                                <span className="ml-1">{formatCursorValue(hoverSnapshot.values[item.parameter_name])}</span>
+                                {item.unit ? <span className="ml-0.5 text-blue-700/70">{item.unit}</span> : null}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span>Move over the chart to inspect synchronized cursor values.</span>
+                        )}
+                      </div>
                       <TimeSeriesChart
                         series={seriesData}
                         height={340}
                         showReferenceMean={showMean}
+                        syncId={`parameters-timeseries-${selectedTestId}`}
+                        onHoverPoint={setHoverSnapshot}
                       />
                     </div>
                   )}
@@ -649,8 +685,15 @@ export default function Parameters() {
                             </span>
                           )}
                         </CardTitle>
-                        <CardDescription className="text-xs">
-                          {s.statistics.count.toLocaleString()} data points
+                        <CardDescription className="text-xs space-y-1">
+                          <div>{s.statistics.count.toLocaleString()} data points</div>
+                          {hoverSnapshot ? (
+                            <div className="text-blue-700">
+                              Cursor @ {formatTimeCursor(hoverSnapshot.timestamp)}:{' '}
+                              {formatCursorValue(hoverSnapshot.values[s.parameter_name])}
+                              {s.unit ? ` ${s.unit}` : ''}
+                            </div>
+                          ) : null}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="pt-0">
