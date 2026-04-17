@@ -58,6 +58,12 @@
   - Follow-up persistence hardening (2026-04-17):
     - On `Parameters` page, saved sets are scoped to `flight-test` level to survive navigation/re-entry and dataset-version switching.
     - Apply flow now warns when set members are missing in current dataset, while preserving max-8 selection truncation.
+  - Full persistence fix across explorer surfaces (2026-04-17):
+    - Fixed mount-time localStorage overwrite race in `ParameterExplorerPanel`.
+    - Unified storage namespace at shared flight-test scope for:
+      - `Parameters` page explorer
+      - `FlightTestDetail` explorer
+    - Added missing/truncation warnings on `FlightTestDetail` apply flow for parity.
 - [ ] P1.3 Chart workflow upgrades
   - Linked cursor/crosshair, markers, thresholds, compare mode.
 - [ ] P1.4 Report UX quality improvements

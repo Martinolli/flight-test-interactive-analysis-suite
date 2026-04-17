@@ -136,6 +136,12 @@
   - Follow-up fix (2026-04-17):
     - `Parameters` page saved sets are now scoped at flight-test level (not dataset-version level) to prevent sets appearing lost after navigation or dataset switching.
     - Applying saved sets now warns when some parameters are unavailable in the currently selected dataset and keeps max-8 truncation behavior.
+  - Persistence hardening (2026-04-17):
+    - Fixed localStorage hydration race in `ParameterExplorerPanel` that could overwrite persisted sets with empty state on remount.
+    - Unified saved-set namespace across both surfaces to shared flight-test scope:
+      - `Parameters` page
+      - `FlightTestDetail` parameters explorer
+    - Saved sets now persist across navigation/refresh and are recoverable from both surfaces for the same flight test.
 
 - [ ] P1.3 Upgrade chart workflow for engineering review
   - Linked crosshair, event markers, threshold bands, compare-runs mode, better export quality.

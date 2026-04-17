@@ -113,9 +113,11 @@ function parseAnalysisContent(analysisMarkdown: string): ParsedAnalysisContent {
 function ParametersPanel({
   flightTestId,
   datasetVersionId,
+  toast,
 }: {
   flightTestId: number;
   datasetVersionId?: number;
+  toast: ReturnType<typeof useToast>;
 }) {
   const [parameters, setParameters] = useState<ParameterInfo[]>([]);
   const [selectedParams, setSelectedParams] = useState<Set<string>>(new Set());
@@ -154,6 +156,7 @@ function ParametersPanel({
         next.delete(name);
       } else {
         if (next.size >= 8) {
+          toast.warning('Limit reached', 'You can overlay up to 8 parameters at once.');
           return prev;
         }
         next.add(name);
@@ -164,8 +167,24 @@ function ParametersPanel({
 
   function applyParameterSet(names: string[]) {
     const available = new Set(parameters.map((p) => p.name));
-    const validNames = names.filter((name) => available.has(name)).slice(0, 8);
-    setSelectedParams(new Set(validNames));
+    const validNames = names.filter((name) => available.has(name));
+    const missingNames = names.filter((name) => !available.has(name));
+    const limited = validNames.slice(0, 8);
+    setSelectedParams(new Set(limited));
+
+    if (validNames.length === 0) {
+      toast.warning('Saved set is empty', 'No parameters from this set exist in the current dataset.');
+      return;
+    }
+    if (missingNames.length > 0) {
+      toast.warning(
+        'Some parameters are unavailable',
+        `${missingNames.length} parameter(s) from this set are missing in the selected dataset version.`
+      );
+    }
+    if (validNames.length > 8) {
+      toast.warning('Set truncated', 'Only the first 8 parameters were applied.');
+    }
   }
 
   if (loadingParams) {
@@ -207,9 +226,7 @@ function ParametersPanel({
         parameters={parameters}
         selectedParams={selectedParams}
         maxSelection={8}
-        storageNamespace={`flight-test-detail:test-${flightTestId}:dataset-${
-          datasetVersionId ?? 'active'
-        }`}
+        storageNamespace={`parameter-explorer:flight-test-${flightTestId}`}
         onToggleParam={toggleParam}
         onApplyParameterSet={applyParameterSet}
       />
@@ -1007,6 +1024,7 @@ export default function FlightTestDetail() {
                   datasetVersionId={
                     selectedDatasetVersionId === '' ? undefined : Number(selectedDatasetVersionId)
                   }
+                  toast={toast}
                 />
               </CardContent>
             </Card>

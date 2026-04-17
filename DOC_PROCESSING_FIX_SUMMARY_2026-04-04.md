@@ -1551,3 +1551,60 @@ pnpm -C frontend run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`).
+
+## P1.2 Follow-up (2026-04-17): Full Cross-Surface Parameter-Set Persistence Fix
+
+### Completed: robust saved-set persistence across Parameters and FlightTestDetail explorers
+
+**Goal:** ensure saved parameter sets behave as stable workflow artifacts across navigation/reload and across both explorer surfaces for the same flight test.
+
+**Files changed:**
+
+- `frontend/src/components/ParameterExplorerPanel.tsx`
+- `frontend/src/pages/Parameters.tsx`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**Root cause found:**
+
+- `ParameterExplorerPanel` could write empty initial state to localStorage before hydration/read completed on mount.
+- Storage namespaces differed across surfaces and contexts, causing sets to appear missing:
+  - `Parameters` explorer namespace differed from `FlightTestDetail` explorer namespace.
+  - dataset-scoped keys fragmented visibility.
+
+**What changed:**
+
+- Added hydration-safe localStorage lifecycle in `ParameterExplorerPanel`:
+  - read keys first
+  - only allow write-back after read/hydration is complete for that key
+- Unified saved-set namespace to shared flight-test scope across both explorers:
+  - `parameter-explorer:flight-test-{id}`
+- Kept dataset-aware apply behavior:
+  - apply only currently available parameters
+  - warn when some set channels are unavailable in selected dataset
+  - preserve max-8 cap with truncation warning
+- Added same missing/truncation warnings on `FlightTestDetail` apply flow (parity with `Parameters` page).
+
+### Acceptance Check (documented)
+
+- [x] Save named set on `Parameters` page.
+- [x] Navigate away and return to `Parameters`: set remains visible and applicable.
+- [x] Open `FlightTestDetail` for same flight test: same set is visible and applicable.
+- [x] Refresh browser: set remains visible.
+- [x] Change dataset version:
+  - set remains visible
+  - only available parameters are applied
+  - missing channels produce warning
+  - >8 valid channels produce truncation warning
+
+**Validation run:**
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Frontend build: successful (`tsc -b && vite build`).

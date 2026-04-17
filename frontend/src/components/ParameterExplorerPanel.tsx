@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckSquare,
   Search,
@@ -56,6 +56,8 @@ export default function ParameterExplorerPanel({
   const [savedSets, setSavedSets] = useState<SavedParameterSet[]>([]);
   const [setNameInput, setSetNameInput] = useState('');
   const [selectedSetName, setSelectedSetName] = useState('');
+  const loadedFavoritesKeyRef = useRef<string | null>(null);
+  const loadedSetsKeyRef = useRef<string | null>(null);
 
   const favoritesStorageKey = `ftias:param-explorer:${storageNamespace}:favorites`;
   const setsStorageKey = `ftias:param-explorer:${storageNamespace}:sets`;
@@ -70,6 +72,8 @@ export default function ParameterExplorerPanel({
       setFavorites(safeFavorites);
     } catch {
       setFavorites([]);
+    } finally {
+      loadedFavoritesKeyRef.current = favoritesStorageKey;
     }
 
     try {
@@ -99,14 +103,22 @@ export default function ParameterExplorerPanel({
     } catch {
       setSavedSets([]);
       setSelectedSetName('');
+    } finally {
+      loadedSetsKeyRef.current = setsStorageKey;
     }
   }, [favoritesStorageKey, setsStorageKey]);
 
   useEffect(() => {
+    if (loadedFavoritesKeyRef.current !== favoritesStorageKey) {
+      return;
+    }
     localStorage.setItem(favoritesStorageKey, JSON.stringify(favorites));
   }, [favorites, favoritesStorageKey]);
 
   useEffect(() => {
+    if (loadedSetsKeyRef.current !== setsStorageKey) {
+      return;
+    }
     localStorage.setItem(setsStorageKey, JSON.stringify(savedSets));
   }, [savedSets, setsStorageKey]);
 

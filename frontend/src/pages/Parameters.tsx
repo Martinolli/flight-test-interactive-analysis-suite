@@ -248,6 +248,10 @@ export default function Parameters() {
     () => datasetVersions.find((v) => v.is_active),
     [datasetVersions]
   );
+  const parameterExplorerNamespace =
+    selectedTestId === ''
+      ? 'parameter-explorer:parameters-page:no-test'
+      : `parameter-explorer:flight-test-${selectedTestId}`;
 
   async function handleActivateSelectedDataset() {
     if (!selectedTestId || selectedDatasetVersionId === '') return;
@@ -436,7 +440,7 @@ export default function Parameters() {
                       parameters={parameters}
                       selectedParams={selectedParams}
                       maxSelection={8}
-                      storageNamespace={`parameters-page:test-${selectedTestId}`}
+                      storageNamespace={parameterExplorerNamespace}
                       onToggleParam={toggleParam}
                       onApplyParameterSet={applyParameterSet}
                     />
