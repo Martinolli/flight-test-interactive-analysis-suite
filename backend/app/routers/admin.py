@@ -11,7 +11,7 @@ import os
 import re
 import json
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -82,6 +82,171 @@ def _load_parameter_stats_snapshot(analysis_job: AnalysisJob) -> List[dict]:
     if not isinstance(data, list):
         return []
     return data
+
+
+def _load_retrieved_sources_snapshot(analysis_job: AnalysisJob) -> List[dict]:
+    raw = analysis_job.retrieved_sources_snapshot_json or "[]"
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _format_float(value: Any, decimals: int = 3) -> str:
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return "—"
+    return f"{num:.{decimals}f}"
+
+
+def _format_int(value: Any) -> str:
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _safe_stat_value(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _truncate_text(text: str, max_len: int = 40) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1].rstrip() + "…"
+
+
+def _normalise_stats_snapshot(stats_snapshot: List[dict]) -> List[Dict[str, Any]]:
+    normalized: List[Dict[str, Any]] = []
+    for row in stats_snapshot or []:
+        if not isinstance(row, dict):
+            continue
+        normalized.append(
+            {
+                "name": _sanitize_pdf_text(str(row.get("name") or "—")),
+                "unit": _sanitize_pdf_text(str(row.get("unit") or "—")),
+                "min_val": _safe_stat_value(row.get("min_val")),
+                "max_val": _safe_stat_value(row.get("max_val")),
+                "avg_val": _safe_stat_value(row.get("avg_val")),
+                "std_val": _safe_stat_value(row.get("std_val")),
+                "sample_count": int(row.get("sample_count") or 0),
+            }
+        )
+
+    # Stable deterministic ordering for reproducible output
+    normalized.sort(key=lambda item: ((item["name"] or "").lower(), item["sample_count"]))
+    return normalized
+
+
+def _dataset_provenance_dict(analysis_job: Optional[AnalysisJob]) -> Dict[str, str]:
+    if not analysis_job:
+        return {
+            "dataset_version_id": "—",
+            "dataset_label": "Not linked",
+            "dataset_number": "—",
+            "dataset_status": "—",
+            "dataset_row_count": "—",
+            "dataset_data_points": "—",
+            "source_session_id": "—",
+        }
+
+    dataset = analysis_job.dataset_version
+    if dataset is None:
+        return {
+            "dataset_version_id": str(analysis_job.dataset_version_id or "—"),
+            "dataset_label": "Unavailable",
+            "dataset_number": "—",
+            "dataset_status": "—",
+            "dataset_row_count": "—",
+            "dataset_data_points": "—",
+            "source_session_id": "—",
+        }
+
+    return {
+        "dataset_version_id": str(dataset.id),
+        "dataset_label": _sanitize_pdf_text(dataset.label or "—"),
+        "dataset_number": str(dataset.version_number),
+        "dataset_status": _sanitize_pdf_text(dataset.status or "—"),
+        "dataset_row_count": _format_int(dataset.row_count) if dataset.row_count is not None else "—",
+        "dataset_data_points": (
+            _format_int(dataset.data_points_count)
+            if dataset.data_points_count is not None
+            else "—"
+        ),
+        "source_session_id": (
+            str(dataset.source_session_id) if dataset.source_session_id is not None else "—"
+        ),
+    }
+
+
+def _analysis_summary_dict(
+    *,
+    analysis_job: Optional[AnalysisJob],
+    stats_snapshot: List[Dict[str, Any]],
+    retrieved_sources_snapshot: List[dict],
+) -> Dict[str, str]:
+    if not analysis_job:
+        return {
+            "analysis_job_id": "—",
+            "analysis_created_at": "—",
+            "model": "—",
+            "parameters_analysed": _format_int(len(stats_snapshot)),
+            "retrieved_sources": _format_int(len(retrieved_sources_snapshot)),
+            "output_sha256": "—",
+        }
+
+    created_at = (
+        analysis_job.created_at.strftime("%Y-%m-%d %H:%M UTC")
+        if analysis_job.created_at
+        else "—"
+    )
+    model_line = _sanitize_pdf_text(analysis_job.model_name or "—")
+    if analysis_job.model_version:
+        model_line = f"{model_line} ({_sanitize_pdf_text(analysis_job.model_version)})"
+
+    return {
+        "analysis_job_id": str(analysis_job.id),
+        "analysis_created_at": created_at,
+        "model": model_line,
+        "parameters_analysed": _format_int(analysis_job.parameters_analysed),
+        "retrieved_sources": _format_int(len(retrieved_sources_snapshot)),
+        "output_sha256": analysis_job.output_sha256 or "—",
+    }
+
+
+def _classify_paragraph(text: str) -> str:
+    normalized = text.strip().lower()
+    if (
+        normalized.startswith("warning")
+        or normalized.startswith("caution")
+        or normalized.startswith("risk")
+        or normalized.startswith("limitation")
+        or "quality notice" in normalized
+        or "insufficient citation" in normalized
+    ):
+        return "warning"
+    if (
+        normalized.startswith("recommendation")
+        or normalized.startswith("mitigation")
+        or normalized.startswith("action")
+        or normalized.startswith("next step")
+    ):
+        return "recommendation"
+    if (
+        normalized.startswith("finding")
+        or normalized.startswith("observation")
+        or normalized.startswith("result")
+        or normalized.startswith("conclusion")
+    ):
+        return "finding"
+    return "normal"
 
 
 # ---------------------------------------------------------------------------
@@ -351,17 +516,22 @@ def _build_pdf(
     analysis_job: Optional[AnalysisJob] = None,
 ) -> bytes:
     """
-    Build a formatted PDF report using reportlab.
-    Structure:
-      - Header: FTIAS logo text + report title
-      - Metadata block: Flight ID, aircraft, date, generated by, timestamp
-      - Section 1: AI Analysis (markdown-stripped plain text)
-      - Annex A: Parameter Statistics table
+    Build an engineering-grade PDF report from immutable analysis-job artifacts.
+    Section order:
+      1. Cover / title
+      2. Flight test metadata summary
+      3. Dataset provenance summary
+      4. Analysis summary
+      5. Key charts / figures
+      6. Parameter statistics summary
+      7. AI analysis narrative
+      8. Sources / provenance / references
     """
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.enums import TA_CENTER
         from reportlab.lib.units import cm
         from reportlab.platypus import (
             HRFlowable,
@@ -385,50 +555,91 @@ def _build_pdf(
         leftMargin=2 * cm,
         topMargin=2.5 * cm,
         bottomMargin=2 * cm,
-        title=f"FTIAS Report — {flight_test.test_name}",
+        title=f"FTIAS Engineering Report — {flight_test.test_name}",
         author="FTIAS",
+        pageCompression=0,
     )
 
     styles = getSampleStyleSheet()
 
-    # Custom styles
-    header_style = ParagraphStyle(
-        "FTIASHeader",
+    cover_title_style = ParagraphStyle(
+        "CoverTitle",
         parent=styles["Heading1"],
-        fontSize=20,
+        fontSize=22,
         textColor=colors.HexColor("#1e3a5f"),
-        spaceAfter=4,
+        alignment=TA_CENTER,
+        spaceAfter=6,
         fontName="Helvetica-Bold",
     )
-    sub_header_style = ParagraphStyle(
-        "FTIASSubHeader",
+    cover_subtitle_style = ParagraphStyle(
+        "CoverSubtitle",
         parent=styles["Normal"],
         fontSize=11,
-        textColor=colors.HexColor("#4a6fa5"),
-        spaceAfter=12,
+        textColor=colors.HexColor("#355070"),
+        alignment=TA_CENTER,
+        spaceAfter=2,
+        fontName="Helvetica",
+    )
+    cover_context_style = ParagraphStyle(
+        "CoverContext",
+        parent=styles["Normal"],
+        fontSize=10,
+        textColor=colors.HexColor("#4f647a"),
+        alignment=TA_CENTER,
+        spaceAfter=2,
         fontName="Helvetica",
     )
     section_title_style = ParagraphStyle(
         "SectionTitle",
         parent=styles["Heading2"],
-        fontSize=13,
+        fontSize=13.5,
         textColor=colors.HexColor("#1e3a5f"),
-        spaceBefore=16,
-        spaceAfter=6,
+        spaceBefore=15,
+        spaceAfter=7,
+        fontName="Helvetica-Bold",
+    )
+    subsection_style = ParagraphStyle(
+        "SubSection",
+        parent=styles["Heading3"],
+        fontSize=11,
+        textColor=colors.HexColor("#27496d"),
+        spaceBefore=8,
+        spaceAfter=5,
+        fontName="Helvetica-Bold",
+    )
+    caption_style = ParagraphStyle(
+        "FigureCaption",
+        parent=styles["Normal"],
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#445668"),
+        spaceBefore=3,
+        spaceAfter=8,
+        fontName="Helvetica-Oblique",
+    )
+    narrative_heading_style = ParagraphStyle(
+        "NarrativeHeading",
+        parent=styles["Heading3"],
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor("#1f3b57"),
+        spaceBefore=7,
+        spaceAfter=3,
         fontName="Helvetica-Bold",
     )
     meta_label_style = ParagraphStyle(
         "MetaLabel",
         parent=styles["Normal"],
-        fontSize=9,
-        textColor=colors.HexColor("#666666"),
+        fontSize=8.5,
+        textColor=colors.HexColor("#5f7387"),
         fontName="Helvetica",
     )
     meta_value_style = ParagraphStyle(
         "MetaValue",
         parent=styles["Normal"],
-        fontSize=10,
-        textColor=colors.HexColor("#1a1a1a"),
+        fontSize=9.5,
+        leading=12,
+        textColor=colors.HexColor("#1d2733"),
         fontName="Helvetica-Bold",
     )
     body_style = ParagraphStyle(
@@ -440,125 +651,186 @@ def _build_pdf(
         spaceAfter=6,
         fontName="Helvetica",
     )
-    annex_title_style = ParagraphStyle(
-        "AnnexTitle",
-        parent=styles["Heading2"],
-        fontSize=13,
-        textColor=colors.HexColor("#1e3a5f"),
-        spaceBefore=24,
-        spaceAfter=8,
-        fontName="Helvetica-Bold",
+    footer_style = ParagraphStyle(
+        "Footer",
+        parent=styles["Normal"],
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#5f7387"),
+        spaceBefore=3,
+        fontName="Helvetica",
     )
 
     story = []
+    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    normalized_stats = _normalise_stats_snapshot(stats_snapshot)
+    retrieved_sources_snapshot = (
+        _load_retrieved_sources_snapshot(analysis_job)
+        if analysis_job is not None
+        else []
+    )
+    dataset_summary = _dataset_provenance_dict(analysis_job)
+    analysis_summary = _analysis_summary_dict(
+        analysis_job=analysis_job,
+        stats_snapshot=normalized_stats,
+        retrieved_sources_snapshot=retrieved_sources_snapshot,
+    )
 
-    # ---- Header ----
-    story.append(Paragraph("FTIAS", header_style))
-    story.append(Paragraph("Flight Test Interactive Analysis Suite", sub_header_style))
+    # ---- Cover / title ----
+    story.append(Paragraph("FTIAS Engineering Analysis Report", cover_title_style))
+    story.append(Paragraph("Flight Test Interactive Analysis Suite", cover_subtitle_style))
+    story.append(
+        Paragraph(
+            f"Flight Test #{flight_test.id}: {_sanitize_pdf_text(flight_test.test_name)}",
+            cover_context_style,
+        )
+    )
+    story.append(Paragraph(f"Report generated: {generated_at}", cover_context_style))
+    if analysis_job:
+        model_line = _sanitize_pdf_text(analysis_job.model_name or "—")
+        if analysis_job.model_version:
+            model_line += f" ({_sanitize_pdf_text(analysis_job.model_version)})"
+        story.append(
+            Paragraph(
+                f"Analysis Job #{analysis_job.id} · Model {model_line}",
+                cover_context_style,
+            )
+        )
+    story.append(Spacer(1, 0.25 * cm))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#1e3a5f")))
-    story.append(Spacer(1, 0.3 * cm))
-    story.append(Paragraph("AI Analysis Report", section_title_style))
     story.append(Spacer(1, 0.2 * cm))
 
-    # ---- Metadata block ----
+    # ---- 1) Flight test metadata summary ----
+    story.append(Paragraph("1. Flight Test Metadata Summary", section_title_style))
     test_date_str = (
         flight_test.test_date.strftime("%Y-%m-%d") if flight_test.test_date else "Not specified"
     )
-    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    meta_data = [
-        ["Flight Test ID", str(flight_test.id), "Test Name", flight_test.test_name],
-        ["Aircraft Type", flight_test.aircraft_type or "Not specified", "Test Date", test_date_str],
-        ["Generated By", generated_by, "Generated At", generated_at],
+    metadata_rows = [
+        [Paragraph("Flight Test ID", meta_label_style), Paragraph(str(flight_test.id), meta_value_style)],
+        [
+            Paragraph("Flight Test Name", meta_label_style),
+            Paragraph(_sanitize_pdf_text(flight_test.test_name), meta_value_style),
+        ],
+        [
+            Paragraph("Aircraft Type", meta_label_style),
+            Paragraph(_sanitize_pdf_text(flight_test.aircraft_type or "Not specified"), meta_value_style),
+        ],
+        [Paragraph("Test Date", meta_label_style), Paragraph(test_date_str, meta_value_style)],
+        [
+            Paragraph("Generated By", meta_label_style),
+            Paragraph(_sanitize_pdf_text(generated_by or "FTIAS"), meta_value_style),
+        ],
+        [Paragraph("Generated At", meta_label_style), Paragraph(generated_at, meta_value_style)],
     ]
-    if analysis_job:
-        provenance_value = (
-            f"#{analysis_job.id} · {analysis_job.model_name}"
-            + (f" ({analysis_job.model_version})" if analysis_job.model_version else "")
-        )
-        meta_data.append(
+    if flight_test.description:
+        metadata_rows.append(
             [
-                "Analysis Job",
-                provenance_value,
-                "Output Hash",
-                analysis_job.output_sha256[:16] + "…",
+                Paragraph("Description", meta_label_style),
+                Paragraph(_strip_markdown(flight_test.description), body_style),
             ]
         )
-        if analysis_job.dataset_version_id is not None:
-            meta_data.append(
+
+    metadata_table = Table(metadata_rows, colWidths=[4.0 * cm, 13.0 * cm])
+    metadata_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+        ("PADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(metadata_table)
+    story.append(Spacer(1, 0.2 * cm))
+
+    # ---- 2) Dataset provenance summary ----
+    story.append(Paragraph("2. Dataset Provenance Summary", section_title_style))
+    dataset_rows = [
+        [Paragraph("Dataset Version ID", meta_label_style), Paragraph(dataset_summary["dataset_version_id"], meta_value_style)],
+        [Paragraph("Dataset Label", meta_label_style), Paragraph(dataset_summary["dataset_label"], meta_value_style)],
+        [Paragraph("Version Number", meta_label_style), Paragraph(dataset_summary["dataset_number"], meta_value_style)],
+        [Paragraph("Status", meta_label_style), Paragraph(dataset_summary["dataset_status"], meta_value_style)],
+        [Paragraph("Rows", meta_label_style), Paragraph(dataset_summary["dataset_row_count"], meta_value_style)],
+        [Paragraph("Data Points", meta_label_style), Paragraph(dataset_summary["dataset_data_points"], meta_value_style)],
+        [Paragraph("Source Session ID", meta_label_style), Paragraph(dataset_summary["source_session_id"], meta_value_style)],
+    ]
+    dataset_table = Table(dataset_rows, colWidths=[4.0 * cm, 13.0 * cm])
+    dataset_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(dataset_table)
+    story.append(Spacer(1, 0.2 * cm))
+
+    # ---- 3) Analysis summary ----
+    story.append(Paragraph("3. Analysis Summary", section_title_style))
+    analysis_rows = [
+        [Paragraph("Analysis Job ID", meta_label_style), Paragraph(analysis_summary["analysis_job_id"], meta_value_style)],
+        [Paragraph("Analysis Created At", meta_label_style), Paragraph(analysis_summary["analysis_created_at"], meta_value_style)],
+        [Paragraph("Model", meta_label_style), Paragraph(analysis_summary["model"], meta_value_style)],
+        [Paragraph("Parameters Analysed", meta_label_style), Paragraph(analysis_summary["parameters_analysed"], meta_value_style)],
+        [Paragraph("Retrieved Sources", meta_label_style), Paragraph(analysis_summary["retrieved_sources"], meta_value_style)],
+        [Paragraph("Output Hash (SHA-256)", meta_label_style), Paragraph(_sanitize_pdf_text(analysis_summary["output_sha256"]), body_style)],
+    ]
+    analysis_table = Table(analysis_rows, colWidths=[4.0 * cm, 13.0 * cm])
+    analysis_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(analysis_table)
+    story.append(Spacer(1, 0.2 * cm))
+
+    # ---- 4) Key charts / figures ----
+    story.append(Paragraph("4. Key Charts / Figures", section_title_style))
+    figure_blocks = _build_stats_figures(normalized_stats)
+    if figure_blocks:
+        for figure_title, drawing, caption in figure_blocks:
+            story.append(Paragraph(figure_title, subsection_style))
+            story.append(drawing)
+            story.append(Paragraph(caption, caption_style))
+    else:
+        story.append(
+            Paragraph(
+                "No persisted parameter statistics were available to render engineering figures.",
+                body_style,
+            )
+        )
+
+    # ---- 5) Parameter statistics summary ----
+    story.append(Paragraph("5. Parameter Statistics Summary", section_title_style))
+    if normalized_stats:
+        total_samples = sum(max(0, int(row.get("sample_count") or 0)) for row in normalized_stats)
+        story.append(
+            Paragraph(
+                (
+                    f"Snapshot includes {len(normalized_stats)} parameters with "
+                    f"{total_samples} samples total."
+                ),
+                body_style,
+            )
+        )
+
+        table_data = [["Parameter", "Unit", "Min", "Max", "Mean", "Std Dev", "Samples"]]
+        for row in normalized_stats:
+            table_data.append(
                 [
-                    "Dataset Version",
-                    f"#{analysis_job.dataset_version_id}",
-                    "",
-                    "",
+                    _sanitize_pdf_text(str(row.get("name") or "—")),
+                    _sanitize_pdf_text(str(row.get("unit") or "—")),
+                    _format_float(row.get("min_val")),
+                    _format_float(row.get("max_val")),
+                    _format_float(row.get("avg_val")),
+                    _format_float(row.get("std_val")),
+                    _format_int(row.get("sample_count")),
                 ]
             )
 
-    meta_table = Table(meta_data, colWidths=[3 * cm, 7 * cm, 3 * cm, 4 * cm])
-    meta_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0f4f8")),
-        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#666666")),
-        ("TEXTCOLOR", (2, 0), (2, -1), colors.HexColor("#666666")),
-        ("TEXTCOLOR", (1, 0), (1, -1), colors.HexColor("#1a1a1a")),
-        ("TEXTCOLOR", (3, 0), (3, -1), colors.HexColor("#1a1a1a")),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica"),
-        ("FONTNAME", (2, 0), (2, -1), "Helvetica"),
-        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
-        ("FONTNAME", (3, 0), (3, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("PADDING", (0, 0), (-1, -1), 6),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c8d6e5")),
-        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.HexColor("#f0f4f8"), colors.HexColor("#e8eef5")]),
-    ]))
-    story.append(meta_table)
-    story.append(Spacer(1, 0.5 * cm))
-
-    # ---- Description ----
-    if flight_test.description:
-        story.append(Paragraph("Description", section_title_style))
-        story.append(Paragraph(_strip_markdown(flight_test.description), body_style))
-
-    # ---- Section 1: AI Analysis ----
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#c8d6e5")))
-    story.append(Paragraph("AI Analysis", section_title_style))
-
-    if analysis_text:
-        analysis_text = _sanitize_pdf_text(analysis_text)
-        # Parse and render the analysis text, handling markdown tables inline
-        for block in _parse_markdown_blocks(analysis_text):
-            if block["type"] == "table":
-                tbl = _build_markdown_table(block["rows"], styles)
-                if tbl:
-                    story.append(tbl)
-                    story.append(Spacer(1, 0.3 * cm))
-            elif block["type"] == "heading":
-                story.append(Paragraph(_sanitize_pdf_text(block["text"]), section_title_style))
-            elif block["type"] == "text" and block["text"]:
-                story.append(Paragraph(_sanitize_pdf_text(block["text"]), body_style))
-    else:
-        story.append(Paragraph(
-            "No analysis text provided. Generate an AI Analysis from the Flight Test Detail page first.",
-            body_style,
-        ))
-
-    # ---- Annex A: Parameter Statistics ----
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#c8d6e5")))
-    story.append(Paragraph("Annex A — Parameter Statistics", annex_title_style))
-
-    if stats_snapshot:
-        table_data = [["Parameter", "Unit", "Min", "Max", "Mean", "Std Dev", "Samples"]]
-        for row in stats_snapshot:
-            table_data.append([
-                _sanitize_pdf_text(str(row.get("name") or "—")),
-                _sanitize_pdf_text(str(row.get("unit") or "—")),
-                f"{float(row.get('min_val') or 0):.3f}",
-                f"{float(row.get('max_val') or 0):.3f}",
-                f"{float(row.get('avg_val') or 0):.3f}",
-                f"{float(row.get('std_val') or 0):.3f}",
-                str(int(row.get("sample_count") or 0)),
-            ])
-
-        # Use Paragraph cells so long parameter names wrap instead of overflow
         para_style_cell = ParagraphStyle(
             "TableCell",
             parent=styles["Normal"],
@@ -576,67 +848,315 @@ def _build_pdf(
             textColor=colors.white,
             wordWrap="CJK",
         )
-        # Wrap all cells in Paragraph for word-wrap support
         wrapped_data = []
         for i, row in enumerate(table_data):
             if i == 0:
                 wrapped_data.append([Paragraph(_sanitize_pdf_text(str(c)), para_style_hdr) for c in row])
             else:
-                wrapped_data.append([
-                    Paragraph(_sanitize_pdf_text(str(row[0])), para_style_cell),  # Parameter name — wraps
-                    Paragraph(_sanitize_pdf_text(str(row[1])), para_style_cell),  # Unit
-                    Paragraph(_sanitize_pdf_text(str(row[2])), para_style_cell),  # Min
-                    Paragraph(_sanitize_pdf_text(str(row[3])), para_style_cell),  # Max
-                    Paragraph(_sanitize_pdf_text(str(row[4])), para_style_cell),  # Mean
-                    Paragraph(_sanitize_pdf_text(str(row[5])), para_style_cell),  # Std Dev
-                    Paragraph(_sanitize_pdf_text(str(row[6])), para_style_cell),  # Samples
-                ])
+                wrapped_data.append(
+                    [
+                        Paragraph(_sanitize_pdf_text(str(row[0])), para_style_cell),
+                        Paragraph(_sanitize_pdf_text(str(row[1])), para_style_cell),
+                        Paragraph(_sanitize_pdf_text(str(row[2])), para_style_cell),
+                        Paragraph(_sanitize_pdf_text(str(row[3])), para_style_cell),
+                        Paragraph(_sanitize_pdf_text(str(row[4])), para_style_cell),
+                        Paragraph(_sanitize_pdf_text(str(row[5])), para_style_cell),
+                        Paragraph(_sanitize_pdf_text(str(row[6])), para_style_cell),
+                    ]
+                )
 
-        # Page width = A4 (21cm) - left(2cm) - right(2cm) = 17cm usable
-        col_widths = [5.5 * cm, 1.8 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 1.7 * cm]
+        col_widths = [5.5 * cm, 1.7 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 1.8 * cm]
         stats_table = Table(wrapped_data, colWidths=col_widths, repeatRows=1)
         stats_table.setStyle(TableStyle([
-            # Header row
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 9),
+            ("FONTSIZE", (0, 0), (-1, 0), 8.5),
             ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-            # Data rows
             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
             ("FONTSIZE", (0, 1), (-1, -1), 8),
             ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
             ("ALIGN", (0, 1), (0, -1), "LEFT"),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c8d6e5")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f9fc")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
             ("PADDING", (0, 0), (-1, -1), 5),
-            ("TOPPADDING", (0, 0), (-1, 0), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
         ]))
         story.append(stats_table)
     else:
-        story.append(Paragraph("No parameter data available for this flight test.", body_style))
+        story.append(Paragraph("No parameter data available for this analysis job.", body_style))
 
-    # ---- Footer note ----
-    story.append(Spacer(1, 0.8 * cm))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#c8d6e5")))
-    story.append(Paragraph(
-        f"This report was automatically generated by FTIAS on {generated_at}. "
-        "AI-generated analysis is for reference purposes only and should be reviewed "
-        "by a qualified flight test engineer.",
-        ParagraphStyle(
-            "Footer",
+    # ---- 6) AI analysis narrative ----
+    story.append(Paragraph("6. AI Analysis Narrative", section_title_style))
+
+    if analysis_text:
+        analysis_text = _sanitize_pdf_text(analysis_text)
+        for block in _parse_markdown_blocks(analysis_text):
+            if block["type"] == "table":
+                tbl = _build_markdown_table(block["rows"], styles)
+                if tbl:
+                    story.append(tbl)
+                    story.append(Spacer(1, 0.25 * cm))
+                continue
+            if block["type"] == "heading":
+                heading_level = int(block.get("level") or 2)
+                heading_prefix = " " * max(0, heading_level - 2)
+                story.append(
+                    Paragraph(
+                        f"{heading_prefix}{_sanitize_pdf_text(block['text'])}",
+                        narrative_heading_style,
+                    )
+                )
+                continue
+            paragraph_text = _sanitize_pdf_text(block.get("text", ""))
+            if not paragraph_text:
+                continue
+            paragraph_kind = _classify_paragraph(paragraph_text)
+            if paragraph_kind == "normal":
+                story.append(Paragraph(paragraph_text, body_style))
+            else:
+                story.append(_build_callout_table(paragraph_text, paragraph_kind, styles))
+    else:
+        story.append(
+            Paragraph(
+                "No analysis text is stored for this analysis job.",
+                body_style,
+            )
+        )
+
+    # ---- 7) Sources / provenance / references ----
+    story.append(Paragraph("7. Sources / Provenance / References", section_title_style))
+    if retrieved_sources_snapshot:
+        sorted_sources = sorted(
+            retrieved_sources_snapshot,
+            key=lambda item: str(item.get("source_id") or ""),
+        )
+        source_rows = [["ID", "Document", "Location", "Similarity"]]
+        for source in sorted_sources[:25]:
+            document_label = _sanitize_pdf_text(
+                str(source.get("title") or source.get("filename") or "—")
+            )
+            section = _sanitize_pdf_text(str(source.get("section_title") or ""))
+            page_numbers = _sanitize_pdf_text(str(source.get("page_numbers") or ""))
+            location = section or page_numbers or "—"
+            source_rows.append(
+                [
+                    _sanitize_pdf_text(str(source.get("source_id") or "—")),
+                    _truncate_text(document_label, 68),
+                    _truncate_text(location, 40),
+                    _format_float(source.get("similarity"), decimals=3),
+                ]
+            )
+
+        source_hdr_style = ParagraphStyle(
+            "SourceHdr",
             parent=styles["Normal"],
             fontSize=8,
-            textColor=colors.HexColor("#888888"),
-            spaceBefore=4,
-            fontName="Helvetica-Oblique",
-        ),
-    ))
+            leading=10,
+            fontName="Helvetica-Bold",
+            textColor=colors.white,
+        )
+        source_cell_style = ParagraphStyle(
+            "SourceCell",
+            parent=styles["Normal"],
+            fontSize=8,
+            leading=10,
+            fontName="Helvetica",
+        )
+
+        wrapped_source_rows = []
+        for idx, row in enumerate(source_rows):
+            style = source_hdr_style if idx == 0 else source_cell_style
+            wrapped_source_rows.append([Paragraph(_sanitize_pdf_text(str(cell)), style) for cell in row])
+
+        source_table = Table(
+            wrapped_source_rows,
+            colWidths=[1.8 * cm, 8.3 * cm, 4.9 * cm, 2.0 * cm],
+            repeatRows=1,
+        )
+        source_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#27496d")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f9fc")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+            ("PADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(source_table)
+    else:
+        story.append(
+            Paragraph(
+                "No retrieved source snapshot is stored for this analysis job.",
+                body_style,
+            )
+        )
+
+    immutable_statement = (
+        "Provenance statement: This PDF reflects persisted analysis job artifacts. "
+        f"Analysis Job #{analysis_summary['analysis_job_id']} was generated against "
+        f"Dataset Version #{dataset_summary['dataset_version_id']} "
+        f"({dataset_summary['dataset_label']}) and exported on {generated_at}. "
+        "Narrative text and parameter statistics are loaded from immutable saved snapshots, "
+        "not from current mutable flight-test data."
+    )
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#c8d6e5")))
+    story.append(Paragraph(_sanitize_pdf_text(immutable_statement), footer_style))
+    story.append(
+        Paragraph(
+            "Engineering notice: AI-generated content is advisory. Final safety/performance conclusions "
+            "must be validated by qualified flight-test engineering review.",
+            footer_style,
+        )
+    )
 
     doc.build(story)
     return buffer.getvalue()
+
+
+def _build_callout_table(text: str, kind: str, styles):
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Paragraph, Table, TableStyle
+
+    palette = {
+        "warning": (colors.HexColor("#fff4e5"), colors.HexColor("#b45309")),
+        "recommendation": (colors.HexColor("#ecfdf3"), colors.HexColor("#166534")),
+        "finding": (colors.HexColor("#eff6ff"), colors.HexColor("#1d4ed8")),
+    }
+    bg_color, border_color = palette.get(kind, (colors.HexColor("#f8fafc"), colors.HexColor("#64748b")))
+    text_style = ParagraphStyle(
+        f"CalloutText{kind.title()}",
+        parent=styles["Normal"],
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor("#1f2937"),
+        fontName="Helvetica",
+    )
+    table = Table([[Paragraph(_sanitize_pdf_text(text), text_style)]], colWidths=[17.0 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bg_color),
+        ("BOX", (0, 0), (-1, -1), 0.8, border_color),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return table
+
+
+def _build_stats_figures(stats_rows: List[Dict[str, Any]]) -> List[tuple]:
+    if not stats_rows:
+        return []
+    try:
+        from reportlab.graphics.charts.barcharts import HorizontalBarChart, VerticalBarChart
+        from reportlab.graphics.charts.legends import Legend
+        from reportlab.graphics.shapes import Drawing
+        from reportlab.lib import colors
+        from reportlab.lib.units import cm
+    except Exception:
+        return []
+
+    figures: List[tuple] = []
+
+    by_samples = sorted(
+        stats_rows,
+        key=lambda row: (-int(row.get("sample_count") or 0), str(row.get("name") or "")),
+    )
+    top_counts = [row for row in by_samples if int(row.get("sample_count") or 0) > 0][:8]
+    if top_counts:
+        labels = [_truncate_text(str(row.get("name") or "—"), 22) for row in top_counts][::-1]
+        values = [int(row.get("sample_count") or 0) for row in top_counts][::-1]
+
+        drawing = Drawing(16.5 * cm, 7.5 * cm)
+        chart = HorizontalBarChart()
+        chart.x = 3.6 * cm
+        chart.y = 0.9 * cm
+        chart.width = 11.8 * cm
+        chart.height = 5.8 * cm
+        chart.data = [values]
+        chart.categoryAxis.categoryNames = labels
+        chart.categoryAxis.labels.fontName = "Helvetica"
+        chart.categoryAxis.labels.fontSize = 7
+        chart.categoryAxis.labels.boxAnchor = "e"
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = max(max(values), 1) * 1.15
+        chart.valueAxis.labels.fontSize = 7
+        chart.valueAxis.labels.fontName = "Helvetica"
+        chart.barWidth = 8
+        chart.groupSpacing = 4
+        chart.bars[0].fillColor = colors.HexColor("#3b82f6")
+        chart.bars[0].strokeColor = colors.HexColor("#1d4ed8")
+        drawing.add(chart)
+
+        figures.append(
+            (
+                "Figure 1. Sample Count by Parameter (Top 8)",
+                drawing,
+                "Persisted parameter statistics snapshot. Higher bars indicate higher data density per channel.",
+            )
+        )
+
+    top_profile = [row for row in by_samples if row.get("avg_val") is not None][:6]
+    if top_profile:
+        labels = [_truncate_text(str(row.get("name") or "—"), 18) for row in top_profile]
+        min_vals = [row.get("min_val") if row.get("min_val") is not None else 0.0 for row in top_profile]
+        mean_vals = [row.get("avg_val") if row.get("avg_val") is not None else 0.0 for row in top_profile]
+        max_vals = [row.get("max_val") if row.get("max_val") is not None else 0.0 for row in top_profile]
+
+        min_value = min(min(min_vals), min(mean_vals), min(max_vals))
+        max_value = max(max(min_vals), max(mean_vals), max(max_vals))
+        if min_value == max_value:
+            max_value = min_value + 1.0
+
+        drawing = Drawing(16.5 * cm, 8.5 * cm)
+        chart = VerticalBarChart()
+        chart.x = 1.0 * cm
+        chart.y = 1.5 * cm
+        chart.width = 12.6 * cm
+        chart.height = 5.8 * cm
+        chart.data = [min_vals, mean_vals, max_vals]
+        chart.categoryAxis.categoryNames = labels
+        chart.categoryAxis.labels.fontName = "Helvetica"
+        chart.categoryAxis.labels.fontSize = 7
+        chart.valueAxis.labels.fontName = "Helvetica"
+        chart.valueAxis.labels.fontSize = 7
+        chart.valueAxis.valueMin = min_value * 0.98 if min_value < 0 else 0
+        chart.valueAxis.valueMax = max_value * 1.05
+        chart.groupSpacing = 8
+        chart.barSpacing = 1
+        chart.bars[0].fillColor = colors.HexColor("#93c5fd")
+        chart.bars[1].fillColor = colors.HexColor("#3b82f6")
+        chart.bars[2].fillColor = colors.HexColor("#1d4ed8")
+        drawing.add(chart)
+
+        legend = Legend()
+        legend.x = 13.8 * cm
+        legend.y = 4.8 * cm
+        legend.colorNamePairs = [
+            (colors.HexColor("#93c5fd"), "Min"),
+            (colors.HexColor("#3b82f6"), "Mean"),
+            (colors.HexColor("#1d4ed8"), "Max"),
+        ]
+        legend.fontName = "Helvetica"
+        legend.fontSize = 7
+        legend.dx = 7
+        legend.dy = 7
+        legend.deltay = 10
+        drawing.add(legend)
+
+        figures.append(
+            (
+                "Figure 2. Min / Mean / Max Profile (Top 6 by Sample Count)",
+                drawing,
+                "Statistical profile derived from persisted snapshots. Use with detailed table for exact values and units.",
+            )
+        )
+
+    return figures
 
 
 def _strip_markdown(text: str) -> str:
@@ -664,7 +1184,7 @@ def _strip_markdown(text: str) -> str:
 def _parse_markdown_blocks(text: str) -> list:
     """
     Parse markdown text into a list of typed blocks:
-      {"type": "heading", "text": "..."}  — ## headings
+      {"type": "heading", "level": 2, "text": "..."}  — ## headings
       {"type": "table",   "rows": [[...], ...]}  — GFM pipe tables
       {"type": "text",    "text": "..."}  — everything else (paragraphs)
     """
@@ -694,7 +1214,13 @@ def _parse_markdown_blocks(text: str) -> list:
         heading_match = re.match(r"^(#{1,6})\s+(.*)", line)
         if heading_match:
             flush_text()
-            blocks.append({"type": "heading", "text": _sanitize_pdf_text(heading_match.group(2).strip())})
+            blocks.append(
+                {
+                    "type": "heading",
+                    "level": len(heading_match.group(1)),
+                    "text": _sanitize_pdf_text(heading_match.group(2).strip()),
+                }
+            )
             i += 1
             continue
 

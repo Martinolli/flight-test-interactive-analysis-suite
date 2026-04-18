@@ -1913,3 +1913,75 @@ pytest backend/tests/test_flight_tests_comprehensive.py -q
 **Result:**
 
 - `31 passed`
+
+## P1.4 Report Professional Quality Upgrade (2026-04-18)
+
+### Completed: engineering-grade PDF/report structure and provenance visibility
+
+**Objective:**
+
+- Upgrade exported AI analysis reports from functional annex output to professional engineering review format.
+
+**Files changed:**
+
+- `backend/app/routers/admin.py`
+- `backend/tests/test_admin_report_export.py`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed (report template):**
+
+- Rebuilt PDF section hierarchy with stable order:
+  1. cover/title area
+  2. flight test metadata summary
+  3. dataset provenance summary
+  4. analysis summary
+  5. key charts/figures
+  6. parameter statistics summary
+  7. AI narrative
+  8. sources/provenance/references footer
+- Added explicit provenance metadata visibility in report body:
+  - flight test name/ID
+  - aircraft type
+  - dataset version label/ID
+  - analysis job ID
+  - generation timestamp
+  - model/version
+- Added figure section derived from persisted parameter snapshot:
+  - Figure 1: sample count by parameter (top channels)
+  - Figure 2: min/mean/max profile (top channels)
+- Improved narrative readability:
+  - markdown block parsing retained
+  - markdown tables rendered in-report
+  - warning/finding/recommendation paragraphs styled as callouts
+- Added auditable sources/provenance footer:
+  - retrieved source summary table
+  - immutable provenance statement tied to saved `analysis_job_id` and dataset provenance
+
+**Immutability/provenance guarantees preserved:**
+
+- PDF export remains keyed to persisted `analysis_job_id`.
+- Narrative text and parameter statistics are loaded from saved `AnalysisJob` snapshots.
+- No live `DataPoint` recomputation introduced in report export path.
+
+### Test coverage updates
+
+- Extended `backend/tests/test_admin_report_export.py` with a direct PDF-generation regression that validates:
+  - professional section headers exist in output
+  - provenance statement is present
+  - dataset provenance label rendering is present
+- Existing immutable export tests remain passing:
+  - persisted analysis text usage
+  - unknown job rejection
+  - persisted stats snapshot usage after mutable data changes
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_admin_report_export.py -q
+```
+
+**Result:**
+
+- `4 passed`

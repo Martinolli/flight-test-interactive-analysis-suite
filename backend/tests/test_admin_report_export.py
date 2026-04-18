@@ -5,7 +5,7 @@ import json
 
 from fastapi import status
 
-from app.models import AnalysisJob, DataPoint, FlightTest, TestParameter
+from app.models import AnalysisJob, DataPoint, DatasetVersion, FlightTest, TestParameter
 from app.routers import admin as admin_router
 
 
@@ -138,3 +138,96 @@ def test_admin_pdf_export_uses_persisted_stats_snapshot_after_data_changes(
     )
     assert response.status_code == status.HTTP_200_OK
     assert captured["stats_snapshot"] == persisted_snapshot
+
+
+def test_build_pdf_contains_professional_sections_and_provenance_block(db_session, admin_user):
+    flight_test = _create_flight_test(db_session, admin_user["id"], name="Professional Report")
+    dataset_version = DatasetVersion(
+        flight_test_id=flight_test.id,
+        version_number=3,
+        label="v3",
+        status="active",
+        row_count=1234,
+        data_points_count=4321,
+        created_by_id=admin_user["id"],
+    )
+    db_session.add(dataset_version)
+    db_session.commit()
+    db_session.refresh(dataset_version)
+
+    job = AnalysisJob(
+        flight_test_id=flight_test.id,
+        created_by_id=admin_user["id"],
+        dataset_version_id=dataset_version.id,
+        status="completed",
+        model_name="gpt-4o-mini",
+        model_version="2026-04-01",
+        parameters_analysed=2,
+        parameter_stats_snapshot_json=json.dumps(
+            [
+                {
+                    "name": "IAS",
+                    "unit": "kt",
+                    "min_val": 80.0,
+                    "max_val": 210.0,
+                    "avg_val": 140.0,
+                    "std_val": 9.5,
+                    "sample_count": 320,
+                },
+                {
+                    "name": "AOA",
+                    "unit": "deg",
+                    "min_val": 2.1,
+                    "max_val": 14.4,
+                    "avg_val": 6.9,
+                    "std_val": 1.2,
+                    "sample_count": 310,
+                },
+            ]
+        ),
+        prompt_text="Prompt",
+        retrieved_source_ids_json='["S1","S2"]',
+        retrieved_sources_snapshot_json=json.dumps(
+            [
+                {
+                    "source_id": "S1",
+                    "filename": "MIL-HDBK-1763.pdf",
+                    "title": "MIL-HDBK-1763",
+                    "page_numbers": "33-34",
+                    "section_title": "Separation Analysis",
+                    "similarity": 0.83,
+                }
+            ]
+        ),
+        output_sha256="f" * 64,
+        analysis_text=(
+            "## Findings\n"
+            "Finding: Separation envelope remains constrained at high alpha.\n\n"
+            "## Recommendations\n"
+            "Recommendation: Expand instrumentation for release transient capture."
+        ),
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    # Warm relationship for deterministic provenance rendering in helper.
+    _ = job.dataset_version
+
+    pdf_bytes = admin_router._build_pdf(
+        flight_test=flight_test,
+        stats_snapshot=json.loads(job.parameter_stats_snapshot_json),
+        analysis_text=job.analysis_text,
+        generated_by=admin_user["username"],
+        analysis_job=job,
+    )
+
+    assert b"FTIAS Engineering Analysis Report" in pdf_bytes
+    assert b"1. Flight Test Metadata Summary" in pdf_bytes
+    assert b"2. Dataset Provenance Summary" in pdf_bytes
+    assert b"4. Key Charts / Figures" in pdf_bytes
+    assert b"5. Parameter Statistics Summary" in pdf_bytes
+    assert b"7. Sources / Provenance / References" in pdf_bytes
+    assert b"Provenance statement: This PDF reflects persisted analysis job artifacts." in pdf_bytes
+    assert b"Dataset Label" in pdf_bytes
+    assert dataset_version.label.encode() in pdf_bytes

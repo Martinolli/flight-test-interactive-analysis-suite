@@ -165,8 +165,29 @@
     - Restored reliable PNG export using SVG-first path for Recharts with fallback, plus user-visible export error handling.
     - Improved hover responsiveness by memoizing heavy chart derivations and suppressing redundant hover-state updates.
 
-- [ ] P1.4 Improve PDF/report professional quality
-  - Structured template, figure quality, cleaner references, provenance footer.
+- [x] P1.4 Improve PDF/report professional quality
+  - Implemented professional engineering report structure with fixed section hierarchy:
+    1) cover/title
+    2) flight-test metadata
+    3) dataset provenance
+    4) analysis summary
+    5) key figures
+    6) parameter statistics summary
+    7) AI narrative
+    8) sources/provenance footer
+  - Added explicit provenance visibility in report body:
+    - flight test name/ID
+    - aircraft type
+    - dataset version label/ID
+    - analysis job ID
+    - generation timestamp
+    - model/version
+  - Added persisted-snapshot-derived figures and improved narrative rendering:
+    - key stats figures (sample density + min/mean/max profile)
+    - markdown table rendering preserved
+    - warning/finding/recommendation callout styling
+  - Added auditable provenance footer + retrieved-source summary table.
+  - Added backend regression coverage for report section/provenance rendering while preserving immutable `analysis_job_id` export flow.
 
 - [ ] P1.5 Define capability catalog before deeper domain branching
   - Capability families

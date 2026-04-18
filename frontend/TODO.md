@@ -93,8 +93,10 @@
     - Event markers now render robustly by resolving marker timestamps to nearest chart sample when direct key matching fails.
     - PNG export reliability restored with SVG-first export path, fallback behavior, and user-visible export failure toast.
     - Hover responsiveness improved by reducing redundant hover updates and memoizing chart derivation work.
-- [ ] P1.4 Report UX quality improvements
-  - Better figure selection/preview and clearer professional formatting expectations.
+- [x] P1.4 Report UX quality improvements
+  - Backend export template upgraded to professional engineering report structure with explicit metadata/provenance blocks.
+  - Report now includes key figures, compact parameter summary table, improved narrative formatting, and auditable source/provenance footer.
+  - Frontend immutable export flow remains unchanged (`analysis_job_id`-driven), preserving saved-job reproducibility.
 - [ ] P1.5 Capability-catalog-aware UI preparation
   - Support capability/mode applicability hints once backend catalog is defined.
 
