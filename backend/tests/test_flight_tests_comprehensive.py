@@ -10,6 +10,7 @@ from fastapi import status
 
 from app.auth import get_password_hash
 from app.models import (
+    AnalysisJob,
     DataPoint,
     DatasetVersion,
     FlightTest,
@@ -277,6 +278,193 @@ class TestFlightTestCRUD:
             db_session.query(DataPoint).filter(DataPoint.flight_test_id == flight_test.id).all()
         )
         assert len(data_points) == 0
+
+    def test_delete_flight_test_with_dataset_versions_sessions_and_analysis_jobs(
+        self, client, test_user, auth_headers, db_session
+    ):
+        """Deleting a versioned/provenance-rich flight test should remove all linked rows."""
+        flight_test = FlightTest(
+            test_name="Delete Provenance-Rich Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        parameter = TestParameter(
+            name="DELETE_PROVENANCE_PARAM",
+            description="Delete provenance test parameter",
+            unit="kt",
+        )
+        db_session.add(parameter)
+        db_session.commit()
+        db_session.refresh(parameter)
+
+        session_v1 = IngestionSession(
+            flight_test_id=flight_test.id,
+            filename="v1.csv",
+            file_type="csv",
+            source_format="csv",
+            row_count=2,
+            status="success",
+            uploaded_by_id=test_user["id"],
+        )
+        session_v2 = IngestionSession(
+            flight_test_id=flight_test.id,
+            filename="v2.csv",
+            file_type="csv",
+            source_format="csv",
+            row_count=2,
+            status="success",
+            uploaded_by_id=test_user["id"],
+        )
+        db_session.add_all([session_v1, session_v2])
+        db_session.flush()
+
+        dataset_v1 = DatasetVersion(
+            flight_test_id=flight_test.id,
+            version_number=1,
+            label="v1",
+            status="success",
+            row_count=2,
+            data_points_count=2,
+            source_session_id=session_v1.id,
+            created_by_id=test_user["id"],
+        )
+        dataset_v2 = DatasetVersion(
+            flight_test_id=flight_test.id,
+            version_number=2,
+            label="v2",
+            status="success",
+            row_count=2,
+            data_points_count=2,
+            source_session_id=session_v2.id,
+            created_by_id=test_user["id"],
+        )
+        db_session.add_all([dataset_v1, dataset_v2])
+        db_session.flush()
+
+        session_v1.dataset_version_id = dataset_v1.id
+        session_v2.dataset_version_id = dataset_v2.id
+        flight_test.active_dataset_version_id = dataset_v2.id
+
+        db_session.add_all(
+            [
+                DataPoint(
+                    flight_test_id=flight_test.id,
+                    dataset_version_id=dataset_v1.id,
+                    parameter_id=parameter.id,
+                    timestamp=datetime(2025, 8, 15, 10, 0, 0),
+                    value=101.0,
+                ),
+                DataPoint(
+                    flight_test_id=flight_test.id,
+                    dataset_version_id=dataset_v2.id,
+                    parameter_id=parameter.id,
+                    timestamp=datetime(2025, 8, 15, 10, 0, 1),
+                    value=202.0,
+                ),
+            ]
+        )
+
+        db_session.add_all(
+            [
+                AnalysisJob(
+                    flight_test_id=flight_test.id,
+                    created_by_id=test_user["id"],
+                    dataset_version_id=dataset_v1.id,
+                    status="completed",
+                    model_name="gpt-4o-mini",
+                    model_version="test",
+                    parameters_analysed=1,
+                    parameter_stats_snapshot_json="[]",
+                    prompt_text="prompt-v1",
+                    retrieved_source_ids_json="[]",
+                    retrieved_sources_snapshot_json="[]",
+                    output_sha256="a" * 64,
+                    analysis_text="analysis-v1",
+                ),
+                AnalysisJob(
+                    flight_test_id=flight_test.id,
+                    created_by_id=test_user["id"],
+                    dataset_version_id=dataset_v2.id,
+                    status="completed",
+                    model_name="gpt-4o-mini",
+                    model_version="test",
+                    parameters_analysed=1,
+                    parameter_stats_snapshot_json="[]",
+                    prompt_text="prompt-v2",
+                    retrieved_source_ids_json="[]",
+                    retrieved_sources_snapshot_json="[]",
+                    output_sha256="b" * 64,
+                    analysis_text="analysis-v2",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        assert (
+            db_session.query(DataPoint)
+            .filter(DataPoint.flight_test_id == flight_test.id)
+            .count()
+            == 2
+        )
+        assert (
+            db_session.query(DatasetVersion)
+            .filter(DatasetVersion.flight_test_id == flight_test.id)
+            .count()
+            == 2
+        )
+        assert (
+            db_session.query(IngestionSession)
+            .filter(IngestionSession.flight_test_id == flight_test.id)
+            .count()
+            == 2
+        )
+        assert (
+            db_session.query(AnalysisJob)
+            .filter(AnalysisJob.flight_test_id == flight_test.id)
+            .count()
+            == 2
+        )
+
+        response = client.delete(
+            f"/api/flight-tests/{flight_test.id}",
+            headers=auth_headers,
+        )
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+        assert (
+            db_session.query(FlightTest)
+            .filter(FlightTest.id == flight_test.id)
+            .first()
+            is None
+        )
+        assert (
+            db_session.query(DataPoint)
+            .filter(DataPoint.flight_test_id == flight_test.id)
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(DatasetVersion)
+            .filter(DatasetVersion.flight_test_id == flight_test.id)
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(IngestionSession)
+            .filter(IngestionSession.flight_test_id == flight_test.id)
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(AnalysisJob)
+            .filter(AnalysisJob.flight_test_id == flight_test.id)
+            .count()
+            == 0
+        )
 
 
 class TestCSVUpload:

@@ -1854,3 +1854,58 @@ pnpm -C frontend run build
 **Result:**
 
 - Frontend build: successful (`tsc -b && vite build`).
+
+## Backend Deletion Integrity Fix (2026-04-18)
+
+### Completed: flight-test deletion hardening for dataset versioning/provenance model
+
+**Problem observed:**
+
+- Deleting some newer flight tests failed (`Failed to fetch` in UI) after dataset versioning/provenance changes.
+- Legacy/simple deletes could still pass.
+
+**Root cause area:**
+
+- `DELETE /api/flight-tests/{test_id}` used a partial delete path (data points + flight test) and relied on implicit behavior for newer related entities.
+- The current model graph includes additional relationships (`dataset_versions`, `ingestion_sessions`, `analysis_jobs`, `active_dataset_version_id`) that require deterministic delete ordering.
+
+**Files changed:**
+
+- `backend/app/routers/flight_tests.py`
+- `backend/tests/test_flight_tests_comprehensive.py`
+- `TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+- Updated delete endpoint to run an explicit transaction-safe sequence:
+  1. clear `flight_tests.active_dataset_version_id`
+  2. delete `DataPoint` rows for flight test
+  3. delete `AnalysisJob` rows for flight test
+  4. delete `IngestionSession` rows for flight test
+  5. delete `DatasetVersion` rows for flight test
+  6. delete `FlightTest` row
+- Preserved ownership/tenancy checks (user can delete only owned flight tests).
+- Added rollback + explicit API error message when delete transaction fails.
+
+**Test coverage added/verified:**
+
+- Existing simple delete test remains valid.
+- Existing cascade-data delete test remains valid.
+- Added provenance-rich delete regression:
+  - flight test with multiple dataset versions
+  - linked ingestion sessions
+  - linked analysis jobs
+  - active dataset pointer
+  - dataset-version-linked datapoints
+  - verifies all related rows are removed after delete.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+```
+
+**Result:**
+
+- `31 passed`

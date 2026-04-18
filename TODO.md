@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 02
 
-**Last updated:** 2026-04-17
+**Last updated:** 2026-04-18
 **Scope:** Backend + Frontend + LLM/RAG + Reporting
 **Plan basis:** aligned to `TODO_REV_01.md`, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, current `TODO.md`, and post-P0.3 audit findings
 
@@ -242,6 +242,9 @@
 - [x] Responsive AI Standards Query page
 - [x] Query warning surfacing
 - [x] Retrieval diversity controls
+- [x] Flight-test deletion integrity for dataset-version/provenance graph
+  - Explicit backend deletion sequence now handles `DataPoint`, `AnalysisJob`, `IngestionSession`, `DatasetVersion`, and `active_dataset_version_id` linkage safely.
+  - Added regression coverage for deleting provenance-rich flight tests.
 
 These baseline controls should be protected by regression tests.
 
@@ -264,4 +267,4 @@ These baseline controls should be protected by regression tests.
 - `AI Standards Query` and `Analyze with AI` are aligned on core UX behavior, but shared rendering-component extraction is still a future refactor opportunity.
 - `Upload Data` and `Document Library` framing/layout standardization is complete.
 - Parameter exploration at scale now includes search, grouping, favorites, and saved parameter sets in both analysis surfaces.
-- Next UX bottleneck is chart workflow depth (linked crosshair/events/thresholds/compare mode).
+- Backend deletion integrity is hardened for legacy and provenance-rich flight tests after dataset versioning rollout.

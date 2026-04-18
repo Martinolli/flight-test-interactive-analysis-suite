@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app import auth, schemas
 from app.database import get_db
 from app.models import (
+    AnalysisJob,
     DataPoint,
     DatasetVersion,
     FlightTest,
@@ -390,8 +391,9 @@ async def delete_flight_test(
     current_user: User = Depends(auth.get_current_active_user),
 ):
     """
-    Delete a flight test and all associated data points.
-    Uses a direct bulk DELETE to avoid loading millions of ORM objects into memory.
+    Delete a flight test and all associated provenance/data records.
+    Uses an explicit, transaction-safe delete sequence to avoid FK-order issues
+    introduced by dataset versioning/provenance entities.
     """
     flight_test = (
         db.query(FlightTest)
@@ -406,12 +408,44 @@ async def delete_flight_test(
             status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
         )
 
-    # Bulk-delete data points directly in SQL — avoids ORM loading millions of rows
-    db.query(DataPoint).filter(DataPoint.flight_test_id == test_id).delete(
-        synchronize_session=False
-    )
-    db.delete(flight_test)
-    db.commit()
+    try:
+        # Break the direct FlightTest -> DatasetVersion linkage first so
+        # downstream deletes cannot trip over active dataset FK ordering.
+        flight_test.active_dataset_version_id = None
+        db.add(flight_test)
+        db.flush()
+
+        # Delete dependent rows explicitly in a safe order for current model graph:
+        # 1) data points
+        # 2) analysis jobs
+        # 3) ingestion sessions
+        # 4) dataset versions
+        # 5) flight test
+        db.query(DataPoint).filter(DataPoint.flight_test_id == test_id).delete(
+            synchronize_session=False
+        )
+        db.query(AnalysisJob).filter(AnalysisJob.flight_test_id == test_id).delete(
+            synchronize_session=False
+        )
+        db.query(IngestionSession).filter(
+            IngestionSession.flight_test_id == test_id
+        ).delete(
+            synchronize_session=False
+        )
+        db.query(DatasetVersion).filter(
+            DatasetVersion.flight_test_id == test_id
+        ).delete(
+            synchronize_session=False
+        )
+
+        db.delete(flight_test)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete flight test: {str(exc)}",
+        ) from exc
 
     return None
 
