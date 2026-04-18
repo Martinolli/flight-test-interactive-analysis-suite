@@ -245,6 +245,9 @@
 - [x] Flight-test deletion integrity for dataset-version/provenance graph
   - Explicit backend deletion sequence now handles `DataPoint`, `AnalysisJob`, `IngestionSession`, `DatasetVersion`, and `active_dataset_version_id` linkage safely.
   - Added regression coverage for deleting provenance-rich flight tests.
+  - FK-order follow-up (2026-04-18):
+    - corrected dependency order to delete `DatasetVersion` before `IngestionSession`
+      because `dataset_versions.source_session_id` references `ingestion_sessions.id`.
 
 These baseline controls should be protected by regression tests.
 

@@ -1882,9 +1882,13 @@ pnpm -C frontend run build
   1. clear `flight_tests.active_dataset_version_id`
   2. delete `DataPoint` rows for flight test
   3. delete `AnalysisJob` rows for flight test
-  4. delete `IngestionSession` rows for flight test
-  5. delete `DatasetVersion` rows for flight test
+  4. delete `DatasetVersion` rows for flight test
+  5. delete `IngestionSession` rows for flight test
   6. delete `FlightTest` row
+- FK-order follow-up applied:
+  - `DatasetVersion` must be deleted before `IngestionSession` because
+    `dataset_versions.source_session_id` references `ingestion_sessions.id`.
+  - This resolves observed PostgreSQL FK violation during provenance-rich deletes.
 - Preserved ownership/tenancy checks (user can delete only owned flight tests).
 - Added rollback + explicit API error message when delete transaction fails.
 

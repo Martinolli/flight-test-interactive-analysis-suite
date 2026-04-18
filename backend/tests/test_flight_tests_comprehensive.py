@@ -404,6 +404,11 @@ class TestFlightTestCRUD:
         )
         db_session.commit()
 
+        db_session.refresh(flight_test)
+        assert flight_test.active_dataset_version_id == dataset_v2.id
+        assert dataset_v1.source_session_id == session_v1.id
+        assert dataset_v2.source_session_id == session_v2.id
+
         assert (
             db_session.query(DataPoint)
             .filter(DataPoint.flight_test_id == flight_test.id)

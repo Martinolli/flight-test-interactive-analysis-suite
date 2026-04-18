@@ -418,8 +418,8 @@ async def delete_flight_test(
         # Delete dependent rows explicitly in a safe order for current model graph:
         # 1) data points
         # 2) analysis jobs
-        # 3) ingestion sessions
-        # 4) dataset versions
+        # 3) dataset versions
+        # 4) ingestion sessions
         # 5) flight test
         db.query(DataPoint).filter(DataPoint.flight_test_id == test_id).delete(
             synchronize_session=False
@@ -427,13 +427,13 @@ async def delete_flight_test(
         db.query(AnalysisJob).filter(AnalysisJob.flight_test_id == test_id).delete(
             synchronize_session=False
         )
-        db.query(IngestionSession).filter(
-            IngestionSession.flight_test_id == test_id
+        db.query(DatasetVersion).filter(
+            DatasetVersion.flight_test_id == test_id
         ).delete(
             synchronize_session=False
         )
-        db.query(DatasetVersion).filter(
-            DatasetVersion.flight_test_id == test_id
+        db.query(IngestionSession).filter(
+            IngestionSession.flight_test_id == test_id
         ).delete(
             synchronize_session=False
         )
