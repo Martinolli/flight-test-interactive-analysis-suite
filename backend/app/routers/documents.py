@@ -987,8 +987,23 @@ def _build_deterministic_takeoff_section(metrics: dict) -> str:
     lines = [
         "## Deterministic Calculation (Flight Data) [DATA]",
         "",
+        "### Result Classification",
+        "- Result type: **Estimated takeoff ground roll to liftoff**",
+        "- Classification: **Deterministic data-derived estimate**",
+        (
+            "- Corrections not applied: **wind, runway slope, non-standard atmosphere, "
+            "and certification screen-height corrections**"
+        ),
+        (
+            "- Applicability boundary: valid for the detected WOW/ground-speed takeoff segment only; "
+            "not a certification-corrected takeoff distance."
+        ),
+        "",
         "### Computed Metrics",
-        f"- Takeoff roll distance (integrated speed trace): **{metrics['distance_ft']} ft ({metrics['distance_m']} m)**",
+        (
+            "- Estimated takeoff ground roll to liftoff "
+            f"(integrated speed trace): **{metrics['distance_ft']} ft ({metrics['distance_m']} m)**"
+        ),
         f"- Run time (start-to-liftoff): **{metrics['run_time_s']} s**",
         f"- Start speed: **{metrics['start_speed_kt']} kt**",
         f"- Liftoff speed: **{metrics['liftoff_speed_kt']} kt**",
@@ -1041,7 +1056,11 @@ def _build_deterministic_takeoff_section(metrics: dict) -> str:
     lines.extend(
         [
             "",
-            "Use the integrated speed-trace distance as the primary deterministic takeoff result [DATA].",
+            (
+                "Use the integrated speed-trace distance as the primary deterministic estimate for "
+                "ground roll to liftoff [DATA]."
+            ),
+            "Do not interpret this value as a corrected certification takeoff distance unless corrections are explicitly applied.",
         ]
     )
     return "\n".join(lines)

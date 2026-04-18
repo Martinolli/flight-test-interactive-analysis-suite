@@ -1985,3 +1985,69 @@ pytest backend/tests/test_admin_report_export.py -q
 **Result:**
 
 - `4 passed`
+
+## P1.4a Report Engineering Wording + Result Classification Hardening (2026-04-18)
+
+### Completed: focused content hardening pass (no report-layout redesign)
+
+**Objective:**
+
+- Keep P1.4 report structure intact while hardening engineering wording so deterministic takeoff outputs are not misread as certification-corrected metrics.
+
+**Files changed:**
+
+- `backend/app/routers/admin.py`
+- `backend/app/routers/documents.py`
+- `backend/tests/test_admin_report_export.py`
+- `backend/tests/test_deterministic_takeoff_wording.py`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Result-type labeling hardened (deterministic takeoff context)
+   - Deterministic section now explicitly labels:
+     - `Estimated takeoff ground roll to liftoff`
+     - `Deterministic data-derived estimate`
+     - corrections not applied unless explicitly computed
+   - Wording now avoids implying corrected certification takeoff distance.
+
+2. Assumptions/limitations clarity improved
+   - Added explicit takeoff limitations language:
+     - wind correction not applied
+     - runway slope correction not applied
+     - non-standard atmosphere correction not applied
+     - WOW transition/event-definition sensitivity
+     - sampling/sensor-quality sensitivity
+     - estimate-vs-certification distinction
+
+3. Engineering separation in report narrative strengthened
+   - PDF narrative now renders in explicit engineering subsections:
+     - deterministic computed result
+     - standards cross-check
+     - assumptions and limitations
+     - recommendations
+     - applicability boundaries
+   - Applies to saved immutable analysis-job exports without changing frontend contract.
+
+4. Applicability wording hardened
+   - Added explicit boundaries for takeoff-style outputs:
+     - valid for estimated ground roll to liftoff from available data
+     - not sufficient alone for corrected certification takeoff distance to screen height
+
+5. No regression to P1.4 structure/provenance
+   - Report hierarchy remains intact.
+   - Provenance blocks and source table retained.
+   - Immutable `analysis_job_id` export path unchanged.
+
+### Test coverage updates
+
+- Extended PDF export tests to validate takeoff-context classification and limitation wording appears in generated report output.
+- Added deterministic takeoff-section unit test for wording guarantees.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_admin_report_export.py backend/tests/test_deterministic_takeoff_wording.py -q
+```

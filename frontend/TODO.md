@@ -97,6 +97,12 @@
   - Backend export template upgraded to professional engineering report structure with explicit metadata/provenance blocks.
   - Report now includes key figures, compact parameter summary table, improved narrative formatting, and auditable source/provenance footer.
   - Frontend immutable export flow remains unchanged (`analysis_job_id`-driven), preserving saved-job reproducibility.
+- [x] P1.4a Report engineering wording hardening (backend-driven)
+  - No frontend contract changes required.
+  - Existing export trigger/UI remains unchanged while report content now clarifies:
+    - deterministic estimate vs certification-corrected metric
+    - explicit assumptions/limitations
+    - applicability boundaries in exported narrative.
 - [ ] P1.5 Capability-catalog-aware UI preparation
   - Support capability/mode applicability hints once backend catalog is defined.
 

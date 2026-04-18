@@ -227,7 +227,69 @@ def test_build_pdf_contains_professional_sections_and_provenance_block(db_sessio
     assert b"2. Dataset Provenance Summary" in pdf_bytes
     assert b"4. Key Charts / Figures" in pdf_bytes
     assert b"5. Parameter Statistics Summary" in pdf_bytes
+    assert b"6. Engineering Assessment Narrative" in pdf_bytes
     assert b"7. Sources / Provenance / References" in pdf_bytes
     assert b"Provenance statement: This PDF reflects persisted analysis job artifacts." in pdf_bytes
     assert b"Dataset Label" in pdf_bytes
     assert dataset_version.label.encode() in pdf_bytes
+
+
+def test_build_pdf_takeoff_context_includes_result_classification_and_limitations(
+    db_session, admin_user
+):
+    flight_test = _create_flight_test(db_session, admin_user["id"], name="Takeoff Wording Hardening")
+    job = AnalysisJob(
+        flight_test_id=flight_test.id,
+        created_by_id=admin_user["id"],
+        status="completed",
+        model_name="gpt-4o-mini",
+        model_version="2026-04-01",
+        parameters_analysed=1,
+        parameter_stats_snapshot_json=json.dumps(
+            [
+                {
+                    "name": "GS",
+                    "unit": "kt",
+                    "min_val": 0.0,
+                    "max_val": 83.0,
+                    "avg_val": 42.0,
+                    "std_val": 5.0,
+                    "sample_count": 250,
+                }
+            ]
+        ),
+        prompt_text=(
+            "Provide an approximate takeoff distance calculation using WOW and ground speed data."
+        ),
+        retrieved_source_ids_json='["S1"]',
+        retrieved_sources_snapshot_json='[{"source_id":"S1","title":"MIL-HDBK-1763","similarity":0.8}]',
+        output_sha256="e" * 64,
+        analysis_text=(
+            "## Deterministic Calculation (Flight Data) [DATA]\n"
+            "Estimated takeoff ground roll to liftoff from WOW transition.\n\n"
+            "## Standards Cross-Check\n"
+            "Relevant release standards require careful envelope definition [S1].\n\n"
+            "## Recommendations\n"
+            "Recommendation: validate event-detection sensitivity before campaign release."
+        ),
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    pdf_bytes = admin_router._build_pdf(
+        flight_test=flight_test,
+        stats_snapshot=json.loads(job.parameter_stats_snapshot_json),
+        analysis_text=job.analysis_text,
+        generated_by=admin_user["username"],
+        analysis_job=job,
+    )
+
+    assert b"6.1 Deterministic Computed Result" in pdf_bytes
+    assert b"Estimated takeoff ground roll to liftoff" in pdf_bytes
+    assert b"Deterministic data-derived estimate" in pdf_bytes
+    assert b"Certification-corrected takeoff distance was not computed in this report." in pdf_bytes
+    assert b"6.3 Assumptions and Limitations" in pdf_bytes
+    assert b"Wind correction not applied." in pdf_bytes
+    assert b"6.5 Applicability Boundaries" in pdf_bytes
+    assert b"Not sufficient on its own for corrected certification takeoff distance to screen height." in pdf_bytes

@@ -189,6 +189,25 @@
   - Added auditable provenance footer + retrieved-source summary table.
   - Added backend regression coverage for report section/provenance rendering while preserving immutable `analysis_job_id` export flow.
 
+- [x] P1.4a Harden report engineering wording and result classification
+  - Focused hardening pass without reopening report layout/template design.
+  - Clarified takeoff result labeling in deterministic/report content:
+    - Estimated takeoff ground roll to liftoff
+    - Deterministic data-derived estimate
+    - Certification corrections not applied unless explicitly computed
+  - Added explicit assumptions/limitations language for takeoff-style results:
+    - wind/runway-slope/non-standard-atmosphere corrections not applied
+    - WOW transition/event-definition sensitivity
+    - sampling/sensor-quality sensitivity
+    - estimate-vs-certification distinction
+  - Strengthened engineering separation in PDF narrative rendering:
+    - deterministic computed result
+    - standards cross-check
+    - assumptions/limitations
+    - recommendations
+    - applicability boundaries
+  - Preserved immutable export/provenance behavior (`analysis_job_id` artifact flow).
+
 - [ ] P1.5 Define capability catalog before deeper domain branching
   - Capability families
   - required inputs
@@ -229,13 +248,12 @@
 
 ## Immediate Execution Order
 
-1. P1.4 — Improve PDF/report professional quality  
-2. P1.5 — Define capability catalog before deeper domain branching  
+1. P1.5 — Define capability catalog before deeper domain branching  
 
 - **Reason for this order**
 
 - P1.3 is now completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
-- Highest next impact is report professionalism, then capability-catalog definition before deeper domain branching.
+- Report professionalism and wording hardening are complete through P1.4 + P1.4a; next impact is capability-catalog definition before deeper domain branching.
 
 ---
 

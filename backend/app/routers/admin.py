@@ -249,6 +249,86 @@ def _classify_paragraph(text: str) -> str:
     return "normal"
 
 
+def _is_takeoff_groundroll_context(
+    *,
+    analysis_text: str,
+    analysis_job: Optional[AnalysisJob],
+) -> bool:
+    haystack = f"{analysis_text or ''}\n{(analysis_job.prompt_text if analysis_job else '')}".lower()
+    has_takeoff = "takeoff" in haystack
+    has_groundroll = ("ground roll" in haystack) or ("liftoff" in haystack) or ("wow" in haystack)
+    return has_takeoff and has_groundroll
+
+
+def _section_key_for_heading(heading_text: str) -> str:
+    title = heading_text.strip().lower()
+    if not title:
+        return "general"
+    if any(token in title for token in ["deterministic", "computed metrics", "wow-based", "equations"]):
+        return "deterministic"
+    if any(token in title for token in ["standards cross-check", "standards", "compliance"]):
+        return "standards"
+    if any(token in title for token in ["assumption", "limitations", "risk", "constraint", "uncertainty"]):
+        return "assumptions"
+    if any(token in title for token in ["recommendation", "mitigation", "next step", "actions"]):
+        return "recommendations"
+    if any(token in title for token in ["applicability", "boundary", "scope", "validity"]):
+        return "applicability"
+    if "executive summary" in title or title == "summary":
+        return "summary"
+    if "reference" in title:
+        return "references"
+    return "general"
+
+
+def _bucket_analysis_blocks(blocks: List[dict]) -> Dict[str, List[dict]]:
+    buckets: Dict[str, List[dict]] = {
+        "deterministic": [],
+        "standards": [],
+        "assumptions": [],
+        "recommendations": [],
+        "applicability": [],
+        "summary": [],
+        "general": [],
+        "references": [],
+    }
+    current_section = "general"
+    for block in blocks:
+        if block.get("type") == "heading":
+            new_section = _section_key_for_heading(str(block.get("text") or ""))
+            if new_section == "general" and current_section in {
+                "deterministic",
+                "standards",
+                "assumptions",
+                "recommendations",
+                "applicability",
+            }:
+                # Keep current classified section for sub-headings that do not map directly.
+                continue
+            current_section = new_section
+            continue
+        buckets.setdefault(current_section, []).append(block)
+    return buckets
+
+
+def _default_takeoff_limitations() -> List[str]:
+    return [
+        "Wind correction not applied.",
+        "Runway slope correction not applied.",
+        "Non-standard atmosphere correction not applied.",
+        "WOW transition timing can shift the detected liftoff event.",
+        "Sampling frequency and sensor quality can materially affect estimate precision.",
+        "Result is an approximate engineering estimate, not a formal certification metric.",
+    ]
+
+
+def _default_takeoff_applicability() -> List[str]:
+    return [
+        "Valid for estimated ground roll to liftoff from available WOW and ground-speed data.",
+        "Not sufficient on its own for corrected certification takeoff distance to screen height.",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Pydantic schemas (admin-specific)
 # ---------------------------------------------------------------------------
@@ -886,36 +966,111 @@ def _build_pdf(
     else:
         story.append(Paragraph("No parameter data available for this analysis job.", body_style))
 
-    # ---- 6) AI analysis narrative ----
-    story.append(Paragraph("6. AI Analysis Narrative", section_title_style))
+    # ---- 6) Engineering assessment narrative ----
+    story.append(Paragraph("6. Engineering Assessment Narrative", section_title_style))
 
     if analysis_text:
         analysis_text = _sanitize_pdf_text(analysis_text)
-        for block in _parse_markdown_blocks(analysis_text):
-            if block["type"] == "table":
-                tbl = _build_markdown_table(block["rows"], styles)
-                if tbl:
-                    story.append(tbl)
-                    story.append(Spacer(1, 0.25 * cm))
-                continue
-            if block["type"] == "heading":
-                heading_level = int(block.get("level") or 2)
-                heading_prefix = " " * max(0, heading_level - 2)
-                story.append(
-                    Paragraph(
-                        f"{heading_prefix}{_sanitize_pdf_text(block['text'])}",
-                        narrative_heading_style,
-                    )
+        parsed_blocks = _parse_markdown_blocks(analysis_text)
+        buckets = _bucket_analysis_blocks(parsed_blocks)
+        is_takeoff_context = _is_takeoff_groundroll_context(
+            analysis_text=analysis_text,
+            analysis_job=analysis_job,
+        )
+
+        def _render_blocks(blocks: List[dict]):
+            for block in blocks:
+                if block["type"] == "table":
+                    tbl = _build_markdown_table(block["rows"], styles)
+                    if tbl:
+                        story.append(tbl)
+                        story.append(Spacer(1, 0.25 * cm))
+                    continue
+                paragraph_text = _sanitize_pdf_text(block.get("text", ""))
+                if not paragraph_text:
+                    continue
+                paragraph_kind = _classify_paragraph(paragraph_text)
+                if paragraph_kind == "normal":
+                    story.append(Paragraph(paragraph_text, body_style))
+                else:
+                    story.append(_build_callout_table(paragraph_text, paragraph_kind, styles))
+
+        story.append(Paragraph("6.1 Deterministic Computed Result", subsection_style))
+        if is_takeoff_context:
+            story.append(
+                _build_callout_table(
+                    (
+                        "Result type: Estimated takeoff ground roll to liftoff. "
+                        "Classification: Deterministic data-derived estimate. "
+                        "Certification-corrected takeoff distance was not computed in this report."
+                    ),
+                    "finding",
+                    styles,
                 )
-                continue
-            paragraph_text = _sanitize_pdf_text(block.get("text", ""))
-            if not paragraph_text:
-                continue
-            paragraph_kind = _classify_paragraph(paragraph_text)
-            if paragraph_kind == "normal":
-                story.append(Paragraph(paragraph_text, body_style))
-            else:
-                story.append(_build_callout_table(paragraph_text, paragraph_kind, styles))
+            )
+        if buckets["deterministic"]:
+            _render_blocks(buckets["deterministic"])
+        else:
+            story.append(
+                Paragraph(
+                    "No deterministic subsection was explicitly provided in narrative text.",
+                    body_style,
+                )
+            )
+
+        story.append(Paragraph("6.2 Standards Cross-Check", subsection_style))
+        if buckets["standards"]:
+            _render_blocks(buckets["standards"])
+        else:
+            story.append(
+                Paragraph(
+                    "No explicit standards cross-check subsection was provided.",
+                    body_style,
+                )
+            )
+
+        story.append(Paragraph("6.3 Assumptions and Limitations", subsection_style))
+        if buckets["assumptions"]:
+            _render_blocks(buckets["assumptions"])
+        if is_takeoff_context:
+            for limitation in _default_takeoff_limitations():
+                story.append(_build_callout_table(limitation, "warning", styles))
+        elif not buckets["assumptions"]:
+            story.append(
+                Paragraph(
+                    "No explicit assumptions/limitations subsection was provided.",
+                    body_style,
+                )
+            )
+
+        story.append(Paragraph("6.4 Recommendations", subsection_style))
+        if buckets["recommendations"]:
+            _render_blocks(buckets["recommendations"])
+        else:
+            story.append(
+                Paragraph(
+                    "No explicit recommendations subsection was provided.",
+                    body_style,
+                )
+            )
+
+        story.append(Paragraph("6.5 Applicability Boundaries", subsection_style))
+        if buckets["applicability"]:
+            _render_blocks(buckets["applicability"])
+        if is_takeoff_context:
+            for applicability_note in _default_takeoff_applicability():
+                story.append(_build_callout_table(applicability_note, "warning", styles))
+        elif not buckets["applicability"]:
+            story.append(
+                Paragraph(
+                    "Applicability boundaries were not explicitly defined in narrative text.",
+                    body_style,
+                )
+            )
+
+        if buckets["summary"] or buckets["general"]:
+            story.append(Paragraph("6.6 Additional Context", subsection_style))
+            _render_blocks(buckets["summary"] + buckets["general"])
     else:
         story.append(
             Paragraph(
