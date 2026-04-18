@@ -19,6 +19,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_superuser, get_password_hash
+from app.capabilities import get_capability_definition
 from app.database import get_db
 from app.models import AnalysisJob, Document, FlightTest, User
 
@@ -312,6 +313,11 @@ def _bucket_analysis_blocks(blocks: List[dict]) -> Dict[str, List[dict]]:
 
 
 def _default_takeoff_limitations() -> List[str]:
+    takeoff = get_capability_definition("takeoff")
+    if takeoff and takeoff.default_limitations:
+        return list(takeoff.default_limitations) + [
+            "Result is an approximate engineering estimate, not a formal certification metric.",
+        ]
     return [
         "Wind correction not applied.",
         "Runway slope correction not applied.",
@@ -323,6 +329,9 @@ def _default_takeoff_limitations() -> List[str]:
 
 
 def _default_takeoff_applicability() -> List[str]:
+    takeoff = get_capability_definition("takeoff")
+    if takeoff and takeoff.applicability_boundaries:
+        return list(takeoff.applicability_boundaries)
     return [
         "Valid for estimated ground roll to liftoff from available WOW and ground-speed data.",
         "Not sufficient on its own for corrected certification takeoff distance to screen height.",

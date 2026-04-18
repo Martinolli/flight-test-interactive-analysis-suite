@@ -105,6 +105,7 @@
     - applicability boundaries in exported narrative.
 - [ ] P1.5 Capability-catalog-aware UI preparation
   - Support capability/mode applicability hints once backend catalog is defined.
+  - Backend catalog foundation is now available (`backend/app/capabilities.py`); frontend integration remains pending by design.
 
 ---
 

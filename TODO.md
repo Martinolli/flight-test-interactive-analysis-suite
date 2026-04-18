@@ -208,12 +208,33 @@
     - applicability boundaries
   - Preserved immutable export/provenance behavior (`analysis_job_id` artifact flow).
 
-- [ ] P1.5 Define capability catalog before deeper domain branching
-  - Capability families
-  - required inputs
-  - deterministic vs RAG-assisted classification
-  - blocked-condition rules
-  - applicability boundaries
+- [x] P1.5 Define capability catalog before deeper domain branching
+  - Added backend capability catalog source of truth in `backend/app/capabilities.py` with typed definitions for:
+    - capability identity (key/label/description/status)
+    - required inputs (signals/dataset/provenance/correction inputs)
+    - authority classification (`deterministic_primary`, `deterministic_with_rag_crosscheck`, `rag_guidance_only`, `not_supported`)
+    - blocked/downgrade rules with reason keys and outcome policies
+    - applicability boundaries and output-contract intent
+  - Catalog populated for initial families:
+    - `takeoff`
+    - `landing`
+    - `performance_general`
+    - `handling_qualities`
+    - `trajectory_kinematics`
+    - `systems_monitoring`
+    - `buffet_vibration`
+    - `flutter_support`
+    - `risk_assessment`
+    - `general_standards_query`
+  - Added resolver/evaluator helpers:
+    - `get_capability_definition(...)`
+    - `list_capabilities()`
+    - `evaluate_capability_request(...)`
+  - Integrated minimally with current implemented flow:
+    - takeoff deterministic path now evaluates capability state (signals/coverage/event-detection/certification-request downgrade).
+    - deterministic takeoff section now emits catalog-aligned capability outcome, limitations, and applicability boundaries.
+    - report takeoff limitations/applicability defaults now read from capability catalog (single truth).
+  - Added focused tests for catalog/rules and integration-safe behavior.
 
 ---
 
@@ -248,12 +269,14 @@
 
 ## Immediate Execution Order
 
-1. P1.5 — Define capability catalog before deeper domain branching  
+1. P2.1 — Introduce `analysis_mode` architecture  
+2. P2.2 — Add deterministic calculators beyond takeoff  
 
 - **Reason for this order**
 
-- P1.3 is now completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
-- Report professionalism and wording hardening are complete through P1.4 + P1.4a; next impact is capability-catalog definition before deeper domain branching.
+- P1.3 is completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
+- P1.4 and P1.4a are completed for report professionalism + wording hardening.
+- P1.5 capability-catalog foundation is complete; next impact is structured P2 domain routing and deterministic expansion.
 
 ---
 
@@ -261,7 +284,7 @@
 
 - [ ] G1 Product Truth Gate (after P0.1–P0.4 plus P0.3a) — ready for formal closure review
 - [ ] G2 Engineering UX Gate (after P1.0–P1.4)
-- [ ] G3 Capability Definition Gate (after P1.5)
+- [x] G3 Capability Definition Gate (after P1.5)
 - [ ] G4 Domainization Gate (after P2.1 + first additional deterministic modules)
 
 ---

@@ -292,4 +292,4 @@ def test_build_pdf_takeoff_context_includes_result_classification_and_limitation
     assert b"6.3 Assumptions and Limitations" in pdf_bytes
     assert b"Wind correction not applied." in pdf_bytes
     assert b"6.5 Applicability Boundaries" in pdf_bytes
-    assert b"Not sufficient on its own for corrected certification takeoff distance to screen height." in pdf_bytes
+    assert b"Not equivalent to corrected certification takeoff distance unless explicit corrections are applied." in pdf_bytes

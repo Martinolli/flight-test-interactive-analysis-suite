@@ -2051,3 +2051,87 @@ pytest backend/tests/test_admin_report_export.py -q
 ```powershell
 pytest backend/tests/test_admin_report_export.py backend/tests/test_deterministic_takeoff_wording.py -q
 ```
+
+## P1.5 Capability Catalog Foundation (2026-04-18)
+
+### Completed: backend capability-definition source of truth before P2 branching
+
+**Objective:**
+
+- Define a maintainable capability catalog layer that unifies product truth across deterministic logic, RAG role, blocked/downgrade rules, and applicability wording.
+
+**Files changed:**
+
+- `backend/app/capabilities.py`
+- `backend/app/routers/documents.py`
+- `backend/app/routers/admin.py`
+- `backend/tests/test_capability_catalog.py`
+- `backend/tests/test_documents_tenancy.py` (compat for updated takeoff helper signature)
+- `backend/tests/test_admin_report_export.py`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Added capability catalog module (`backend/app/capabilities.py`)
+   - Typed capability definitions for:
+     - identity (key/label/description/status)
+     - required inputs (signals/dataset/provenance/correction inputs)
+     - authority classification:
+       - `deterministic_primary`
+       - `deterministic_with_rag_crosscheck`
+       - `rag_guidance_only`
+       - `not_supported`
+     - blocked/downgrade rules with reason keys and outcomes
+     - applicability boundaries and output-contract intent
+   - Initial families populated:
+     - `takeoff`
+     - `landing`
+     - `performance_general`
+     - `handling_qualities`
+     - `trajectory_kinematics`
+     - `systems_monitoring`
+     - `buffet_vibration`
+     - `flutter_support`
+     - `risk_assessment`
+     - `general_standards_query`
+
+2. Added capability resolver/evaluator helpers
+   - `get_capability_definition(...)`
+   - `list_capabilities()`
+   - `evaluate_capability_request(...)`
+   - Supports blocked/partial/standards-only/allowed-with-limitations outcomes.
+
+3. Minimal integration into current implemented takeoff flow
+   - Deterministic takeoff computation now evaluates capability state and returns:
+     - authority/status/outcome
+     - rule reason key and user-facing message
+     - missing required signals
+     - applicability boundaries
+     - limitations
+   - Certification-style intent detection added for prompt text, producing downgrade to partial estimate when correction inputs are unavailable.
+   - Deterministic section rendering now includes catalog-aligned outcome, applicability, and limitations.
+
+4. Report wording alignment to catalog truth
+   - Admin report takeoff fallback limitations/applicability now sourced from capability catalog, reducing hard-coded drift.
+
+### Test coverage updates
+
+- Added dedicated capability-catalog tests:
+  - takeoff definition resolution/authority
+  - missing required signal -> blocked outcome
+  - certification request without correction inputs -> partial estimate downgrade
+  - unsupported capability -> `not_supported` blocked state
+  - explicit/stable applicability wording assertions
+- Updated existing tests for compatibility with takeoff helper signature changes.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_capability_catalog.py backend/tests/test_deterministic_takeoff_wording.py backend/tests/test_admin_report_export.py backend/tests/test_documents_tenancy.py -q
+```
+
+**Result:**
+
+- `19 passed`

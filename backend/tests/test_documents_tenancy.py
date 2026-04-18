@@ -245,7 +245,7 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda db, flight_test_id, dataset_version_id=None: {
+        lambda db, flight_test_id, dataset_version_id=None, request_certification_result=False: {
             "distance_ft": 1234.5,
             "distance_m": 376.3,
             "dataset_version_id": dataset_version_id,
@@ -389,7 +389,7 @@ def test_ai_analysis_uses_requested_dataset_version_and_persists_dataset_version
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda db, flight_test_id, dataset_version_id=None: {
+        lambda db, flight_test_id, dataset_version_id=None, request_certification_result=False: {
             "distance_ft": 1234.5,
             "distance_m": 376.3,
             "dataset_version_id": dataset_version_id,
