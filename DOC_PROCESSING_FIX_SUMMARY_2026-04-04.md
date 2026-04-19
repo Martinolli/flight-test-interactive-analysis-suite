@@ -2419,3 +2419,56 @@ pytest backend/tests/test_capability_catalog.py backend/tests/test_analysis_mode
 **Result:**
 
 - Backend tests: `32 passed`
+
+## P2.2 Cross-Check Hardening Pass (2026-04-19)
+
+### Completed: shared deterministic result model + report-compatibility check
+
+**Reason for this pass:**
+
+- Cross-check against full P2.2 acceptance list requested an explicit shared deterministic result contract and additional evidence that report export remains compatible with new non-takeoff deterministic outputs.
+
+**Files changed:**
+
+- `backend/app/analysis/deterministic.py`
+- `backend/app/analysis/__init__.py`
+- `backend/tests/test_deterministic_calculators.py`
+- `backend/tests/test_analysis_mode_routing.py`
+- `backend/tests/test_admin_report_export.py`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Added shared deterministic result structure
+   - Introduced `DeterministicCalculatorResult` dataclass in analysis module.
+   - Standardized calculator output fields:
+     - `available`
+     - `deterministic_metrics`
+     - `deterministic_assumptions`
+     - `reason`
+   - Preserved backward-compatible flattened metric fields so existing router/report logic remains stable.
+
+2. Assumptions now explicit in deterministic outputs
+   - Added mode-specific deterministic assumptions for:
+     - takeoff
+     - landing
+     - performance
+     - buffet/vibration
+   - Deterministic section builders now render assumptions blocks where available.
+
+3. Added compatibility/regression checks
+   - Extended deterministic calculator tests to assert presence of shared result contract fields.
+   - Extended mode-routing tests to assert non-takeoff modes do not emit takeoff deterministic section.
+   - Added admin PDF test proving landing deterministic section text renders in exported report path.
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_capability_catalog.py backend/tests/test_analysis_modes.py backend/tests/test_analysis_mode_routing.py backend/tests/test_deterministic_calculators.py backend/tests/test_deterministic_takeoff_wording.py backend/tests/test_documents_tenancy.py backend/tests/test_admin_report_export.py -q
+```
+
+**Result:**
+
+- Backend tests: `38 passed`

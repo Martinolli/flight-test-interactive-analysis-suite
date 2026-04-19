@@ -279,6 +279,12 @@
   - Extracted deterministic logic into dedicated module package:
     - `backend/app/analysis/deterministic.py`
     - `backend/app/analysis/__init__.py`
+  - Added shared deterministic result contract (`DeterministicCalculatorResult`) with reusable fields:
+    - `available`
+    - `deterministic_metrics`
+    - `deterministic_assumptions`
+    - `reason`
+    - capability-evaluation metadata (outcome/status/authority/reason key/user message)
   - Preserved takeoff as deterministic reference implementation via routed module call.
   - Added bounded deterministic calculators and mode routing integration for:
     - `landing` (WOW + ground-speed touchdown-to-rollout estimate)
@@ -292,6 +298,7 @@
     - modular calculator behavior (`test_deterministic_calculators.py`)
     - mode-routing outputs for landing/performance/buffet
     - catalog status/authority alignment updates
+    - report/export compatibility for landing deterministic narrative rendering
   - Kept non-implemented domain boundaries explicit (`flutter` remains bounded/unsupported).
 
 - [ ] P2.3 Add retrieval metadata model for mode-aware RAG

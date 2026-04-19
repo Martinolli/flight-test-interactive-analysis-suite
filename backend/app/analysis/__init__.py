@@ -1,6 +1,7 @@
 """Deterministic analysis calculators."""
 
 from app.analysis.deterministic import (
+    DeterministicCalculatorResult,
     build_deterministic_buffet_vibration_section,
     build_deterministic_landing_section,
     build_deterministic_performance_section,
@@ -12,6 +13,7 @@ from app.analysis.deterministic import (
 )
 
 __all__ = [
+    "DeterministicCalculatorResult",
     "build_deterministic_buffet_vibration_section",
     "build_deterministic_landing_section",
     "build_deterministic_performance_section",
@@ -21,4 +23,3 @@ __all__ = [
     "compute_performance_metrics",
     "compute_takeoff_metrics",
 ]
-

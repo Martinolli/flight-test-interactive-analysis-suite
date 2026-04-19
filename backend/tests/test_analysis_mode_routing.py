@@ -248,6 +248,7 @@ def test_ai_analysis_performance_mode_runs_mode_specific_deterministic_metrics(
     assert body["capability_key"] == "performance_general"
     assert "Deterministic Calculation (Performance Trends) [DATA]" in body["analysis"]
     assert "Mean climb rate" in body["analysis"]
+    assert "Deterministic Calculation (Flight Data) [DATA]" not in body["analysis"]
 
 
 def test_ai_analysis_buffet_mode_returns_screening_metrics(
@@ -298,6 +299,7 @@ def test_ai_analysis_buffet_mode_returns_screening_metrics(
     assert body["capability_key"] == "buffet_vibration"
     assert "Deterministic Calculation (Buffet/Vibration Screening) [DATA]" in body["analysis"]
     assert "Channels screened" in body["analysis"]
+    assert "Deterministic Calculation (Flight Data) [DATA]" not in body["analysis"]
 
 
 def test_ai_analysis_general_mode_routes_without_takeoff_calculator(

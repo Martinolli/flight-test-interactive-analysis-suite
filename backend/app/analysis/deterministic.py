@@ -11,12 +11,34 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from app.capabilities import CapabilityEvaluation, evaluate_capability_request
 from app.models import DataPoint, TestParameter
+
+
+@dataclass(frozen=True)
+class DeterministicCalculatorResult:
+    """Shared deterministic result structure for all calculator modules."""
+
+    available: bool
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    assumptions: List[str] = field(default_factory=list)
+    reason: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "available": self.available,
+            "deterministic_metrics": dict(self.metrics),
+            "deterministic_assumptions": list(self.assumptions),
+        }
+        if self.reason:
+            payload["reason"] = self.reason
+        payload.update(self.metrics)
+        return payload
 
 
 def _apply_capability_evaluation_to_metrics(metrics: dict, evaluation: CapabilityEvaluation) -> dict:
@@ -31,6 +53,10 @@ def _apply_capability_evaluation_to_metrics(metrics: dict, evaluation: Capabilit
     enriched["capability_applicability_boundaries"] = list(evaluation.applicability_boundaries)
     enriched["capability_limitations"] = list(evaluation.limitations)
     return enriched
+
+
+def _result_with_capability(result: DeterministicCalculatorResult, evaluation: CapabilityEvaluation) -> dict:
+    return _apply_capability_evaluation_to_metrics(result.to_dict(), evaluation)
 
 
 def _choose_param_id(params: List[dict], scorer) -> Optional[int]:
@@ -209,6 +235,7 @@ def _unavailable_metrics(
     event_detection_ok: Optional[bool] = None,
     request_certification_result: bool = False,
     has_standards_context: bool = True,
+    assumptions: Optional[List[str]] = None,
 ) -> dict:
     evaluation = evaluate_capability_request(
         capability_key,
@@ -221,11 +248,12 @@ def _unavailable_metrics(
         correction_inputs_available=False,
         has_standards_context=has_standards_context,
     )
-    return _apply_capability_evaluation_to_metrics(
-        {
-            "available": False,
-            "reason": reason,
-        },
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=False,
+            reason=reason,
+            assumptions=assumptions or [],
+        ),
         evaluation,
     )
 
@@ -426,8 +454,10 @@ def compute_takeoff_metrics(
         request_certification_result=request_certification_result,
         correction_inputs_available=False,
     )
-    return _apply_capability_evaluation_to_metrics(
-        {
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=True,
+            metrics={
             "available": True,
             "distance_ft": round(distance_ft, 1),
             "distance_m": round(distance_ft * 0.3048, 1),
@@ -444,7 +474,14 @@ def compute_takeoff_metrics(
             "sensor_accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
             "sensor_accel_mean_fts2": round(accel_sensor_fts2, 3) if accel_sensor_fts2 is not None else None,
             "sample_intervals_used": valid_intervals,
-        },
+            },
+            assumptions=[
+                "WOW mean threshold 0.5 is used to separate on-ground vs airborne states.",
+                "Ground-roll distance is integrated from available ground-speed samples with a trapezoidal method.",
+                "Time gaps > 10s are ignored during distance integration to avoid sparse-interval distortion.",
+                "No certification correction inputs (wind/runway slope/atmosphere/screen-height) are applied.",
+            ],
+        ),
         evaluation,
     )
 
@@ -625,8 +662,10 @@ def compute_landing_metrics(
         request_certification_result=request_certification_result,
         correction_inputs_available=False,
     )
-    return _apply_capability_evaluation_to_metrics(
-        {
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=True,
+            metrics={
             "available": True,
             "distance_ft": round(distance_ft, 1),
             "distance_m": round(distance_ft * 0.3048, 1),
@@ -639,7 +678,14 @@ def compute_landing_metrics(
             "sample_intervals_used": valid_intervals,
             "wow_channels_used": len(wow_ids),
             "wow_ground_threshold": 0.5,
-        },
+            },
+            assumptions=[
+                "Touchdown is detected from WOW airborne-to-ground transition with speed sanity threshold.",
+                "Rollout distance is integrated from touchdown to low-speed rollout end using ground-speed samples.",
+                "Low-speed rollout end threshold defaults to approximately 8 kt when stop is not directly observed.",
+                "No certification correction inputs (wind/runway/braking normalization/screen-height) are applied.",
+            ],
+        ),
         evaluation,
     )
 
@@ -794,8 +840,10 @@ def compute_performance_metrics(
         has_time_series_continuity=True,
         data_coverage_ok=True,
     )
-    return _apply_capability_evaluation_to_metrics(
-        {
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=True,
+            metrics={
             "available": True,
             "analysis_window_s": round(duration_s, 2),
             "samples_used": len(points),
@@ -806,7 +854,13 @@ def compute_performance_metrics(
             "min_speed_kt": round(min_speed_kt, 2) if min_speed_kt is not None else None,
             "accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
             "accel_mean_fts2": round(accel_mean_fts2, 3) if accel_mean_fts2 is not None else None,
-        },
+            },
+            assumptions=[
+                "Metrics are computed only from available channels in the selected dataset version.",
+                "Mean climb rate is derived from vertical-speed channel when present, otherwise altitude/time fallback.",
+                "No atmospheric, thrust, or certification correction models are applied in this bounded mode.",
+            ],
+        ),
         evaluation,
     )
 
@@ -906,8 +960,10 @@ def compute_buffet_vibration_metrics(
         has_time_series_continuity=True,
         data_coverage_ok=True,
     )
-    return _apply_capability_evaluation_to_metrics(
-        {
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=True,
+            metrics={
             "available": True,
             "channels_screened": len(channel_summaries),
             "dominant_channel": dominant["name"],
@@ -915,7 +971,13 @@ def compute_buffet_vibration_metrics(
             "dominant_unit": dominant["unit"],
             "channels_with_exceedances": sum(1 for c in channel_summaries if c["exceedance_count"] > 0),
             "channel_summaries": channel_summaries[:6],
-        },
+            },
+            assumptions=[
+                "This mode performs descriptive screening (RMS/peaks/spread/exceedance) on available vibration-like channels.",
+                "Exceedance markers use a simple 3-sigma-from-mean heuristic per channel.",
+                "Output is screening support only and does not represent formal loads substantiation or flutter clearance.",
+            ],
+        ),
         evaluation,
     )
 
@@ -940,6 +1002,11 @@ def _build_unavailable_section(title: str, metrics: dict) -> str:
     if limitations:
         lines.extend(["", "### Limitations"])
         for item in limitations:
+            lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
             lines.append(f"- {item}")
     return "\n".join(lines)
 
@@ -1062,6 +1129,11 @@ def build_deterministic_takeoff_section(metrics: dict) -> str:
         lines.extend(["", "### Limitations"])
         for item in capability_limitations:
             lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
+            lines.append(f"- {item}")
     if capability_reason_key and outcome != "partial_estimate":
         lines.append("")
         lines.append(f"- Capability rule key: {capability_reason_key}")
@@ -1103,6 +1175,11 @@ def build_deterministic_landing_section(metrics: dict) -> str:
     if limitations:
         lines.extend(["", "### Limitations"])
         for item in limitations:
+            lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
             lines.append(f"- {item}")
     return "\n".join(lines)
 
@@ -1147,6 +1224,11 @@ def build_deterministic_performance_section(metrics: dict) -> str:
     if limitations:
         lines.extend(["", "### Limitations"])
         for item in limitations:
+            lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
             lines.append(f"- {item}")
     return "\n".join(lines)
 
@@ -1197,5 +1279,9 @@ def build_deterministic_buffet_vibration_section(metrics: dict) -> str:
         lines.extend(["", "### Limitations"])
         for item in limitations:
             lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
+            lines.append(f"- {item}")
     return "\n".join(lines)
-

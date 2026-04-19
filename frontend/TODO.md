@@ -124,6 +124,7 @@
 - [x] P2.2 Backend deterministic expansion alignment (no new frontend UI required in this slice)
   - Backend now routes deterministic calculators for `landing`, `performance`, and `buffet_vibration`.
   - Existing mode payload wiring already forwards `analysis_mode`; no frontend contract change was required for this step.
+  - Backend deterministic result contract now includes reusable `deterministic_metrics` and `deterministic_assumptions` fields for future UI surfacing.
 - [ ] P2.3 Analysis job history + provenance panel
 - [ ] P2.4 Confidence/coverage/applicability badges
 - [ ] P2.5 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)

@@ -64,6 +64,9 @@ def test_takeoff_calculator_regression_with_wow_and_groundspeed(db_session, test
     assert result["capability_key"] == "takeoff"
     assert result["distance_ft"] > 0
     assert result["capability_outcome"] in {"allow_with_limitations", "partial_estimate"}
+    assert isinstance(result["deterministic_metrics"], dict)
+    assert isinstance(result["deterministic_assumptions"], list)
+    assert result["deterministic_metrics"]["distance_ft"] == result["distance_ft"]
 
 
 def test_landing_calculator_supported_with_touchdown_transition(db_session, test_user):
@@ -99,6 +102,8 @@ def test_landing_calculator_supported_with_touchdown_transition(db_session, test
     assert result["capability_key"] == "landing"
     assert result["distance_ft"] > 0
     assert result["touchdown_speed_kt"] >= result["rollout_end_speed_kt"]
+    assert "deterministic_metrics" in result
+    assert len(result["deterministic_assumptions"]) > 0
 
 
 def test_landing_calculator_blocks_when_wow_signal_missing(db_session, test_user):
@@ -154,6 +159,8 @@ def test_performance_calculator_returns_non_takeoff_metrics(db_session, test_use
     assert result["capability_key"] == "performance_general"
     assert result["mean_climb_rate_fpm"] is not None
     assert result["speed_delta_kt"] is not None
+    assert "deterministic_metrics" in result
+    assert len(result["deterministic_assumptions"]) > 0
 
 
 def test_buffet_vibration_calculator_returns_screening_output(db_session, test_user):
@@ -177,3 +184,5 @@ def test_buffet_vibration_calculator_returns_screening_output(db_session, test_u
     assert result["capability_key"] == "buffet_vibration"
     assert result["channels_screened"] >= 1
     assert len(result["channel_summaries"]) >= 1
+    assert "deterministic_metrics" in result
+    assert len(result["deterministic_assumptions"]) > 0

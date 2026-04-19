@@ -293,3 +293,62 @@ def test_build_pdf_takeoff_context_includes_result_classification_and_limitation
     assert b"Wind correction not applied." in pdf_bytes
     assert b"6.5 Applicability Boundaries" in pdf_bytes
     assert b"Not equivalent to corrected certification takeoff distance unless explicit corrections are applied." in pdf_bytes
+
+
+def test_admin_pdf_export_landing_context_uses_persisted_mode_specific_analysis_text(
+    client, db_session, admin_user, admin_headers, monkeypatch
+):
+    flight_test = _create_flight_test(db_session, admin_user["id"], name="Landing Report Compatibility")
+    job = AnalysisJob(
+        flight_test_id=flight_test.id,
+        created_by_id=admin_user["id"],
+        status="completed",
+        model_name="gpt-4o-mini",
+        model_version="2026-04-19",
+        parameters_analysed=1,
+        parameter_stats_snapshot_json=json.dumps(
+            [
+                {
+                    "name": "GS",
+                    "unit": "kt",
+                    "min_val": 5.0,
+                    "max_val": 132.0,
+                    "avg_val": 55.0,
+                    "std_val": 12.0,
+                    "sample_count": 260,
+                }
+            ]
+        ),
+        prompt_text="Provide a bounded deterministic landing rollout estimate.",
+        retrieved_source_ids_json='["S1"]',
+        retrieved_sources_snapshot_json='[{"source_id":"S1","title":"MIL-HDBK-1763","similarity":0.79}]',
+        output_sha256="a" * 64,
+        analysis_text=(
+            "## Deterministic Calculation (Landing Data) [DATA]\n"
+            "Estimated landing rollout distance using WOW and ground-speed traces.\n\n"
+            "## Recommendations\n"
+            "Recommendation: validate touchdown event-detection consistency across runs."
+        ),
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    captured = {}
+
+    def fake_build_pdf(*, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None):
+        captured["analysis_text"] = analysis_text
+        captured["analysis_job_id"] = analysis_job.id if analysis_job else None
+        return b"%PDF-1.4\n%mock\n"
+
+    monkeypatch.setattr(admin_router, "_build_pdf", fake_build_pdf)
+
+    response = client.post(
+        f"/api/admin/flight-tests/{flight_test.id}/report.pdf",
+        json={"analysis_job_id": job.id},
+        headers=admin_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert captured["analysis_job_id"] == job.id
+    assert "Deterministic Calculation (Landing Data) [DATA]" in captured["analysis_text"]
+    assert "Estimated landing rollout distance" in captured["analysis_text"]
