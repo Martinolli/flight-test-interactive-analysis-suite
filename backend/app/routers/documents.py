@@ -220,6 +220,7 @@ class AIAnalysisResponse(BaseModel):
     output_sha256: str
     created_at: str
     retrieved_source_ids: List[str] = Field(default_factory=list)
+    retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
 
 
 class AnalysisJobResponse(BaseModel):
@@ -2281,6 +2282,9 @@ def _analysis_job_to_response(
     source_ids = _safe_json_load(job.retrieved_source_ids_json, [])
     if not isinstance(source_ids, list):
         source_ids = []
+    retrieved_sources_snapshot = _safe_json_load(job.retrieved_sources_snapshot_json, [])
+    if not isinstance(retrieved_sources_snapshot, list):
+        retrieved_sources_snapshot = []
     analysis_mode, _clean_prompt = _decode_prompt_mode(job.prompt_text or "")
     selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
     if selected_mode is None:
@@ -2298,6 +2302,7 @@ def _analysis_job_to_response(
         output_sha256=job.output_sha256,
         created_at=job.created_at.isoformat() if job.created_at else "",
         retrieved_source_ids=[str(item) for item in source_ids if item],
+        retrieved_sources_snapshot=retrieved_sources_snapshot,
     )
 
 

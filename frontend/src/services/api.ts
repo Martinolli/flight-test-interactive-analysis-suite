@@ -170,6 +170,15 @@ export interface AIAnalysisResponse {
   output_sha256: string;
   created_at: string;
   retrieved_source_ids: string[];
+  retrieved_sources_snapshot: Array<{
+    source_id?: string;
+    filename?: string;
+    title?: string;
+    page_numbers?: string;
+    section_title?: string;
+    similarity?: number;
+    excerpt?: string;
+  }>;
 }
 
 export interface AnalysisJobResponse {

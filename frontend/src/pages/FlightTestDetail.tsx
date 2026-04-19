@@ -372,7 +372,8 @@ function AIAnalysisPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(true);
-  const [showSources, setShowSources] = useState(false);
+  const [showNarrativeCitations, setShowNarrativeCitations] = useState(false);
+  const [showRetrievedSources, setShowRetrievedSources] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [loadingSavedJob, setLoadingSavedJob] = useState(false);
   const [savedJobIdInput, setSavedJobIdInput] = useState('');
@@ -382,6 +383,14 @@ function AIAnalysisPanel({
   const [loadingAnalysisModes, setLoadingAnalysisModes] = useState(false);
   const { user } = useAuth();
   const parsedAnalysis = result ? parseAnalysisContent(result.analysis) : null;
+  const narrativeCitations = parsedAnalysis?.sources ?? [];
+  const retrievedSourcesSnapshot = result?.retrieved_sources_snapshot ?? [];
+  const retrievedSourceIds = result?.retrieved_source_ids ?? [];
+  const uniqueRetrievedSourceIds = Array.from(new Set(retrievedSourceIds.filter(Boolean)));
+  const retrievedSourceCount =
+    retrievedSourcesSnapshot.length > 0
+      ? retrievedSourcesSnapshot.length
+      : uniqueRetrievedSourceIds.length;
   const analysisDatasetVersion =
     result?.dataset_version_id == null
       ? undefined
@@ -501,7 +510,8 @@ function AIAnalysisPanel({
       if (data.analysis_mode) {
         setSelectedAnalysisMode(data.analysis_mode as AnalysisModeKey);
       }
-      setShowSources(false);
+      setShowNarrativeCitations(false);
+      setShowRetrievedSources(false);
     } catch (err) {
       setError((err as Error).message || 'AI analysis failed');
     } finally {
@@ -532,11 +542,13 @@ function AIAnalysisPanel({
         output_sha256: job.output_sha256,
         created_at: job.created_at,
         retrieved_source_ids: job.retrieved_source_ids,
+        retrieved_sources_snapshot: job.retrieved_sources_snapshot,
       });
       if (job.analysis_mode) {
         setSelectedAnalysisMode(job.analysis_mode as AnalysisModeKey);
       }
-      setShowSources(false);
+      setShowNarrativeCitations(false);
+      setShowRetrievedSources(false);
       toast.success(`Loaded analysis job #${job.id}`);
     } catch (err) {
       toast.error((err as Error).message || 'Failed to load saved analysis job.');
@@ -716,9 +728,17 @@ function AIAnalysisPanel({
               <span>·</span>
               <span>Mode: {result.analysis_mode ?? activeModeFromResult}</span>
               <span>·</span>
+              <span>Narrative citations: {narrativeCitations.length}</span>
+              <span>·</span>
+              <span>Retrieved sources: {retrievedSourceCount}</span>
+              <span>·</span>
               <span>Analysis dataset: {analysisDatasetLabel}</span>
               <span>·</span>
               <span>Analysis Job #{result.analysis_job_id}</span>
+            </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              Narrative citations are the sources explicitly cited in the visible analysis text. Retrieved sources are
+              the full source set saved with this analysis job artifact and used for provenance/reporting.
             </div>
             {result.analysis_mode && result.analysis_mode !== selectedAnalysisMode && (
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
@@ -776,23 +796,86 @@ function AIAnalysisPanel({
                     </div>
                   )}
 
-                  {(parsedAnalysis?.sources.length ?? 0) > 0 && (
-                    <div className="mt-3 border-t border-gray-100 pt-3">
-                      <button
-                        onClick={() => setShowSources((v) => !v)}
-                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        {parsedAnalysis?.sources.length} source{(parsedAnalysis?.sources.length ?? 0) > 1 ? 's' : ''}
-                        {showSources ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </button>
-                      {showSources && (
-                        <div className="mt-2 space-y-1.5">
-                          {parsedAnalysis?.sources.map((source) => (
-                            <div key={source} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                              {source}
+                  {(narrativeCitations.length > 0 || retrievedSourceCount > 0) && (
+                    <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+                      {narrativeCitations.length > 0 && (
+                        <div>
+                          <button
+                            onClick={() => setShowNarrativeCitations((v) => !v)}
+                            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Narrative citations ({narrativeCitations.length})
+                            {showNarrativeCitations ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                          {showNarrativeCitations && (
+                            <div className="mt-2 space-y-1.5">
+                              {narrativeCitations.map((source) => (
+                                <div
+                                  key={source}
+                                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700"
+                                >
+                                  {source}
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
+                        </div>
+                      )}
+
+                      {retrievedSourceCount > 0 && (
+                        <div>
+                          <button
+                            onClick={() => setShowRetrievedSources((v) => !v)}
+                            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Retrieved sources ({retrievedSourceCount})
+                            {showRetrievedSources ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                          {showRetrievedSources && (
+                            <div className="mt-2 space-y-1.5">
+                              <p className="text-[11px] text-gray-500">
+                                Full retrieved set from persisted analysis-job provenance (PDF/report footer uses this set).
+                              </p>
+                              {retrievedSourcesSnapshot.length > 0
+                                ? retrievedSourcesSnapshot.map((source, index) => (
+                                    <div
+                                      key={`${source.source_id ?? 'source'}-${index}`}
+                                      className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-gray-700"
+                                    >
+                                      <div className="font-medium text-gray-800">
+                                        {source.source_id ?? `S?-${index + 1}`}
+                                        {' · '}
+                                        {source.title || source.filename || 'Untitled source'}
+                                      </div>
+                                      <div className="mt-0.5 text-gray-600">
+                                        {source.page_numbers ? `p.${source.page_numbers}` : 'page n/a'}
+                                        {source.section_title ? ` · ${source.section_title}` : ''}
+                                        {typeof source.similarity === 'number'
+                                          ? ` · sim ${source.similarity.toFixed(3)}`
+                                          : ''}
+                                      </div>
+                                    </div>
+                                  ))
+                                : uniqueRetrievedSourceIds.map((sourceId) => (
+                                    <div
+                                      key={sourceId}
+                                      className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-gray-700"
+                                    >
+                                      {sourceId}
+                                    </div>
+                                  ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

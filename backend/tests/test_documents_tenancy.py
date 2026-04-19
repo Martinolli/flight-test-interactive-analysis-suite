@@ -268,6 +268,9 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     assert body["model_name"]
     assert body["output_sha256"]
     assert body["retrieved_source_ids"] == ["S1"]
+    assert isinstance(body.get("retrieved_sources_snapshot"), list)
+    assert len(body["retrieved_sources_snapshot"]) == 1
+    assert body["retrieved_sources_snapshot"][0]["source_id"] == "S1"
 
     persisted_job = (
         db_session.query(AnalysisJob)

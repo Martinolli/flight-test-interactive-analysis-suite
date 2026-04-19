@@ -117,6 +117,10 @@
   - `Analyze with AI` request now sends `analysis_mode` separately from `user_prompt`.
   - AI panel now consumes `/api/documents/analysis-modes` to surface mode status/authority and warn when selected mode is limited.
   - Re-opened saved analysis jobs now carry and display their persisted `analysis_mode` provenance in the panel state.
+  - AI panel provenance/source rendering now distinguishes:
+    - `Narrative citations (N)` from analysis text references.
+    - `Retrieved sources (M)` from persisted analysis-job retrieved-source snapshot.
+  - Source counts are displayed separately to keep dashboard view aligned with saved-job/PDF provenance totals.
 - [ ] P2.2 Analysis job history + provenance panel
 - [ ] P2.3 Confidence/coverage/applicability badges
 - [ ] P2.4 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)

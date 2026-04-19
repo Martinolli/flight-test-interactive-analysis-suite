@@ -129,6 +129,9 @@ def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
     body = response.json()
     assert body["analysis_mode"] == "takeoff"
     assert body["capability_key"] == "takeoff"
+    assert isinstance(body.get("retrieved_sources_snapshot"), list)
+    assert len(body["retrieved_sources_snapshot"]) == 1
+    assert body["retrieved_sources_snapshot"][0]["source_id"] == "S1"
 
     persisted_job = (
         db_session.query(AnalysisJob)

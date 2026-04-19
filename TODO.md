@@ -268,6 +268,12 @@
     - quick mode chips now map to explicit backend `analysis_mode` keys and send mode in request payload
     - AI panel now surfaces backend mode truth (`implemented` / `partial` / `planned` / `blocked`) via `/api/documents/analysis-modes`
     - UI shows bounded-capability notice for non-implemented modes and preserves prompt-vs-mode separation
+  - Provenance display alignment hardening:
+    - AI response now includes persisted `retrieved_sources_snapshot` so dashboard panel can show full retrieved-source provenance.
+    - Flight Test Detail AI panel now distinguishes:
+      - narrative citations (sources explicitly cited in visible analysis text)
+      - retrieved sources (full persisted analysis-job source set used for provenance/PDF footer).
+    - Source counts are now surfaced as separate values to avoid under-reporting retrieved evidence.
 
 - [ ] P2.2 Add deterministic calculators beyond takeoff
   - Extract current logic to dedicated analysis modules.

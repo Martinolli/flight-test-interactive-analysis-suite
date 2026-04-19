@@ -2288,3 +2288,59 @@ pnpm -C frontend run build
 
 - Backend mode-routing tests: `8 passed`
 - Frontend build: `success`
+
+## P2.1 Provenance Display Alignment Fix — Narrative vs Retrieved Sources (2026-04-19)
+
+### Completed: Dashboard AI Analysis panel now reflects full persisted source provenance
+
+**Observed issue:**
+
+- Saved-job PDF/report showed full retrieved-source set (e.g., `Retrieved Sources: 14`), while Dashboard AI panel showed only a small subset from narrative references.
+- This created a provenance mismatch between dashboard view and immutable analysis-job/report artifacts.
+
+**Files changed:**
+
+- `backend/app/routers/documents.py`
+- `backend/tests/test_documents_tenancy.py`
+- `backend/tests/test_analysis_mode_routing.py`
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Backend response contract alignment
+   - Extended `AIAnalysisResponse` to include:
+     - `retrieved_sources_snapshot`
+   - `_analysis_job_to_response(...)` now returns both:
+     - `retrieved_source_ids`
+     - `retrieved_sources_snapshot`
+   - Immediate post-run analysis responses and reopened saved-job flows now share compatible source-provenance fields.
+
+2. Dashboard AI panel source distinction
+   - Source display is split into two explicit sections:
+     - `Narrative citations (N)` — references explicitly shown/cited in analysis text.
+     - `Retrieved sources (M)` — full persisted source set used by analysis artifact/provenance.
+   - Added traceability wording clarifying that PDF/report provenance footer uses the full retrieved set.
+   - Counts are surfaced separately in panel metadata to avoid under-reporting.
+
+3. Preserved existing behavior
+   - Markdown rendering unchanged.
+   - Quality notice rendering unchanged.
+   - Reopen-by-ID flow preserved (now carries retrieved-source snapshot into panel state).
+   - Dataset provenance display unchanged.
+   - Immutable PDF export flow unchanged.
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_documents_tenancy.py backend/tests/test_analysis_mode_routing.py backend/tests/test_analysis_modes.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend tests: `16 passed`
+- Frontend build: `success`
