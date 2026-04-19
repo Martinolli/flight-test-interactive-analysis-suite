@@ -1,6 +1,6 @@
 # FTIAS Frontend — TODO (Execution Alignment)
 
-**Last updated:** 2026-04-17  
+**Last updated:** 2026-04-19  
 **Alignment:** mirrors root execution plan (`TODO.md`) and REV02 review.
 
 ---
@@ -112,6 +112,8 @@
 ## P2 — Domainization and Risk Workflow
 
 - [ ] P2.1 Analysis mode selector and mode-specific UX cues
+  - Backend P2.1 routing foundation is now available (`analysis_mode` request/response + `/api/documents/analysis-modes`).
+  - Frontend mode selector and mode-specific cues remain pending by design.
 - [ ] P2.2 Analysis job history + provenance panel
 - [ ] P2.3 Confidence/coverage/applicability badges
 - [ ] P2.4 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)

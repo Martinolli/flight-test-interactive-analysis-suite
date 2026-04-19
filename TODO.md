@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 02
 
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-19
 **Scope:** Backend + Frontend + LLM/RAG + Reporting
 **Plan basis:** aligned to `TODO_REV_01.md`, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, current `TODO.md`, and post-P0.3 audit findings
 
@@ -240,7 +240,7 @@
 
 ## P2 — Domainization + Deterministic Expansion
 
-- [ ] P2.1 Introduce `analysis_mode` architecture
+- [x] P2.1 Introduce `analysis_mode` architecture
   - Domain routing for:
     - `takeoff`
     - `landing`
@@ -251,6 +251,19 @@
     - `propulsion_systems`
     - `electrical_systems`
     - `general`
+  - Implemented backend mode-routing foundation:
+    - Added explicit mode registry/resolver in `backend/app/analysis_modes.py`.
+    - Added `/api/documents/analysis-modes` endpoint exposing mode key/label/description, capability key, status, and authority.
+    - Extended AI analysis request/response contract with `analysis_mode` and `capability_key`.
+    - Mode-tagged persisted prompts (`[analysis_mode:...]`) for saved-analysis provenance; reopen flow decodes and returns clean prompt text.
+    - Current deterministic takeoff path is now routed through `analysis_mode=takeoff`.
+    - Non-takeoff modes return explicit capability-aware bounded output (blocked/partial/guidance-aware), without claiming unsupported deterministic computation.
+  - Added focused regression coverage for:
+    - mode registry/capability alignment
+    - default mode resolution
+    - takeoff routed behavior and persisted mode tag
+    - explicit limited outcome for non-implemented mode (`landing`)
+    - unknown-mode request rejection
 
 - [ ] P2.2 Add deterministic calculators beyond takeoff
   - Extract current logic to dedicated analysis modules.

@@ -33,8 +33,16 @@ except ImportError:
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.analysis_modes import (
+    AnalysisModeDefinition,
+    analysis_mode_authority,
+    analysis_mode_status,
+    get_analysis_mode_definition,
+    list_analysis_modes,
+    resolve_analysis_mode,
+)
 from app.auth import get_current_user
-from app.capabilities import CapabilityEvaluation, evaluate_capability_request
+from app.capabilities import CapabilityEvaluation, CapabilityOutcome, evaluate_capability_request
 from app.database import SessionLocal, get_db
 from app.models import (
     AnalysisJob,
@@ -202,6 +210,8 @@ class QueryResponse(BaseModel):
 class AIAnalysisResponse(BaseModel):
     analysis: str
     flight_test_name: str
+    analysis_mode: str = "takeoff"
+    capability_key: Optional[str] = None
     dataset_version_id: Optional[int] = None
     parameters_analysed: int
     analysis_job_id: int
@@ -216,6 +226,8 @@ class AnalysisJobResponse(BaseModel):
     id: int
     flight_test_id: int
     flight_test_name: str
+    analysis_mode: str = "takeoff"
+    capability_key: Optional[str] = None
     dataset_version_id: Optional[int] = None
     parameters_analysed: int
     status: str
@@ -229,6 +241,16 @@ class AnalysisJobResponse(BaseModel):
     retrieved_source_ids: List[str] = Field(default_factory=list)
     retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
     parameter_stats_snapshot: List[dict] = Field(default_factory=list)
+
+
+class AnalysisModeOut(BaseModel):
+    key: str
+    label: str
+    description: str
+    capability_key: str
+    capability_status: str
+    authority: str
+    default: bool
 
 
 # ---------------------------------------------------------------------------
@@ -1988,6 +2010,31 @@ def query_documents(
 
 
 # ---------------------------------------------------------------------------
+# GET /api/documents/analysis-modes
+# ---------------------------------------------------------------------------
+
+@router.get("/analysis-modes", response_model=List[AnalysisModeOut])
+def get_analysis_modes(
+    _current_user: User = Depends(get_current_user),
+):
+    """Return available analysis modes and their capability-backed status."""
+    response: List[AnalysisModeOut] = []
+    for mode in list_analysis_modes():
+        response.append(
+            AnalysisModeOut(
+                key=mode.key,
+                label=mode.label,
+                description=mode.description,
+                capability_key=mode.capability_key,
+                capability_status=analysis_mode_status(mode).value,
+                authority=analysis_mode_authority(mode).value,
+                default=mode.default,
+            )
+        )
+    return response
+
+
+# ---------------------------------------------------------------------------
 # Analysis job helpers
 # ---------------------------------------------------------------------------
 
@@ -2013,6 +2060,183 @@ def _safe_json_load(value: Optional[str], default):
         return json.loads(value)
     except Exception:
         return default
+
+
+_ANALYSIS_MODE_PROMPT_RE = re.compile(
+    r"^\[analysis_mode:(?P<mode>[a-z_]+)\]\s*(?P<prompt>.*)$",
+    flags=re.DOTALL,
+)
+
+
+def _encode_prompt_with_mode(user_prompt: str, analysis_mode: str) -> str:
+    raw = (user_prompt or "").strip()
+    return f"[analysis_mode:{analysis_mode}] {raw}".strip()
+
+
+def _decode_prompt_mode(prompt_text: str) -> Tuple[Optional[str], str]:
+    text = prompt_text or ""
+    match = _ANALYSIS_MODE_PROMPT_RE.match(text.strip())
+    if not match:
+        return None, text
+    return match.group("mode"), match.group("prompt")
+
+
+def _build_mode_routing_section(
+    *,
+    mode: AnalysisModeDefinition,
+    capability_eval: CapabilityEvaluation,
+) -> str:
+    lines = [
+        "## Analysis Mode Routing",
+        f"- Requested mode: **{mode.key}** ({mode.label})",
+        f"- Capability key: **{capability_eval.capability_key}**",
+        f"- Capability status: **{capability_eval.status.value}**",
+        f"- Authority classification: **{capability_eval.authority.value}**",
+        f"- Routing outcome: **{capability_eval.outcome.value}**",
+    ]
+    if capability_eval.reason_key:
+        lines.append(f"- Rule reason key: **{capability_eval.reason_key}**")
+    lines.append(f"- Routing note: {capability_eval.user_message}")
+    if capability_eval.missing_required_signals:
+        lines.append(
+            "- Missing required signals: "
+            + ", ".join(capability_eval.missing_required_signals)
+        )
+    if capability_eval.applicability_boundaries:
+        lines.append("")
+        lines.append("### Applicability Boundaries")
+        for item in capability_eval.applicability_boundaries:
+            lines.append(f"- {item}")
+    if capability_eval.limitations:
+        lines.append("")
+        lines.append("### Limitations")
+        for item in capability_eval.limitations:
+            lines.append(f"- {item}")
+    return "\n".join(lines)
+
+
+def _build_non_takeoff_deterministic_section(
+    *,
+    mode: AnalysisModeDefinition,
+    capability_eval: CapabilityEvaluation,
+) -> str:
+    lines = [
+        "## Deterministic Calculation (Mode Scope) [DATA]",
+        (
+            f"No deterministic {mode.label.lower()} calculator is executed in this release for "
+            f"`analysis_mode={mode.key}`."
+        ),
+        f"- Outcome: **{capability_eval.outcome.value}**",
+    ]
+    if capability_eval.reason_key:
+        lines.append(f"- Reason key: **{capability_eval.reason_key}**")
+    if capability_eval.outcome == CapabilityOutcome.STANDARDS_ONLY_GUIDANCE:
+        lines.append("- Behavior: standards/context guidance only (no authoritative deterministic metric).")
+    elif capability_eval.outcome == CapabilityOutcome.BLOCKED:
+        lines.append("- Behavior: analysis is capability-gated; deterministic result is blocked.")
+    elif capability_eval.outcome == CapabilityOutcome.PARTIAL_ESTIMATE:
+        lines.append("- Behavior: partial estimate only with explicit limitations.")
+    else:
+        lines.append("- Behavior: mode can provide narrative guidance with explicit applicability boundaries.")
+    return "\n".join(lines)
+
+
+def _analysis_retrieval_focus_for_mode(mode_key: str) -> str:
+    focus_map = {
+        "takeoff": "takeoff distance ground roll liftoff runway acceleration weight on wheels procedures certification",
+        "landing": "landing distance touchdown braking deceleration runway procedures standards",
+        "performance": "performance flight envelope climb cruise drag thrust standards",
+        "handling_qualities": "handling qualities controllability stability pilot workload flying qualities",
+        "buffet_vibration": "buffet vibration structural response instrumentation standards",
+        "flutter": "flutter aeroelastic stability modal analysis safety limitations",
+        "propulsion_systems": "propulsion engine performance thrust fuel system monitoring limits",
+        "electrical_systems": "electrical system monitoring loads generators buses protections standards",
+        "general": "flight test standards procedures engineering analysis assumptions limitations",
+    }
+    return focus_map.get(mode_key, focus_map["general"])
+
+
+def _default_analysis_goal_for_mode(mode: AnalysisModeDefinition) -> str:
+    if mode.key == "takeoff":
+        return (
+            "Produce a structured report with: (1) Executive Summary, "
+            "(2) Parameter Analysis with notable observations, "
+            "(3) Potential Anomalies or Concerns, (4) Recommendations."
+        )
+    if mode.key == "general":
+        return (
+            "Produce a structured engineering interpretation with standards cross-check, "
+            "explicit assumptions, limitations, and recommended follow-up analysis."
+        )
+    return (
+        f"Provide a mode-scoped engineering assessment for {mode.label}. "
+        "Explicitly state current implementation limits, blocked conditions, and required additional data."
+    )
+
+
+def _capability_eval_from_takeoff_metrics(metrics: dict) -> CapabilityEvaluation:
+    authority = metrics.get("capability_authority") or "deterministic_with_rag_crosscheck"
+    status = metrics.get("capability_status") or "implemented"
+    outcome = metrics.get("capability_outcome") or "allow_with_limitations"
+    return CapabilityEvaluation(
+        capability_key=str(metrics.get("capability_key") or "takeoff"),
+        label="Takeoff Analysis",
+        status=analysis_mode_status(resolve_analysis_mode("takeoff")),
+        authority=analysis_mode_authority(resolve_analysis_mode("takeoff")),
+        outcome=CapabilityOutcome(outcome) if outcome in {item.value for item in CapabilityOutcome} else CapabilityOutcome.ALLOW_WITH_LIMITATIONS,
+        reason_key=metrics.get("capability_reason_key"),
+        user_message=str(metrics.get("capability_user_message") or "Takeoff capability evaluation completed."),
+        missing_required_signals=list(metrics.get("capability_missing_signals") or []),
+        applicability_boundaries=list(metrics.get("capability_applicability_boundaries") or []),
+        limitations=list(metrics.get("capability_limitations") or []),
+    )
+
+
+def _build_mode_limited_analysis_text(
+    *,
+    mode: AnalysisModeDefinition,
+    capability_eval: CapabilityEvaluation,
+    analysis_goal: str,
+) -> str:
+    lines = [
+        "### Executive Summary",
+        (
+            f"The selected analysis mode `{mode.key}` is currently routed as `{capability_eval.outcome.value}`. "
+            "This response provides capability-aware boundaries and next-step guidance only."
+        ),
+        "",
+        "### Mode Applicability and Limits",
+        f"- Capability status: **{capability_eval.status.value}**",
+        f"- Authority classification: **{capability_eval.authority.value}**",
+    ]
+    if capability_eval.reason_key:
+        lines.append(f"- Rule reason: **{capability_eval.reason_key}**")
+    lines.extend(
+        [
+            f"- Routing message: {capability_eval.user_message}",
+            "",
+            "### Assumptions and Limitations",
+        ]
+    )
+    if capability_eval.limitations:
+        lines.extend([f"- {item}" for item in capability_eval.limitations])
+    else:
+        lines.append("- No additional limitations were provided by catalog rules.")
+    lines.extend(["", "### Applicability Boundaries"])
+    if capability_eval.applicability_boundaries:
+        lines.extend([f"- {item}" for item in capability_eval.applicability_boundaries])
+    else:
+        lines.append("- Applicability boundaries are not yet defined for this mode.")
+    lines.extend(
+        [
+            "",
+            "### Recommendations",
+            "- Use `analysis_mode=takeoff` for currently implemented deterministic performance analysis.",
+            "- For this mode, use standards guidance as advisory context until deterministic modules are implemented.",
+            f"- Requested goal: {analysis_goal}",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _serialize_retrieval_snapshot(sources: List[dict], excerpt_chars: int = 320) -> List[dict]:
@@ -2057,9 +2281,15 @@ def _analysis_job_to_response(
     source_ids = _safe_json_load(job.retrieved_source_ids_json, [])
     if not isinstance(source_ids, list):
         source_ids = []
+    analysis_mode, _clean_prompt = _decode_prompt_mode(job.prompt_text or "")
+    selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
+    if selected_mode is None:
+        selected_mode = resolve_analysis_mode(None)
     return AIAnalysisResponse(
         analysis=job.analysis_text,
         flight_test_name=flight_test_name,
+        analysis_mode=selected_mode.key,
+        capability_key=selected_mode.capability_key,
         dataset_version_id=job.dataset_version_id,
         parameters_analysed=job.parameters_analysed,
         analysis_job_id=job.id,
@@ -2141,17 +2371,23 @@ def get_ai_analysis_job(
     parameter_stats_snapshot = _safe_json_load(job.parameter_stats_snapshot_json, [])
     if not isinstance(parameter_stats_snapshot, list):
         parameter_stats_snapshot = []
+    analysis_mode, clean_prompt_text = _decode_prompt_mode(job.prompt_text or "")
+    selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
+    if selected_mode is None:
+        selected_mode = resolve_analysis_mode(None)
 
     return AnalysisJobResponse(
         id=job.id,
         flight_test_id=job.flight_test_id,
         flight_test_name=ft.test_name,
+        analysis_mode=selected_mode.key,
+        capability_key=selected_mode.capability_key,
         dataset_version_id=job.dataset_version_id,
         parameters_analysed=job.parameters_analysed,
         status=job.status,
         model_name=job.model_name,
         model_version=job.model_version,
-        prompt_text=job.prompt_text,
+        prompt_text=clean_prompt_text,
         analysis=job.analysis_text,
         output_sha256=job.output_sha256,
         created_at=job.created_at.isoformat() if job.created_at else "",
@@ -2169,6 +2405,7 @@ def get_ai_analysis_job(
 class AIAnalysisRequest(BaseModel):
     user_prompt: str | None = None
     dataset_version_id: Optional[int] = None
+    analysis_mode: Optional[str] = None
 
 
 @router.post(
@@ -2243,171 +2480,258 @@ def ai_analysis(
         )
     stats_table = "\n".join(stats_lines)
 
-    # If the user supplied a specific analysis goal, use it; otherwise use the default.
+    requested_mode_key = (body.analysis_mode or "").strip().lower()
+    if requested_mode_key and not get_analysis_mode_definition(requested_mode_key):
+        supported = ", ".join([mode.key for mode in list_analysis_modes()])
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported analysis_mode '{requested_mode_key}'. "
+                f"Supported modes: {supported}."
+            ),
+        )
+    selected_mode = resolve_analysis_mode(requested_mode_key or None)
+
+    # If the user supplied a specific analysis goal, use it; otherwise use the mode default.
     if body.user_prompt and body.user_prompt.strip():
         analysis_goal = body.user_prompt.strip()
     else:
-        analysis_goal = (
-            "Produce a structured report with: (1) Executive Summary, "
-            "(2) Parameter Analysis with notable observations, "
-            "(3) Potential Anomalies or Concerns, (4) Recommendations."
-        )
+        analysis_goal = _default_analysis_goal_for_mode(selected_mode)
 
-    # Deterministic takeoff metrics from time-series data (authoritative section)
-    certification_requested = _is_certification_result_requested(analysis_goal)
-    takeoff_metrics = _compute_takeoff_metrics(
-        db=db,
-        flight_test_id=flight_test_id,
-        dataset_version_id=dataset_version_id,
-        request_certification_result=certification_requested,
+    available_signal_names = [str(row.name) for row in stats_rows]
+    mode_eval = evaluate_capability_request(
+        selected_mode.capability_key,
+        available_signals=available_signal_names,
+        has_dataset=bool(stats_rows),
+        has_standards_context=True,
     )
-    deterministic_section = _build_deterministic_takeoff_section(takeoff_metrics)
-
-    # Hybrid document retrieval with stable source IDs
-    param_names = [r.name for r in stats_rows[:10]]
-    retrieval_focus = (
-        "takeoff distance ground roll liftoff runway acceleration "
-        "weight on wheels procedures certification"
+    mode_routing_section = _build_mode_routing_section(
+        mode=selected_mode,
+        capability_eval=mode_eval,
     )
-    retrieval_question = (
-        f"{analysis_goal}\n"
-        f"Focus terms: {retrieval_focus}\n"
-        f"Aircraft: {ft.aircraft_type or ''}\n"
-        f"Flight test parameter names: {'; '.join(param_names)}"
-    )
-    sources, context_text = _retrieve_hybrid_sources(
-        db=db,
-        question=retrieval_question,
-        requested_top_k=8,
-        owner_user_id=current_user.id,
-    )
-
-    # Build the LLM prompt (LLM writes interpretation/cross-check only)
-    system_prompt = (
-        "You are a senior flight test engineer. "
-        "A deterministic takeoff section has already been computed by software and must not be recalculated "
-        "or numerically modified. "
-        "Your task is to produce interpretation and standards cross-check only, using ONLY provided source excerpts. "
-        "Cite standards claims with [Sx]. For deterministic data references, use [DATA]. "
-        "Do not emit USED_SOURCES footer."
-    )
-
-    user_prompt = (
-        f"Flight Test: {ft.test_name}\n"
-        f"Aircraft: {ft.aircraft_type or 'Not specified'}\n"
-        f"Test Date: {ft.test_date.strftime('%Y-%m-%d') if ft.test_date else 'Not specified'}\n"
-        f"Description: {ft.description or 'None'}\n\n"
-        f"Analysis Goal: {analysis_goal}\n\n"
-        f"Parameter Statistics:\n{stats_table}\n\n"
-        "Deterministic Section (already computed and authoritative):\n"
-        f"{deterministic_section}\n\n"
-        "Requirements:\n"
-        "- Do not recompute or alter deterministic values.\n"
-        "- Write sections: (1) Executive Summary, (2) Standards Cross-Check, "
-        "(3) Risks/Assumptions, (4) Recommendations.\n"
-        "- In section (2) Standards Cross-Check, each substantive sentence must include at least one inline [Sx] citation.\n"
-        "- If section (4) Recommendations references standards/procedures, include [Sx] there as well.\n"
-        "- If standards evidence is missing, state that explicitly.\n"
-    )
-
-    if context_text:
-        user_prompt += f"\n\nReference Document Excerpts:\n\n{context_text}"
 
     analysis_model = os.getenv("ANALYSIS_LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4o-mini"))
     analysis_temperature = max(0.0, min(1.0, float(os.getenv("ANALYSIS_TEMPERATURE", "0.2"))))
     analysis_max_tokens = max(1200, min(4096, int(os.getenv("ANALYSIS_MAX_TOKENS", "2600"))))
 
-    try:
-        client = get_openai_client()
-        completion = client.chat.completions.create(
-            model=analysis_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=analysis_temperature,
-            max_tokens=analysis_max_tokens,
+    deterministic_section = ""
+    llm_analysis_text = ""
+    persisted_prompt_text = ""
+    sources: List[dict] = []
+    cited_sources: List[dict] = []
+    context_text = ""
+    run_llm = False
+
+    if selected_mode.key == "takeoff":
+        certification_requested = _is_certification_result_requested(analysis_goal)
+        takeoff_metrics = _compute_takeoff_metrics(
+            db=db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            request_certification_result=certification_requested,
         )
-        analysis_text = completion.choices[0].message.content or ""
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"LLM analysis failed: {exc}",
+        mode_eval = _capability_eval_from_takeoff_metrics(takeoff_metrics)
+        mode_routing_section = _build_mode_routing_section(
+            mode=selected_mode,
+            capability_eval=mode_eval,
+        )
+        deterministic_section = _build_deterministic_takeoff_section(takeoff_metrics)
+        run_llm = True
+    else:
+        deterministic_section = _build_non_takeoff_deterministic_section(
+            mode=selected_mode,
+            capability_eval=mode_eval,
+        )
+        # Only "general" currently runs routed LLM guidance path.
+        run_llm = selected_mode.key == "general"
+
+    if run_llm:
+        param_names = [r.name for r in stats_rows[:10]]
+        retrieval_focus = _analysis_retrieval_focus_for_mode(selected_mode.key)
+        retrieval_question = (
+            f"{analysis_goal}\n"
+            f"Focus terms: {retrieval_focus}\n"
+            f"Aircraft: {ft.aircraft_type or ''}\n"
+            f"Flight test parameter names: {'; '.join(param_names)}"
+        )
+        sources, context_text = _retrieve_hybrid_sources(
+            db=db,
+            question=retrieval_question,
+            requested_top_k=8,
+            owner_user_id=current_user.id,
         )
 
-    analysis_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", analysis_text).strip()
-
-    # Optional strict citation-density repair for Standards Cross-Check section.
-    min_citation_density = max(
-        0.0, min(1.0, float(os.getenv("ANALYSIS_MIN_CITATION_DENSITY", "0.75")))
-    )
-    standards_section = _extract_standards_cross_check_section(analysis_text)
-    standards_density = _citation_density(standards_section)
-    if sources and standards_section and standards_density < min_citation_density:
-        source_lines: List[str] = []
-        for s in sources:
-            ref_label = (
-                f"{s.get('title') or s.get('filename')}"
-                + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
-                + (f" — {s.get('section_title')}" if s.get("section_title") else "")
+        if selected_mode.key == "takeoff":
+            system_prompt = (
+                "You are a senior flight test engineer. "
+                "A deterministic takeoff section has already been computed by software and must not be recalculated "
+                "or numerically modified. "
+                "Your task is to produce interpretation and standards cross-check only, using ONLY provided source excerpts. "
+                "Cite standards claims with [Sx]. For deterministic data references, use [DATA]. "
+                "Do not emit USED_SOURCES footer."
             )
-            source_lines.append(f"- {s.get('source_id')}: {ref_label}")
-        source_legend = "\n".join(source_lines)
-        repair_system_prompt = (
-            "You are a technical editor. Revise the analysis to improve citation coverage only. "
-            "Preserve structure, numbers, and conclusions. "
-            "For Standards Cross-Check statements, ensure each substantive sentence has an inline [Sx] citation "
-            "using only source IDs from the provided legend. "
-            "Do not add a references section. Do not emit USED_SOURCES."
-        )
-        repair_user_prompt = (
-            "Source ID legend:\n"
-            f"{source_legend}\n\n"
-            "Revise the analysis below for citation density compliance:\n\n"
-            f"{analysis_text}"
-        )
+            llm_user_prompt = (
+                f"Flight Test: {ft.test_name}\n"
+                f"Aircraft: {ft.aircraft_type or 'Not specified'}\n"
+                f"Test Date: {ft.test_date.strftime('%Y-%m-%d') if ft.test_date else 'Not specified'}\n"
+                f"Description: {ft.description or 'None'}\n\n"
+                f"Analysis Goal: {analysis_goal}\n\n"
+                f"Parameter Statistics:\n{stats_table}\n\n"
+                "Mode Routing Section (authoritative):\n"
+                f"{mode_routing_section}\n\n"
+                "Deterministic Section (already computed and authoritative):\n"
+                f"{deterministic_section}\n\n"
+                "Requirements:\n"
+                "- Do not recompute or alter deterministic values.\n"
+                "- Write sections: (1) Executive Summary, (2) Standards Cross-Check, "
+                "(3) Risks/Assumptions, (4) Recommendations.\n"
+                "- In section (2) Standards Cross-Check, each substantive sentence must include at least one inline [Sx] citation.\n"
+                "- If section (4) Recommendations references standards/procedures, include [Sx] there as well.\n"
+                "- If standards evidence is missing, state that explicitly.\n"
+            )
+        else:
+            system_prompt = (
+                "You are a senior flight test engineer. "
+                "Respect the backend mode routing decision and capability limits exactly as provided. "
+                "Do not claim deterministic computed outputs unless explicitly present in the provided deterministic section. "
+                "Use standards/context guidance with inline [Sx] citations when evidence exists. "
+                "Do not emit USED_SOURCES footer."
+            )
+            llm_user_prompt = (
+                f"Flight Test: {ft.test_name}\n"
+                f"Aircraft: {ft.aircraft_type or 'Not specified'}\n"
+                f"Test Date: {ft.test_date.strftime('%Y-%m-%d') if ft.test_date else 'Not specified'}\n"
+                f"Description: {ft.description or 'None'}\n\n"
+                f"Selected Analysis Mode: {selected_mode.key} ({selected_mode.label})\n"
+                f"Analysis Goal: {analysis_goal}\n\n"
+                f"Parameter Statistics:\n{stats_table}\n\n"
+                "Mode Routing Section (authoritative):\n"
+                f"{mode_routing_section}\n\n"
+                "Deterministic Section:\n"
+                f"{deterministic_section}\n\n"
+                "Requirements:\n"
+                "- Keep capability limitations explicit and prominent.\n"
+                "- Do not fabricate unsupported deterministic metrics.\n"
+                "- Write sections: (1) Executive Summary, (2) Mode Applicability and Limits, "
+                "(3) Standards/Context Guidance, (4) Recommendations.\n"
+            )
+
+        if context_text:
+            llm_user_prompt += f"\n\nReference Document Excerpts:\n\n{context_text}"
+
         try:
-            repaired = client.chat.completions.create(
+            client = get_openai_client()
+            completion = client.chat.completions.create(
                 model=analysis_model,
                 messages=[
-                    {"role": "system", "content": repair_system_prompt},
-                    {"role": "user", "content": repair_user_prompt},
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": llm_user_prompt},
                 ],
-                temperature=0.0,
+                temperature=analysis_temperature,
                 max_tokens=analysis_max_tokens,
             )
-            repaired_text = (repaired.choices[0].message.content or "").strip()
-            repaired_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", repaired_text).strip()
-            if repaired_text:
-                analysis_text = repaired_text
-        except Exception as repair_exc:
-            logger.warning("Citation density repair skipped due to LLM error: %s", repair_exc)
-
-    inline_source_ids = _extract_inline_source_ids(analysis_text)
-    if inline_source_ids and sources:
-        cited_sources = [s for s in sources if s.get("source_id") in set(inline_source_ids)]
-    else:
-        cited_sources = []
-
-    final_analysis = deterministic_section.strip() + "\n\n" + analysis_text.strip()
-
-    if cited_sources:
-        refs_lines = ["", "### References"]
-        for s in cited_sources:
-            ref_label = (
-                f"{s.get('title') or s.get('filename')}"
-                + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
-                + (f" — {s.get('section_title')}" if s.get("section_title") else "")
+            llm_analysis_text = completion.choices[0].message.content or ""
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"LLM analysis failed: {exc}",
             )
-            refs_lines.append(
-                f"- [{s['source_id']}] {ref_label}"
+
+        llm_analysis_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", llm_analysis_text).strip()
+
+        # Optional strict citation-density repair for takeoff standards cross-check.
+        if selected_mode.key == "takeoff":
+            min_citation_density = max(
+                0.0, min(1.0, float(os.getenv("ANALYSIS_MIN_CITATION_DENSITY", "0.75")))
             )
-        final_analysis = f"{final_analysis}\n" + "\n".join(refs_lines)
-    else:
+            standards_section = _extract_standards_cross_check_section(llm_analysis_text)
+            standards_density = _citation_density(standards_section)
+            if sources and standards_section and standards_density < min_citation_density:
+                source_lines: List[str] = []
+                for s in sources:
+                    ref_label = (
+                        f"{s.get('title') or s.get('filename')}"
+                        + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
+                        + (f" — {s.get('section_title')}" if s.get("section_title") else "")
+                    )
+                    source_lines.append(f"- {s.get('source_id')}: {ref_label}")
+                source_legend = "\n".join(source_lines)
+                repair_system_prompt = (
+                    "You are a technical editor. Revise the analysis to improve citation coverage only. "
+                    "Preserve structure, numbers, and conclusions. "
+                    "For Standards Cross-Check statements, ensure each substantive sentence has an inline [Sx] citation "
+                    "using only source IDs from the provided legend. "
+                    "Do not add a references section. Do not emit USED_SOURCES."
+                )
+                repair_user_prompt = (
+                    "Source ID legend:\n"
+                    f"{source_legend}\n\n"
+                    "Revise the analysis below for citation density compliance:\n\n"
+                    f"{llm_analysis_text}"
+                )
+                try:
+                    repaired = client.chat.completions.create(
+                        model=analysis_model,
+                        messages=[
+                            {"role": "system", "content": repair_system_prompt},
+                            {"role": "user", "content": repair_user_prompt},
+                        ],
+                        temperature=0.0,
+                        max_tokens=analysis_max_tokens,
+                    )
+                    repaired_text = (repaired.choices[0].message.content or "").strip()
+                    repaired_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", repaired_text).strip()
+                    if repaired_text:
+                        llm_analysis_text = repaired_text
+                except Exception as repair_exc:
+                    logger.warning("Citation density repair skipped due to LLM error: %s", repair_exc)
+
+        inline_source_ids = _extract_inline_source_ids(llm_analysis_text)
+        if inline_source_ids and sources:
+            cited_sources = [s for s in sources if s.get("source_id") in set(inline_source_ids)]
+        else:
+            cited_sources = []
+
         final_analysis = (
-            f"{final_analysis}\n\n### References\n"
-            "- No inline [Sx] citations were produced by the model for standards claims."
+            mode_routing_section.strip()
+            + "\n\n"
+            + deterministic_section.strip()
+            + "\n\n"
+            + llm_analysis_text.strip()
         )
+        if cited_sources:
+            refs_lines = ["", "### References"]
+            for s in cited_sources:
+                ref_label = (
+                    f"{s.get('title') or s.get('filename')}"
+                    + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
+                    + (f" — {s.get('section_title')}" if s.get("section_title") else "")
+                )
+                refs_lines.append(
+                    f"- [{s['source_id']}] {ref_label}"
+                )
+            final_analysis = f"{final_analysis}\n" + "\n".join(refs_lines)
+        else:
+            final_analysis = (
+                f"{final_analysis}\n\n### References\n"
+                "- No inline [Sx] citations were produced by the model for standards claims."
+            )
+        persisted_prompt_text = _encode_prompt_with_mode(llm_user_prompt, selected_mode.key)
+    else:
+        llm_analysis_text = _build_mode_limited_analysis_text(
+            mode=selected_mode,
+            capability_eval=mode_eval,
+            analysis_goal=analysis_goal,
+        )
+        final_analysis = (
+            mode_routing_section.strip()
+            + "\n\n"
+            + deterministic_section.strip()
+            + "\n\n"
+            + llm_analysis_text.strip()
+            + "\n\n### References\n- This mode path did not run standards retrieval in the current release."
+        )
+        persisted_prompt_text = _encode_prompt_with_mode(analysis_goal, selected_mode.key)
 
     retrieved_source_ids = [
         str(source.get("source_id"))
@@ -2427,7 +2751,7 @@ def ai_analysis(
         model_version=os.getenv("ANALYSIS_MODEL_VERSION"),
         parameters_analysed=len(stats_rows),
         parameter_stats_snapshot_json=json.dumps(parameter_stats_snapshot),
-        prompt_text=user_prompt,
+        prompt_text=persisted_prompt_text,
         retrieved_source_ids_json=json.dumps(retrieved_source_ids),
         retrieved_sources_snapshot_json=json.dumps(retrieved_sources_snapshot),
         output_sha256=output_sha256,

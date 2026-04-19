@@ -2135,3 +2135,87 @@ pytest backend/tests/test_capability_catalog.py backend/tests/test_deterministic
 **Result:**
 
 - `19 passed`
+
+## P2.1 Analysis-Mode Architecture Foundation (2026-04-19)
+
+### Completed: backend `analysis_mode` routing layer with capability-aligned behavior
+
+**Objective:**
+
+- Introduce explicit mode-based analysis routing so FTIAS is no longer a single-path takeoff pipeline.
+- Keep current deterministic-authoritative philosophy and avoid false support claims for non-implemented domains.
+
+**Files changed:**
+
+- `backend/app/analysis_modes.py` (new)
+- `backend/app/routers/documents.py`
+- `backend/tests/test_analysis_modes.py` (new)
+- `backend/tests/test_analysis_mode_routing.py` (new)
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Added explicit analysis mode registry and resolver
+   - Defined stable mode keys:
+     - `takeoff`
+     - `landing`
+     - `performance`
+     - `handling_qualities`
+     - `buffet_vibration`
+     - `flutter`
+     - `propulsion_systems`
+     - `electrical_systems`
+     - `general`
+   - Mapped each mode to capability-catalog keys and exposed status/authority metadata.
+
+2. Added mode discovery API
+   - New endpoint:
+     - `GET /api/documents/analysis-modes`
+   - Returns mode metadata aligned with capability catalog truth:
+     - key/label/description
+     - capability key
+     - capability status
+     - authority
+     - default flag
+
+3. Routed AI analysis requests by `analysis_mode`
+   - Extended request model with `analysis_mode` (optional; defaults safely to `takeoff`).
+   - Extended response/job response with:
+     - `analysis_mode`
+     - `capability_key`
+   - Current deterministic takeoff flow is now executed as the concrete routed implementation (`analysis_mode=takeoff`).
+
+4. Added structured behavior for non-implemented modes
+   - Non-takeoff modes do not claim deterministic support when not implemented.
+   - Returned analysis includes explicit capability-aware boundaries (blocked/partial/guidance-limited outcomes).
+   - Unknown mode keys are rejected with explicit supported-mode list.
+
+5. Preserved saved-analysis provenance and backward compatibility
+   - Persisted prompts are now mode-tagged:
+     - `[analysis_mode:<mode_key>] ...`
+   - Reopened analysis jobs decode the tag, return clean prompt text, and expose saved mode provenance.
+   - Existing no-mode requests remain compatible via default `takeoff`.
+
+### Test coverage added
+
+- `backend/tests/test_analysis_modes.py`
+  - required mode list
+  - default mode resolution
+  - mode-to-capability catalog alignment
+- `backend/tests/test_analysis_mode_routing.py`
+  - `/analysis-modes` contract
+  - default/takeoff routing + persisted mode tag
+  - explicit limited behavior for `landing`
+  - unknown mode rejection
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_analysis_modes.py backend/tests/test_analysis_mode_routing.py backend/tests/test_documents_tenancy.py backend/tests/test_capability_catalog.py -q
+```
+
+**Result:**
+
+- `20 passed`
