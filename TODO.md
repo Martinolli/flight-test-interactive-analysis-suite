@@ -264,6 +264,10 @@
     - takeoff routed behavior and persisted mode tag
     - explicit limited outcome for non-implemented mode (`landing`)
     - unknown-mode request rejection
+  - Frontend integration hardening (Dashboard / Flight Test Detail AI Analysis):
+    - quick mode chips now map to explicit backend `analysis_mode` keys and send mode in request payload
+    - AI panel now surfaces backend mode truth (`implemented` / `partial` / `planned` / `blocked`) via `/api/documents/analysis-modes`
+    - UI shows bounded-capability notice for non-implemented modes and preserves prompt-vs-mode separation
 
 - [ ] P2.2 Add deterministic calculators beyond takeoff
   - Extract current logic to dedicated analysis modules.

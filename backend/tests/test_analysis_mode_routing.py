@@ -172,6 +172,70 @@ def test_ai_analysis_landing_mode_returns_explicit_mode_limited_outcome(
     assert "analysis_mode=landing" in body["analysis"]
 
 
+def test_ai_analysis_general_mode_routes_without_takeoff_calculator(
+    client, db_session, test_user, auth_headers, monkeypatch
+):
+    flight_test = _create_flight_test_with_single_datapoint(db_session, test_user["id"])
+
+    def fake_retrieve_hybrid_sources(*, db, question, requested_top_k, owner_user_id):
+        return (
+            [
+                {
+                    "source_id": "S1",
+                    "filename": "std.pdf",
+                    "title": "General Standard",
+                    "page_numbers": "9",
+                    "section_title": "General",
+                    "similarity": 0.97,
+                    "text": "general guidance chunk",
+                }
+            ],
+            "[S1] general guidance context",
+        )
+
+    class _FakeMessage:
+        content = "General engineering guidance [S1]"
+
+    class _FakeChoice:
+        message = _FakeMessage()
+
+    class _FakeCompletion:
+        choices = [_FakeChoice()]
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs):
+            return _FakeCompletion()
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        chat = _FakeChat()
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router, "_retrieve_hybrid_sources", fake_retrieve_hybrid_sources)
+    monkeypatch.setattr(documents_router, "get_openai_client", lambda: _FakeClient())
+    monkeypatch.setattr(documents_router.func, "stddev", lambda col: documents_router.func.avg(col))
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_takeoff_metrics",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+    )
+
+    response = client.post(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
+        json={"analysis_mode": "general", "user_prompt": "Provide a general engineering summary"},
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["analysis_mode"] == "general"
+    assert body["capability_key"] == "general_standards_query"
+    assert "Deterministic Takeoff Computation" not in body["analysis"]
+    assert "analysis_mode=general" in body["analysis"]
+
+
 def test_ai_analysis_rejects_unknown_analysis_mode(
     client, db_session, test_user, auth_headers, monkeypatch
 ):

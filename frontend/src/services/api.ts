@@ -160,6 +160,8 @@ export interface QueryResponse {
 export interface AIAnalysisResponse {
   analysis: string;
   flight_test_name: string;
+  analysis_mode: string;
+  capability_key?: string | null;
   dataset_version_id?: number | null;
   parameters_analysed: number;
   analysis_job_id: number;
@@ -174,6 +176,8 @@ export interface AnalysisJobResponse {
   id: number;
   flight_test_id: number;
   flight_test_name: string;
+  analysis_mode: string;
+  capability_key?: string | null;
   dataset_version_id?: number | null;
   parameters_analysed: number;
   status: string;
@@ -203,6 +207,21 @@ export interface AnalysisJobResponse {
     similarity?: number;
     excerpt?: string;
   }>;
+}
+
+export interface AnalysisModeInfo {
+  key: string;
+  label: string;
+  description: string;
+  capability_key: string;
+  capability_status: 'implemented' | 'partial' | 'planned' | 'blocked' | string;
+  authority:
+    | 'deterministic_primary'
+    | 'deterministic_with_rag_crosscheck'
+    | 'rag_guidance_only'
+    | 'not_supported'
+    | string;
+  default: boolean;
 }
 
 // ─── Admin Types ──────────────────────────────────────────────────────────────
@@ -475,7 +494,8 @@ export class ApiService {
   static async getAIAnalysis(
     flightTestId: number,
     userPrompt?: string,
-    datasetVersionId?: number
+    datasetVersionId?: number,
+    analysisMode?: string
   ): Promise<AIAnalysisResponse> {
     return this.request<AIAnalysisResponse>(
       `/api/documents/flight-tests/${flightTestId}/ai-analysis`,
@@ -485,9 +505,14 @@ export class ApiService {
         body: JSON.stringify({
           user_prompt: userPrompt ?? null,
           dataset_version_id: datasetVersionId ?? null,
+          analysis_mode: analysisMode ?? null,
         }),
       }
     );
+  }
+
+  static async getAnalysisModes(): Promise<AnalysisModeInfo[]> {
+    return this.request<AnalysisModeInfo[]>('/api/documents/analysis-modes');
   }
 
   static async getAIAnalysisJob(

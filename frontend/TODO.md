@@ -111,9 +111,12 @@
 
 ## P2 — Domainization and Risk Workflow
 
-- [ ] P2.1 Analysis mode selector and mode-specific UX cues
-  - Backend P2.1 routing foundation is now available (`analysis_mode` request/response + `/api/documents/analysis-modes`).
-  - Frontend mode selector and mode-specific cues remain pending by design.
+- [x] P2.1 Analysis mode selector and mode-specific UX cues
+  - `FlightTestDetail` AI Analysis quick chips now map to explicit backend mode keys:
+    - `takeoff`, `landing`, `performance`, `buffet_vibration`, `general`
+  - `Analyze with AI` request now sends `analysis_mode` separately from `user_prompt`.
+  - AI panel now consumes `/api/documents/analysis-modes` to surface mode status/authority and warn when selected mode is limited.
+  - Re-opened saved analysis jobs now carry and display their persisted `analysis_mode` provenance in the panel state.
 - [ ] P2.2 Analysis job history + provenance panel
 - [ ] P2.3 Confidence/coverage/applicability badges
 - [ ] P2.4 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)

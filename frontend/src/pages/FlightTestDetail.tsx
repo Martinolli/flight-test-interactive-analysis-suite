@@ -27,6 +27,7 @@ import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ToastContainer, useToast } from '../components/ui/toast';
 import {
   AIAnalysisResponse,
+  AnalysisModeInfo,
   ApiService,
   DatasetVersion,
   FlightTest,
@@ -117,6 +118,66 @@ function parseAnalysisContent(analysisMarkdown: string): ParsedAnalysisContent {
   }
 
   return { body, sources, warnings };
+}
+
+type AnalysisModeKey =
+  | 'takeoff'
+  | 'landing'
+  | 'performance'
+  | 'handling_qualities'
+  | 'buffet_vibration'
+  | 'flutter'
+  | 'propulsion_systems'
+  | 'electrical_systems'
+  | 'general';
+
+interface QuickAnalysisPreset {
+  label: string;
+  mode: AnalysisModeKey;
+  text: string;
+}
+
+const QUICK_ANALYSIS_PRESETS: QuickAnalysisPreset[] = [
+  {
+    label: 'Takeoff Performance',
+    mode: 'takeoff',
+    text: 'Analyse the takeoff performance: ground roll distance, rotation speed, climb gradient, and any deviations from expected values.',
+  },
+  {
+    label: 'Landing Performance',
+    mode: 'landing',
+    text: 'Analyse the landing performance: approach speed, touchdown point, ground roll distance, and deceleration rate.',
+  },
+  {
+    label: 'Climb Performance',
+    mode: 'performance',
+    text: 'Analyse the climb performance: rate of climb, climb gradient, engine parameters during climb, and fuel consumption.',
+  },
+  {
+    label: 'Vibration & Loads',
+    mode: 'buffet_vibration',
+    text: 'Analyse structural loads and vibration data: identify any abnormal load factors, vibration frequencies, or exceedances of structural limits.',
+  },
+  {
+    label: 'General Summary',
+    mode: 'general',
+    text: 'Produce a general flight test summary with executive overview, key parameter observations, anomalies, and recommendations.',
+  },
+];
+
+function statusBadgeClasses(status?: string): string {
+  switch (status) {
+    case 'implemented':
+      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    case 'partial':
+      return 'bg-amber-100 text-amber-800 border-amber-200';
+    case 'planned':
+      return 'bg-slate-100 text-slate-700 border-slate-200';
+    case 'blocked':
+      return 'bg-rose-100 text-rose-800 border-rose-200';
+    default:
+      return 'bg-gray-100 text-gray-700 border-gray-200';
+  }
 }
 
 // ─── Parameters & Data Panel ─────────────────────────────────────────────────
@@ -316,6 +377,9 @@ function AIAnalysisPanel({
   const [loadingSavedJob, setLoadingSavedJob] = useState(false);
   const [savedJobIdInput, setSavedJobIdInput] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
+  const [selectedAnalysisMode, setSelectedAnalysisMode] = useState<AnalysisModeKey>('takeoff');
+  const [analysisModes, setAnalysisModes] = useState<AnalysisModeInfo[]>([]);
+  const [loadingAnalysisModes, setLoadingAnalysisModes] = useState(false);
   const { user } = useAuth();
   const parsedAnalysis = result ? parseAnalysisContent(result.analysis) : null;
   const analysisDatasetVersion =
@@ -332,15 +396,35 @@ function AIAnalysisPanel({
     result?.dataset_version_id != null &&
     datasetVersionId != null &&
     result.dataset_version_id !== datasetVersionId;
+  const activeModeFromResult = (result?.analysis_mode ?? selectedAnalysisMode) as AnalysisModeKey;
+  const selectedModeInfo =
+    analysisModes.find((mode) => mode.key === selectedAnalysisMode) ??
+    analysisModes.find((mode) => mode.default) ??
+    null;
 
-  // Quick-prompt chips — click to pre-fill the prompt box
-  const QUICK_PROMPTS = [
-    { label: 'Takeoff Performance', text: 'Analyse the takeoff performance: ground roll distance, rotation speed, climb gradient, and any deviations from expected values.' },
-    { label: 'Landing Performance', text: 'Analyse the landing performance: approach speed, touchdown point, ground roll distance, and deceleration rate.' },
-    { label: 'Climb Performance', text: 'Analyse the climb performance: rate of climb, climb gradient, engine parameters during climb, and fuel consumption.' },
-    { label: 'Vibration & Loads', text: 'Analyse structural loads and vibration data: identify any abnormal load factors, vibration frequencies, or exceedances of structural limits.' },
-    { label: 'General Summary', text: 'Produce a general flight test summary with executive overview, key parameter observations, anomalies, and recommendations.' },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingAnalysisModes(true);
+    ApiService.getAnalysisModes()
+      .then((modes) => {
+        if (cancelled) return;
+        setAnalysisModes(modes);
+        const defaultMode = modes.find((mode) => mode.default)?.key as AnalysisModeKey | undefined;
+        if (!selectedAnalysisMode && defaultMode) {
+          setSelectedAnalysisMode(defaultMode);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAnalysisModes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAnalysisModes(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleExportPDF() {
     if (!result) return;
@@ -410,9 +494,13 @@ function AIAnalysisPanel({
       const data = await ApiService.getAIAnalysis(
         flightTestId,
         userPrompt.trim() || undefined,
-        datasetVersionId
+        datasetVersionId,
+        selectedAnalysisMode
       );
       setResult(data);
+      if (data.analysis_mode) {
+        setSelectedAnalysisMode(data.analysis_mode as AnalysisModeKey);
+      }
       setShowSources(false);
     } catch (err) {
       setError((err as Error).message || 'AI analysis failed');
@@ -434,6 +522,8 @@ function AIAnalysisPanel({
       setResult({
         analysis: job.analysis,
         flight_test_name: job.flight_test_name,
+        analysis_mode: job.analysis_mode ?? 'takeoff',
+        capability_key: job.capability_key ?? null,
         dataset_version_id: job.dataset_version_id ?? null,
         parameters_analysed: job.parameters_analysed,
         analysis_job_id: job.id,
@@ -443,6 +533,9 @@ function AIAnalysisPanel({
         created_at: job.created_at,
         retrieved_source_ids: job.retrieved_source_ids,
       });
+      if (job.analysis_mode) {
+        setSelectedAnalysisMode(job.analysis_mode as AnalysisModeKey);
+      }
       setShowSources(false);
       toast.success(`Loaded analysis job #${job.id}`);
     } catch (err) {
@@ -472,24 +565,70 @@ function AIAnalysisPanel({
         <p className="text-xs text-gray-500 mt-1">
           Cross-references your flight data against indexed standards and handbooks using RAG.
         </p>
-        {/* Quick-prompt chips */}
+        {/* Mode + quick-prompt chips */}
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {QUICK_PROMPTS.map((qp) => (
+          {QUICK_ANALYSIS_PRESETS.map((qp) => {
+            const modeInfo = analysisModes.find((mode) => mode.key === qp.mode);
+            const modeStatus = modeInfo?.capability_status;
+            return (
             <button
               key={qp.label}
-              onClick={() => setUserPrompt(qp.text)}
+              onClick={() => {
+                setSelectedAnalysisMode(qp.mode);
+                setUserPrompt(qp.text);
+              }}
               disabled={loading}
               className={cn(
                 'text-xs px-2.5 py-1 rounded-full border transition-colors',
-                userPrompt === qp.text
+                selectedAnalysisMode === qp.mode
                   ? 'bg-purple-100 border-purple-300 text-purple-700'
                   : 'border-gray-200 text-gray-500 hover:border-purple-300 hover:text-purple-600'
               )}
+              title={
+                modeInfo
+                  ? `${modeInfo.label} • ${modeInfo.capability_status} • ${modeInfo.authority}`
+                  : qp.mode
+              }
             >
               {qp.label}
+              {modeStatus && modeStatus !== 'implemented' ? (
+                <span className="ml-1 opacity-70">({modeStatus})</span>
+              ) : null}
             </button>
-          ))}
+            );
+          })}
         </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-gray-500">
+            Selected mode: <strong>{selectedModeInfo?.label ?? selectedAnalysisMode}</strong>
+          </span>
+          {loadingAnalysisModes ? (
+            <span className="inline-flex items-center gap-1 text-gray-400">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              loading mode capabilities…
+            </span>
+          ) : selectedModeInfo ? (
+            <>
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full border px-2 py-0.5 font-medium capitalize',
+                  statusBadgeClasses(selectedModeInfo.capability_status)
+                )}
+              >
+                {selectedModeInfo.capability_status}
+              </span>
+              <span className="text-gray-500">{selectedModeInfo.authority}</span>
+            </>
+          ) : (
+            <span className="text-amber-700">Mode catalog unavailable; backend default mode may apply.</span>
+          )}
+        </div>
+        {selectedModeInfo && selectedModeInfo.capability_status !== 'implemented' && (
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            This mode is currently <strong>{selectedModeInfo.capability_status}</strong>. Results are bounded by
+            capability limits and may return guidance/partial output instead of full deterministic analysis.
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {/* Prompt input — always visible */}
@@ -497,7 +636,7 @@ function AIAnalysisPanel({
           <textarea
             value={userPrompt}
             onChange={(e) => setUserPrompt(e.target.value)}
-            placeholder="Describe your analysis goal, or click a chip above to pre-fill… (leave blank for a general report)"
+            placeholder="Describe your analysis goal for the selected mode, or click a chip above to pre-fill… (leave blank to use mode-default behavior)"
             rows={2}
             disabled={loading}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
@@ -575,10 +714,18 @@ function AIAnalysisPanel({
               <span>·</span>
               <span>Flight test: {result.flight_test_name}</span>
               <span>·</span>
+              <span>Mode: {result.analysis_mode ?? activeModeFromResult}</span>
+              <span>·</span>
               <span>Analysis dataset: {analysisDatasetLabel}</span>
               <span>·</span>
               <span>Analysis Job #{result.analysis_job_id}</span>
             </div>
+            {result.analysis_mode && result.analysis_mode !== selectedAnalysisMode && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                Loaded analysis was generated in mode <strong>{result.analysis_mode}</strong>, while current
+                selection is <strong>{selectedAnalysisMode}</strong>.
+              </div>
+            )}
             {analysisDatasetDiffersFromSelection && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 Reopened analysis provenance uses <strong>{analysisDatasetLabel}</strong>, while

@@ -2219,3 +2219,72 @@ pytest backend/tests/test_analysis_modes.py backend/tests/test_analysis_mode_rou
 **Result:**
 
 - `20 passed`
+
+## P2.1 Frontend Integration Fix — Dashboard / Flight Test Detail Mode Wiring (2026-04-19)
+
+### Completed: AI Analysis UI now uses backend `analysis_mode` routing explicitly
+
+**Observed issue:**
+
+- Flight Test Detail AI quick options changed prompt text but did not send `analysis_mode`.
+- Backend therefore defaulted to `takeoff`, making multiple options look like takeoff output.
+
+**Files changed:**
+
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/FlightTestDetail.tsx`
+- `backend/tests/test_analysis_mode_routing.py`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Frontend request contract now carries `analysis_mode`
+   - `ApiService.getAIAnalysis(...)` now accepts and sends `analysis_mode`.
+   - `AIAnalysisResponse` and `AnalysisJobResponse` types now include:
+     - `analysis_mode`
+     - `capability_key`
+
+2. Flight Test Detail AI panel now tracks mode explicitly
+   - Added explicit selected mode state independent from prompt text.
+   - Quick option mapping:
+     - Takeoff Performance → `takeoff`
+     - Landing Performance → `landing`
+     - Climb Performance → `performance`
+     - Vibration & Loads → `buffet_vibration`
+     - General Summary → `general`
+   - Running analysis now sends both:
+     - `analysis_mode` (routing control)
+     - `user_prompt` (request refinement)
+
+3. Mode truth surfaced from backend catalog
+   - Added frontend call to `GET /api/documents/analysis-modes`.
+   - AI panel now shows selected mode status/authority and warns when mode is non-implemented/limited.
+   - Avoids implying equal completeness across all quick options.
+
+4. Saved analysis reopen flow preserved and improved
+   - Reopened job now restores/display its persisted `analysis_mode`.
+   - Existing dataset provenance display/mismatch notice behavior remains intact.
+
+5. Takeoff and immutable export flows preserved
+   - Takeoff mode continues to route as before.
+   - `analysis_job_id` reopen/export behavior unchanged.
+   - PDF export by saved job ID unchanged.
+
+### Additional regression coverage
+
+- Extended backend routing tests with:
+  - `general` mode request proving no takeoff deterministic calculator fallback is executed.
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_analysis_mode_routing.py backend/tests/test_analysis_modes.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend mode-routing tests: `8 passed`
+- Frontend build: `success`
