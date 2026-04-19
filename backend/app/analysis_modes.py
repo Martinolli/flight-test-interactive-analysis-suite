@@ -39,13 +39,13 @@ _ANALYSIS_MODES: Dict[str, AnalysisModeDefinition] = {
     "landing": AnalysisModeDefinition(
         key="landing",
         label="Landing",
-        description="Landing-performance analysis routing (planned/partial behavior in current release).",
+        description="Deterministic landing rollout analysis with bounded applicability statements.",
         capability_key="landing",
     ),
     "performance": AnalysisModeDefinition(
         key="performance",
         label="Performance",
-        description="General performance analysis routing.",
+        description="Deterministic bounded performance trend analysis.",
         capability_key="performance_general",
     ),
     "handling_qualities": AnalysisModeDefinition(
@@ -57,7 +57,7 @@ _ANALYSIS_MODES: Dict[str, AnalysisModeDefinition] = {
     "buffet_vibration": AnalysisModeDefinition(
         key="buffet_vibration",
         label="Buffet and Vibration",
-        description="Buffet/vibration mode routing.",
+        description="Deterministic buffet/vibration screening mode.",
         capability_key="buffet_vibration",
     ),
     "flutter": AnalysisModeDefinition(

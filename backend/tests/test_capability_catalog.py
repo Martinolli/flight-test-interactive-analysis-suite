@@ -65,3 +65,48 @@ def test_takeoff_applicability_statements_are_stable_and_explicit():
     combined = " ".join(evaluation.applicability_boundaries)
     assert "estimated ground roll to liftoff" in combined.lower()
     assert "not equivalent to corrected certification takeoff distance" in combined.lower()
+
+
+def test_landing_capability_is_implemented_and_deterministic():
+    cap = get_capability_definition("landing")
+    assert cap is not None
+    assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
+    assert cap.authority == CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK
+    assert "ground_speed" in cap.required_inputs.required_signals
+    assert "weight_on_wheels" in cap.required_inputs.required_signals
+
+
+def test_performance_general_capability_is_bounded_deterministic():
+    cap = get_capability_definition("performance_general")
+    assert cap is not None
+    assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
+    assert cap.authority == CapabilityAuthority.DETERMINISTIC_PRIMARY
+
+    evaluation = evaluate_capability_request(
+        "performance_general",
+        available_signals=["ground_speed", "altitude"],
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    assert evaluation.outcome == CapabilityOutcome.ALLOW_WITH_LIMITATIONS
+    assert "certification" in " ".join(evaluation.applicability_boundaries).lower()
+
+
+def test_buffet_vibration_capability_is_deterministic_screening_only():
+    cap = get_capability_definition("buffet_vibration")
+    assert cap is not None
+    assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
+    assert cap.authority == CapabilityAuthority.DETERMINISTIC_PRIMARY
+
+    evaluation = evaluate_capability_request(
+        "buffet_vibration",
+        available_signals=["accelerometers"],
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    assert evaluation.outcome == CapabilityOutcome.ALLOW_WITH_LIMITATIONS
+    assert "not sufficient for formal loads substantiation" in " ".join(
+        evaluation.applicability_boundaries
+    ).lower()

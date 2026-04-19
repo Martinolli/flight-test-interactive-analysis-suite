@@ -191,20 +191,75 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
         "landing": CapabilityDefinition(
             key="landing",
             label="Landing Analysis",
-            description="Landing distance/performance capability scaffold; deterministic implementation pending.",
-            status=CapabilityImplementationStatus.PLANNED,
-            authority=CapabilityAuthority.NOT_SUPPORTED,
+            description=(
+                "Deterministic landing rollout estimation from WOW and ground-speed signals, "
+                "with bounded applicability and explicit correction limits."
+            ),
+            status=CapabilityImplementationStatus.IMPLEMENTED,
+            authority=CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK,
             required_inputs=CapabilityRequiredInputs(
                 required_signals=["ground_speed", "weight_on_wheels"],
+                required_dataset_conditions=[
+                    "time_series_continuity",
+                    "sufficient_sample_coverage",
+                    "resolvable_touchdown_transition",
+                ],
                 optional_signals=["brake_pressure", "pitch_angle", "flap_setting"],
+                certification_correction_inputs=[
+                    "wind_component",
+                    "runway_slope",
+                    "runway_condition",
+                    "approach_screen_height_profile",
+                ],
             ),
-            blocked_rules=[],
-            applicability_boundaries=[
-                "Landing deterministic computation is not yet implemented in this release."
+            blocked_rules=[
+                BlockedConditionRule(
+                    reason_key="missing_required_signals",
+                    description="Required deterministic landing signals are missing.",
+                    user_message=(
+                        "Landing deterministic analysis requires Ground Speed and Weight-on-Wheels signals."
+                    ),
+                    outcome=CapabilityOutcome.BLOCKED,
+                ),
+                BlockedConditionRule(
+                    reason_key="invalid_event_detection",
+                    description="Touchdown or rollout boundaries could not be resolved.",
+                    user_message=(
+                        "Could not reliably detect touchdown/rollout boundaries from WOW and speed data."
+                    ),
+                    outcome=CapabilityOutcome.BLOCKED,
+                ),
+                BlockedConditionRule(
+                    reason_key="certification_corrections_missing",
+                    description="Certification-corrected landing request lacks correction inputs.",
+                    user_message=(
+                        "Requested certification-style landing distance, but correction inputs are unavailable. "
+                        "Returning deterministic rollout estimate with explicit limitations."
+                    ),
+                    outcome=CapabilityOutcome.PARTIAL_ESTIMATE,
+                ),
             ],
-            default_limitations=["Current output is limited to standards guidance only."],
+            applicability_boundaries=[
+                "Valid for estimated touchdown-to-rollout distance from available WOW and ground-speed data.",
+                "Not equivalent to corrected certification landing distance unless explicit corrections are applied.",
+                "Sensitive to WOW touchdown detection quality and speed-signal integrity.",
+            ],
+            default_limitations=[
+                "Wind correction not applied.",
+                "Runway slope correction not applied.",
+                "Runway surface/condition correction not applied.",
+                "Touchdown/event-definition timing can shift estimated rollout boundaries.",
+                "Sampling frequency and sensor quality can materially affect estimate precision.",
+            ],
             output_contract=CapabilityOutputContract(
-                deterministic_metrics=[],
+                deterministic_metrics=[
+                    "estimated_landing_rollout_distance_ft",
+                    "estimated_landing_rollout_distance_m",
+                    "touchdown_speed_kt",
+                    "rollout_end_speed_kt",
+                    "rollout_time_s",
+                    "mean_deceleration_fts2",
+                ],
                 standards_crosscheck_allowed=True,
             ),
         ),
@@ -212,21 +267,32 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
             key="performance_general",
             label="General Performance Assessment",
             description=(
-                "Cross-parameter performance interpretation with contextual standards support."
+                "Deterministic bounded performance trend metrics from available flight-test channels."
             ),
-            status=CapabilityImplementationStatus.PARTIAL,
-            authority=CapabilityAuthority.RAG_GUIDANCE_ONLY,
+            status=CapabilityImplementationStatus.IMPLEMENTED,
+            authority=CapabilityAuthority.DETERMINISTIC_PRIMARY,
             required_inputs=CapabilityRequiredInputs(
                 required_signals=[],
                 required_dataset_conditions=["minimum_relevant_parameters_available"],
             ),
             blocked_rules=[],
             applicability_boundaries=[
-                "Provides contextual interpretation; no authoritative deterministic certification metric."
+                "Provides bounded deterministic trend metrics from available channels only.",
+                "Not a full certification performance determination without dedicated correction models.",
             ],
-            default_limitations=["Output is advisory and depends on source coverage quality."],
+            default_limitations=[
+                "Computed metrics depend on available altitude/vertical-speed/ground-speed channel coverage.",
+                "No atmospheric, engine-state, or runway-correction model is applied in this mode.",
+                "Use results as engineering trend support, not standalone certification evidence.",
+            ],
             output_contract=CapabilityOutputContract(
-                deterministic_metrics=[],
+                deterministic_metrics=[
+                    "analysis_window_s",
+                    "mean_climb_rate_fpm",
+                    "altitude_change_ft",
+                    "speed_delta_kt",
+                    "mean_longitudinal_accel_fts2",
+                ],
                 standards_crosscheck_allowed=True,
             ),
         ),
@@ -292,19 +358,32 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
         "buffet_vibration": CapabilityDefinition(
             key="buffet_vibration",
             label="Buffet and Vibration Support",
-            description="Pre-screening support for buffet/vibration trends; formal methods pending.",
-            status=CapabilityImplementationStatus.PLANNED,
-            authority=CapabilityAuthority.NOT_SUPPORTED,
+            description=(
+                "Deterministic screening support for buffet/vibration behavior from available acceleration channels."
+            ),
+            status=CapabilityImplementationStatus.IMPLEMENTED,
+            authority=CapabilityAuthority.DETERMINISTIC_PRIMARY,
             required_inputs=CapabilityRequiredInputs(
                 optional_signals=["accelerometers", "frequency_features"],
             ),
             blocked_rules=[],
             applicability_boundaries=[
-                "Not sufficient for formal buffet/vibration clearance determination."
+                "Supports pre-screening and anomaly flagging only.",
+                "Not sufficient for formal loads substantiation or flutter clearance determination.",
             ],
-            default_limitations=["Dedicated spectral/dynamic methods are not yet implemented."],
+            default_limitations=[
+                "Current output is descriptive screening, not a formal spectral/aeroelastic determination.",
+                "Channel quality, placement, and sampling rates can materially affect screening conclusions.",
+                "Use with dedicated domain methods before making clearance decisions.",
+            ],
             output_contract=CapabilityOutputContract(
-                deterministic_metrics=[],
+                deterministic_metrics=[
+                    "channel_rms",
+                    "channel_peak_abs",
+                    "p95_abs",
+                    "exceedance_count",
+                    "dominant_channel",
+                ],
                 standards_crosscheck_allowed=True,
             ),
         ),
@@ -552,12 +631,13 @@ def evaluate_capability_request(
             limitations=capability.default_limitations,
         )
 
-    # For implemented deterministic takeoff in current scope, keep explicit limitations.
-    outcome = (
-        CapabilityOutcome.ALLOW_WITH_LIMITATIONS
-        if capability.key == "takeoff"
-        else CapabilityOutcome.ALLOWED
-    )
+    # Deterministic capabilities are always returned with explicit limitations.
+    outcome = CapabilityOutcome.ALLOWED
+    if capability.authority in {
+        CapabilityAuthority.DETERMINISTIC_PRIMARY,
+        CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK,
+    }:
+        outcome = CapabilityOutcome.ALLOW_WITH_LIMITATIONS
     return CapabilityEvaluation(
         capability_key=capability.key,
         label=capability.label,

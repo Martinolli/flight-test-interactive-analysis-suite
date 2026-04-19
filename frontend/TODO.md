@@ -121,10 +121,13 @@
     - `Narrative citations (N)` from analysis text references.
     - `Retrieved sources (M)` from persisted analysis-job retrieved-source snapshot.
   - Source counts are displayed separately to keep dashboard view aligned with saved-job/PDF provenance totals.
-- [ ] P2.2 Analysis job history + provenance panel
-- [ ] P2.3 Confidence/coverage/applicability badges
-- [ ] P2.4 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)
-- [ ] P2.5 AI mitigation drafting assistant (advisory only, not authoritative scoring)
+- [x] P2.2 Backend deterministic expansion alignment (no new frontend UI required in this slice)
+  - Backend now routes deterministic calculators for `landing`, `performance`, and `buffet_vibration`.
+  - Existing mode payload wiring already forwards `analysis_mode`; no frontend contract change was required for this step.
+- [ ] P2.3 Analysis job history + provenance panel
+- [ ] P2.4 Confidence/coverage/applicability badges
+- [ ] P2.5 FRAT workspace in Flight Test Detail (deterministic workflow + approval UX)
+- [ ] P2.6 AI mitigation drafting assistant (advisory only, not authoritative scoring)
 
 ---
 

@@ -275,9 +275,24 @@
       - retrieved sources (full persisted analysis-job source set used for provenance/PDF footer).
     - Source counts are now surfaced as separate values to avoid under-reporting retrieved evidence.
 
-- [ ] P2.2 Add deterministic calculators beyond takeoff
-  - Extract current logic to dedicated analysis modules.
-  - Add landing / climb / vibration / flutter-support metrics in a modular structure.
+- [x] P2.2 Add deterministic calculators beyond takeoff
+  - Extracted deterministic logic into dedicated module package:
+    - `backend/app/analysis/deterministic.py`
+    - `backend/app/analysis/__init__.py`
+  - Preserved takeoff as deterministic reference implementation via routed module call.
+  - Added bounded deterministic calculators and mode routing integration for:
+    - `landing` (WOW + ground-speed touchdown-to-rollout estimate)
+    - `performance` (`performance_general` bounded trend metrics)
+    - `buffet_vibration` (deterministic screening metrics, not clearance determination)
+  - Updated capability-catalog truth to align with implemented deterministic scope:
+    - `landing`: `implemented`, `deterministic_with_rag_crosscheck`
+    - `performance_general`: `implemented`, `deterministic_primary`
+    - `buffet_vibration`: `implemented`, `deterministic_primary`
+  - Added focused regression coverage for:
+    - modular calculator behavior (`test_deterministic_calculators.py`)
+    - mode-routing outputs for landing/performance/buffet
+    - catalog status/authority alignment updates
+  - Kept non-implemented domain boundaries explicit (`flutter` remains bounded/unsupported).
 
 - [ ] P2.3 Add retrieval metadata model for mode-aware RAG
   - Authority / revision / domain / capability tags with mode pre-filtering.
@@ -292,14 +307,14 @@
 
 ## Immediate Execution Order
 
-1. P2.1 — Introduce `analysis_mode` architecture  
-2. P2.2 — Add deterministic calculators beyond takeoff  
+1. P2.3 — Add retrieval metadata model for mode-aware RAG  
+2. P2.4 — Add confidence / coverage / applicability controls  
 
 - **Reason for this order**
 
 - P1.3 is completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
 - P1.4 and P1.4a are completed for report professionalism + wording hardening.
-- P1.5 capability-catalog foundation is complete; next impact is structured P2 domain routing and deterministic expansion.
+- P2.1 routing and P2.2 deterministic expansion are complete; next impact is retrieval metadata + confidence/coverage control hardening.
 
 ---
 
@@ -308,7 +323,7 @@
 - [ ] G1 Product Truth Gate (after P0.1–P0.4 plus P0.3a) — ready for formal closure review
 - [ ] G2 Engineering UX Gate (after P1.0–P1.4)
 - [x] G3 Capability Definition Gate (after P1.5)
-- [ ] G4 Domainization Gate (after P2.1 + first additional deterministic modules)
+- [x] G4 Domainization Gate (after P2.1 + first additional deterministic modules)
 
 ---
 

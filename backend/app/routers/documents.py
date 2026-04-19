@@ -33,6 +33,16 @@ except ImportError:
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.analysis import (
+    build_deterministic_buffet_vibration_section as _build_deterministic_buffet_vibration_section_impl,
+    build_deterministic_landing_section as _build_deterministic_landing_section_impl,
+    build_deterministic_performance_section as _build_deterministic_performance_section_impl,
+    build_deterministic_takeoff_section as _build_deterministic_takeoff_section_impl,
+    compute_buffet_vibration_metrics as _compute_buffet_vibration_metrics_impl,
+    compute_landing_metrics as _compute_landing_metrics_impl,
+    compute_performance_metrics as _compute_performance_metrics_impl,
+    compute_takeoff_metrics as _compute_takeoff_metrics_impl,
+)
 from app.analysis_modes import (
     AnalysisModeDefinition,
     analysis_mode_authority,
@@ -42,7 +52,13 @@ from app.analysis_modes import (
     resolve_analysis_mode,
 )
 from app.auth import get_current_user
-from app.capabilities import CapabilityEvaluation, CapabilityOutcome, evaluate_capability_request
+from app.capabilities import (
+    CapabilityAuthority,
+    CapabilityEvaluation,
+    CapabilityImplementationStatus,
+    CapabilityOutcome,
+    evaluate_capability_request,
+)
 from app.database import SessionLocal, get_db
 from app.models import (
     AnalysisJob,
@@ -777,61 +793,6 @@ def _retrieve_hybrid_sources(
     return sources, "\n\n---\n\n".join(context_parts)
 
 
-def _choose_param_id(params: List[dict], scorer) -> Optional[int]:
-    best_id = None
-    best_score = float("-inf")
-    for p in params:
-        score = scorer(p["name"], p.get("unit"))
-        if score > best_score:
-            best_score = score
-            best_id = p["id"]
-    return best_id if best_score > 0 else None
-
-
-def _score_ground_speed(name: str, unit: Optional[str]) -> float:
-    n = (name or "").lower()
-    u = (unit or "").lower()
-    score = 0.0
-    if "ground speed" in n or ("ground" in n and "speed" in n):
-        score += 6
-    if "airspeed" in n:
-        score -= 2
-    if re.search(r"\bgs\b", n):
-        score += 2
-    if "speed" in n:
-        score += 1
-    if "kt" in u:
-        score += 2
-    return score
-
-
-def _score_wow(name: str, unit: Optional[str]) -> float:
-    n = (name or "").lower()
-    score = 0.0
-    if "weight on wheels" in n:
-        score += 8
-    if re.search(r"\bwow\b", n):
-        score += 5
-    if "wheel" in n and "weight" in n:
-        score += 3
-    return score
-
-
-def _score_longitudinal_accel(name: str, unit: Optional[str]) -> float:
-    n = (name or "").lower()
-    u = (unit or "").lower()
-    score = 0.0
-    if "longitudinal" in n and "accel" in n:
-        score += 6
-    if "x accel" in n or "x_accel" in n or "longitudinal x" in n:
-        score += 4
-    if "accel" in n:
-        score += 1
-    if u == "g":
-        score += 1
-    return score
-
-
 def _is_certification_result_requested(text_prompt: str) -> bool:
     prompt = (text_prompt or "").lower()
     if not prompt:
@@ -842,23 +803,11 @@ def _is_certification_result_requested(text_prompt: str) -> bool:
         "screen height",
         "balanced field",
         "corrected takeoff distance",
+        "corrected landing distance",
         "regulatory takeoff distance",
+        "regulatory landing distance",
     ]
     return any(keyword in prompt for keyword in keywords)
-
-
-def _apply_capability_evaluation_to_metrics(metrics: dict, evaluation: CapabilityEvaluation) -> dict:
-    enriched = dict(metrics)
-    enriched["capability_key"] = evaluation.capability_key
-    enriched["capability_authority"] = evaluation.authority.value
-    enriched["capability_status"] = evaluation.status.value
-    enriched["capability_outcome"] = evaluation.outcome.value
-    enriched["capability_reason_key"] = evaluation.reason_key
-    enriched["capability_user_message"] = evaluation.user_message
-    enriched["capability_missing_signals"] = list(evaluation.missing_required_signals)
-    enriched["capability_applicability_boundaries"] = list(evaluation.applicability_boundaries)
-    enriched["capability_limitations"] = list(evaluation.limitations)
-    return enriched
 
 
 def _compute_takeoff_metrics(
@@ -867,428 +816,70 @@ def _compute_takeoff_metrics(
     dataset_version_id: Optional[int] = None,
     request_certification_result: bool = False,
 ) -> dict:
-    """Compute takeoff run metrics from time-series data (deterministic)."""
-    param_query = (
-        db.query(TestParameter.id, TestParameter.name, TestParameter.unit)
-        .join(DataPoint, DataPoint.parameter_id == TestParameter.id)
-        .filter(DataPoint.flight_test_id == flight_test_id)
-    )
-    if dataset_version_id is not None:
-        param_query = param_query.filter(
-            DataPoint.dataset_version_id == dataset_version_id
-        )
-    param_rows = param_query.distinct().all()
-    params = [{"id": r.id, "name": r.name, "unit": r.unit} for r in param_rows]
-    if not params:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=[],
-            has_dataset=False,
-            has_standards_context=False,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {
-                "available": False,
-                "reason": "No parameters found for flight test.",
-            },
-            evaluation,
-        )
-
-    ground_speed_id = _choose_param_id(params, _score_ground_speed)
-    wow_ids = [p["id"] for p in params if _score_wow(p["name"], p.get("unit")) > 0]
-    accel_id = _choose_param_id(params, _score_longitudinal_accel)
-    available_signals = set()
-    if ground_speed_id is not None:
-        available_signals.add("ground_speed")
-    if wow_ids:
-        available_signals.add("weight_on_wheels")
-    if accel_id is not None:
-        available_signals.add("longitudinal_acceleration")
-
-    if ground_speed_id is None:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {"available": False, "reason": "Ground speed parameter not found."},
-            evaluation,
-        )
-    if not wow_ids:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {"available": False, "reason": "Weight-on-wheels parameter not found."},
-            evaluation,
-        )
-
-    selected_ids = set([ground_speed_id, *wow_ids])
-    if accel_id is not None:
-        selected_ids.add(accel_id)
-
-    points_query = (
-        db.query(DataPoint.timestamp, DataPoint.parameter_id, DataPoint.value)
-        .filter(
-            DataPoint.flight_test_id == flight_test_id,
-            DataPoint.parameter_id.in_(selected_ids),
-        )
-    )
-    if dataset_version_id is not None:
-        points_query = points_query.filter(
-            DataPoint.dataset_version_id == dataset_version_id
-        )
-    rows = points_query.order_by(DataPoint.timestamp.asc()).all()
-    if not rows:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            has_time_series_continuity=False,
-            data_coverage_ok=False,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {"available": False, "reason": "No datapoints found for required parameters."},
-            evaluation,
-        )
-
-    timeline: Dict[Any, Dict[int, float]] = {}
-    for r in rows:
-        timeline.setdefault(r.timestamp, {})[r.parameter_id] = float(r.value)
-
-    points = []
-    for ts in sorted(timeline.keys()):
-        vals = timeline[ts]
-        gs = vals.get(ground_speed_id)
-        if gs is None:
-            continue
-        wow_values = [vals[w_id] for w_id in wow_ids if w_id in vals]
-        wow_avg = (sum(wow_values) / len(wow_values)) if wow_values else None
-        accel_val = vals.get(accel_id) if accel_id is not None else None
-        points.append({"ts": ts, "gs_kt": gs, "wow": wow_avg, "accel": accel_val})
-
-    if len(points) < 2:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            has_time_series_continuity=False,
-            data_coverage_ok=False,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {
-                "available": False,
-                "reason": "Insufficient timeseries points for takeoff calculation.",
-            },
-            evaluation,
-        )
-
-    liftoff_idx = None
-    for i in range(1, len(points)):
-        prev_pt = points[i - 1]
-        cur_pt = points[i]
-        if prev_pt["wow"] is None or cur_pt["wow"] is None:
-            continue
-        if prev_pt["wow"] >= 0.5 and cur_pt["wow"] < 0.5 and cur_pt["gs_kt"] >= 30:
-            liftoff_idx = i
-            break
-    if liftoff_idx is None:
-        for i, pt in enumerate(points):
-            if pt["wow"] is not None and pt["wow"] < 0.5 and pt["gs_kt"] >= 30:
-                liftoff_idx = i
-                break
-    if liftoff_idx is None:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            has_time_series_continuity=True,
-            data_coverage_ok=True,
-            event_detection_ok=False,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {
-                "available": False,
-                "reason": "Could not detect liftoff transition from WOW signals.",
-            },
-            evaluation,
-        )
-
-    start_idx = None
-    for i in range(liftoff_idx, -1, -1):
-        pt = points[i]
-        if (pt["wow"] is None or pt["wow"] >= 0.5) and pt["gs_kt"] <= 5:
-            start_idx = i
-            break
-    if start_idx is None:
-        # fallback: earliest on-ground sample before liftoff
-        candidates = [
-            i for i in range(0, liftoff_idx + 1)
-            if points[i]["wow"] is None or points[i]["wow"] >= 0.5
-        ]
-        start_idx = candidates[0] if candidates else 0
-
-    if start_idx >= liftoff_idx:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            has_time_series_continuity=True,
-            data_coverage_ok=True,
-            event_detection_ok=False,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {"available": False, "reason": "Invalid takeoff segment boundaries."},
-            evaluation,
-        )
-
-    knot_to_fts = 1.687809857
-    distance_ft = 0.0
-    valid_intervals = 0
-    for i in range(start_idx + 1, liftoff_idx + 1):
-        p0 = points[i - 1]
-        p1 = points[i]
-        dt = (p1["ts"] - p0["ts"]).total_seconds()
-        if dt <= 0 or dt > 10:
-            continue
-        v0 = max(p0["gs_kt"], 0.0) * knot_to_fts
-        v1 = max(p1["gs_kt"], 0.0) * knot_to_fts
-        distance_ft += ((v0 + v1) / 2.0) * dt
-        valid_intervals += 1
-
-    if valid_intervals == 0:
-        evaluation = evaluate_capability_request(
-            "takeoff",
-            available_signals=available_signals,
-            has_dataset=True,
-            has_time_series_continuity=True,
-            data_coverage_ok=False,
-            event_detection_ok=False,
-            request_certification_result=request_certification_result,
-            correction_inputs_available=False,
-        )
-        return _apply_capability_evaluation_to_metrics(
-            {
-                "available": False,
-                "reason": "No valid time intervals for distance integration.",
-            },
-            evaluation,
-        )
-
-    start_pt = points[start_idx]
-    liftoff_pt = points[liftoff_idx]
-    duration_s = (liftoff_pt["ts"] - start_pt["ts"]).total_seconds()
-    mean_accel_fts2 = None
-    if duration_s > 0:
-        mean_accel_fts2 = (
-            (liftoff_pt["gs_kt"] - start_pt["gs_kt"]) * knot_to_fts
-        ) / duration_s
-
-    accel_samples = [
-        pt["accel"] for pt in points[start_idx: liftoff_idx + 1]
-        if pt["accel"] is not None
-    ]
-    accel_mean_g = (sum(accel_samples) / len(accel_samples)) if accel_samples else None
-    accel_sensor_fts2 = (accel_mean_g * 32.174) if accel_mean_g is not None else None
-
-    evaluation = evaluate_capability_request(
-        "takeoff",
-        available_signals=available_signals,
-        has_dataset=True,
-        has_time_series_continuity=True,
-        data_coverage_ok=True,
-        event_detection_ok=True,
+    return _compute_takeoff_metrics_impl(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
         request_certification_result=request_certification_result,
-        correction_inputs_available=False,
-    )
-    return _apply_capability_evaluation_to_metrics(
-        {
-        "available": True,
-        "distance_ft": round(distance_ft, 1),
-        "distance_m": round(distance_ft * 0.3048, 1),
-        "wow_channels_used": len(wow_ids),
-        "wow_ground_threshold": 0.5,
-        "start_timestamp": start_pt["ts"].isoformat(),
-        "liftoff_timestamp": liftoff_pt["ts"].isoformat(),
-        "start_wow_mean": round(start_pt["wow"], 3) if start_pt["wow"] is not None else None,
-        "liftoff_wow_mean": round(liftoff_pt["wow"], 3) if liftoff_pt["wow"] is not None else None,
-        "start_speed_kt": round(start_pt["gs_kt"], 2),
-        "liftoff_speed_kt": round(liftoff_pt["gs_kt"], 2),
-        "run_time_s": round(duration_s, 2),
-        "mean_accel_fts2": round(mean_accel_fts2, 3) if mean_accel_fts2 is not None else None,
-        "sensor_accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
-        "sensor_accel_mean_fts2": round(accel_sensor_fts2, 3) if accel_sensor_fts2 is not None else None,
-        "sample_intervals_used": valid_intervals,
-        },
-        evaluation,
     )
 
 
 def _build_deterministic_takeoff_section(metrics: dict) -> str:
-    """Render deterministic takeoff section directly from computed data."""
-    outcome = metrics.get("capability_outcome")
-    capability_limitations = metrics.get("capability_limitations") or []
-    capability_applicability = metrics.get("capability_applicability_boundaries") or []
-    capability_reason_key = metrics.get("capability_reason_key")
+    return _build_deterministic_takeoff_section_impl(metrics)
 
-    if not metrics.get("available"):
-        lines = [
-            "## Deterministic Calculation (Flight Data) [DATA]",
-            "Deterministic takeoff metrics are unavailable for this dataset.",
-            "",
-            f"- Reason: {metrics.get('reason', 'Unknown')}",
-        ]
-        if capability_reason_key:
-            lines.append(f"- Capability rule key: {capability_reason_key}")
-        if outcome:
-            lines.append(f"- Capability outcome: {outcome}")
-        if capability_applicability:
-            lines.append("")
-            lines.append("### Applicability Boundaries")
-            for item in capability_applicability:
-                lines.append(f"- {item}")
-        if capability_limitations:
-            lines.append("")
-            lines.append("### Limitations")
-            for item in capability_limitations:
-                lines.append(f"- {item}")
-        return "\n".join(lines) + "\n"
 
-    lines = [
-        "## Deterministic Calculation (Flight Data) [DATA]",
-        "",
-        "### Result Classification",
-        "- Result type: **Estimated takeoff ground roll to liftoff**",
-        "- Classification: **Deterministic data-derived estimate**",
-        (
-            "- Corrections not applied: **wind, runway slope, non-standard atmosphere, "
-            "and certification screen-height corrections**"
-        ),
-    ]
-    if outcome == "partial_estimate":
-        lines.append(
-            "- Capability outcome: **Partial estimate** due to unavailable correction inputs for certification-style request."
-        )
-    else:
-        lines.append("- Capability outcome: **Allow with explicit limitations**")
-    lines.append(
-        (
-            "- Applicability boundary: valid for the detected WOW/ground-speed takeoff segment only; "
-            "not a certification-corrected takeoff distance."
-        )
+def _compute_landing_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    return _compute_landing_metrics_impl(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        request_certification_result=request_certification_result,
     )
-    lines.extend(
-        [
-            "",
-            "### Computed Metrics",
-        ]
-    )
-    knot_to_fts = 1.687809857
-    vi_kt = float(metrics["start_speed_kt"])
-    vf_kt = float(metrics["liftoff_speed_kt"])
-    t_s = float(metrics["run_time_s"])
-    vi_fts = vi_kt * knot_to_fts
-    vf_fts = vf_kt * knot_to_fts
-    accel_fts2 = metrics.get("mean_accel_fts2")
-    accel_for_eq = float(accel_fts2) if accel_fts2 is not None else None
-    distance_integrated = float(metrics["distance_ft"])
 
-    distance_kinematic = None
-    if accel_for_eq is not None:
-        distance_kinematic = (vi_fts * t_s) + (0.5 * accel_for_eq * (t_s ** 2))
 
-    lines.extend(
-        [
-            (
-                "- Estimated takeoff ground roll to liftoff "
-                f"(integrated speed trace): **{metrics['distance_ft']} ft ({metrics['distance_m']} m)**"
-            ),
-        f"- Run time (start-to-liftoff): **{metrics['run_time_s']} s**",
-        f"- Start speed: **{metrics['start_speed_kt']} kt**",
-        f"- Liftoff speed: **{metrics['liftoff_speed_kt']} kt**",
-        f"- Mean acceleration from speed trace: **{metrics.get('mean_accel_fts2', 'n/a')} ft/s^2**",
-        (
-            f"- Mean acceleration from sensor: **{metrics.get('sensor_accel_mean_g', 'n/a')} g "
-            f"({metrics.get('sensor_accel_mean_fts2', 'n/a')} ft/s^2)**"
-        ),
-        f"- Integration intervals used: **{metrics['sample_intervals_used']}**",
-            "",
-            "### WOW-Based Segment Definition",
-        (
-            f"- WOW channels used: **{metrics.get('wow_channels_used', 'n/a')}** "
-            "(LH/RH wheels when available)"
-        ),
-        (
-            f"- On-ground condition: **mean WOW >= {metrics.get('wow_ground_threshold', 0.5)}** "
-            "(approximately WOW=1)"
-        ),
-        (
-            f"- Airborne condition: **mean WOW < {metrics.get('wow_ground_threshold', 0.5)}** "
-            "(approximately WOW=0)"
-        ),
-        (
-            f"- Start sample: **{metrics.get('start_timestamp', 'n/a')}** "
-            f"(WOW={metrics.get('start_wow_mean', 'n/a')}, GS={metrics['start_speed_kt']} kt)"
-        ),
-        (
-            f"- Liftoff sample: **{metrics.get('liftoff_timestamp', 'n/a')}** "
-            f"(WOW={metrics.get('liftoff_wow_mean', 'n/a')}, GS={metrics['liftoff_speed_kt']} kt)"
-        ),
-            "",
-            "### Equations",
-            "- Velocity conversion: V_ft_s = V_kt x 1.687809857",
-            "- Mean acceleration from speed trace: a = (Vf - Vi) / t",
-            "- Kinematic distance check: d = Vi x t + 0.5 x a x t^2",
-            "",
-            "### Substitution (units preserved)",
-            f"- Vi = {vi_kt} kt = {vi_fts:.3f} ft/s",
-            f"- Vf = {vf_kt} kt = {vf_fts:.3f} ft/s",
-            f"- t = {t_s} s",
-        ]
+def _build_deterministic_landing_section(metrics: dict) -> str:
+    return _build_deterministic_landing_section_impl(metrics)
+
+
+def _compute_performance_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    return _compute_performance_metrics_impl(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        request_certification_result=request_certification_result,
     )
-    if accel_for_eq is not None:
-        lines.append(f"- a = ({vf_fts:.3f} - {vi_fts:.3f}) / {t_s:.2f} = {accel_for_eq:.3f} ft/s^2")
-    if distance_kinematic is not None:
-        lines.append(
-            f"- Kinematic distance check: d ≈ {distance_kinematic:.1f} ft "
-            f"(integrated result: {distance_integrated:.1f} ft)"
-        )
-    lines.extend(
-        [
-            "",
-            (
-                "Use the integrated speed-trace distance as the primary deterministic estimate for "
-                "ground roll to liftoff [DATA]."
-            ),
-            "Do not interpret this value as a corrected certification takeoff distance unless corrections are explicitly applied.",
-        ]
+
+
+def _build_deterministic_performance_section(metrics: dict) -> str:
+    return _build_deterministic_performance_section_impl(metrics)
+
+
+def _compute_buffet_vibration_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    return _compute_buffet_vibration_metrics_impl(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        request_certification_result=request_certification_result,
     )
-    if capability_applicability:
-        lines.extend(["", "### Applicability Boundaries"])
-        for item in capability_applicability:
-            lines.append(f"- {item}")
-    if capability_limitations:
-        lines.extend(["", "### Limitations"])
-        for item in capability_limitations:
-            lines.append(f"- {item}")
-    return "\n".join(lines)
+
+
+def _build_deterministic_buffet_vibration_section(metrics: dict) -> str:
+    return _build_deterministic_buffet_vibration_section_impl(metrics)
 
 
 # ---------------------------------------------------------------------------
@@ -2175,18 +1766,32 @@ def _default_analysis_goal_for_mode(mode: AnalysisModeDefinition) -> str:
     )
 
 
-def _capability_eval_from_takeoff_metrics(metrics: dict) -> CapabilityEvaluation:
-    authority = metrics.get("capability_authority") or "deterministic_with_rag_crosscheck"
-    status = metrics.get("capability_status") or "implemented"
+def _capability_eval_from_deterministic_metrics(
+    metrics: dict,
+    mode: AnalysisModeDefinition,
+) -> CapabilityEvaluation:
     outcome = metrics.get("capability_outcome") or "allow_with_limitations"
+    status_value = metrics.get("capability_status")
+    authority_value = metrics.get("capability_authority")
+    resolved_status = analysis_mode_status(mode)
+    resolved_authority = analysis_mode_authority(mode)
+
+    if status_value in {item.value for item in CapabilityImplementationStatus}:
+        resolved_status = CapabilityImplementationStatus(status_value)
+    if authority_value in {item.value for item in CapabilityAuthority}:
+        resolved_authority = CapabilityAuthority(authority_value)
+
     return CapabilityEvaluation(
-        capability_key=str(metrics.get("capability_key") or "takeoff"),
-        label="Takeoff Analysis",
-        status=analysis_mode_status(resolve_analysis_mode("takeoff")),
-        authority=analysis_mode_authority(resolve_analysis_mode("takeoff")),
+        capability_key=str(metrics.get("capability_key") or mode.capability_key),
+        label=mode.label,
+        status=resolved_status,
+        authority=resolved_authority,
         outcome=CapabilityOutcome(outcome) if outcome in {item.value for item in CapabilityOutcome} else CapabilityOutcome.ALLOW_WITH_LIMITATIONS,
         reason_key=metrics.get("capability_reason_key"),
-        user_message=str(metrics.get("capability_user_message") or "Takeoff capability evaluation completed."),
+        user_message=str(
+            metrics.get("capability_user_message")
+            or f"{mode.label} capability evaluation completed."
+        ),
         missing_required_signals=list(metrics.get("capability_missing_signals") or []),
         applicability_boundaries=list(metrics.get("capability_applicability_boundaries") or []),
         limitations=list(metrics.get("capability_limitations") or []),
@@ -2198,13 +1803,22 @@ def _build_mode_limited_analysis_text(
     mode: AnalysisModeDefinition,
     capability_eval: CapabilityEvaluation,
     analysis_goal: str,
+    deterministic_available: bool = False,
 ) -> str:
-    lines = [
-        "### Executive Summary",
-        (
+    if deterministic_available:
+        summary_line = (
+            f"The selected analysis mode `{mode.key}` produced deterministic bounded results. "
+            "This section captures applicability boundaries and follow-up guidance."
+        )
+    else:
+        summary_line = (
             f"The selected analysis mode `{mode.key}` is currently routed as `{capability_eval.outcome.value}`. "
             "This response provides capability-aware boundaries and next-step guidance only."
-        ),
+        )
+
+    lines = [
+        "### Executive Summary",
+        summary_line,
         "",
         "### Mode Applicability and Limits",
         f"- Capability status: **{capability_eval.status.value}**",
@@ -2232,8 +1846,8 @@ def _build_mode_limited_analysis_text(
         [
             "",
             "### Recommendations",
-            "- Use `analysis_mode=takeoff` for currently implemented deterministic performance analysis.",
-            "- For this mode, use standards guidance as advisory context until deterministic modules are implemented.",
+            "- Use deterministic mode outputs as authoritative only within the stated applicability boundaries.",
+            "- For unsupported domains, use standards/context guidance as advisory evidence only.",
             f"- Requested goal: {analysis_goal}",
         ]
     )
@@ -2527,21 +2141,45 @@ def ai_analysis(
     context_text = ""
     run_llm = False
 
+    certification_requested = _is_certification_result_requested(analysis_goal)
+    deterministic_metrics = None
+
     if selected_mode.key == "takeoff":
-        certification_requested = _is_certification_result_requested(analysis_goal)
-        takeoff_metrics = _compute_takeoff_metrics(
+        deterministic_metrics = _compute_takeoff_metrics(
             db=db,
             flight_test_id=flight_test_id,
             dataset_version_id=dataset_version_id,
             request_certification_result=certification_requested,
         )
-        mode_eval = _capability_eval_from_takeoff_metrics(takeoff_metrics)
-        mode_routing_section = _build_mode_routing_section(
-            mode=selected_mode,
-            capability_eval=mode_eval,
-        )
-        deterministic_section = _build_deterministic_takeoff_section(takeoff_metrics)
+        deterministic_section = _build_deterministic_takeoff_section(deterministic_metrics)
         run_llm = True
+    elif selected_mode.key == "landing":
+        deterministic_metrics = _compute_landing_metrics(
+            db=db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            request_certification_result=certification_requested,
+        )
+        deterministic_section = _build_deterministic_landing_section(deterministic_metrics)
+        run_llm = False
+    elif selected_mode.key == "performance":
+        deterministic_metrics = _compute_performance_metrics(
+            db=db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            request_certification_result=certification_requested,
+        )
+        deterministic_section = _build_deterministic_performance_section(deterministic_metrics)
+        run_llm = False
+    elif selected_mode.key == "buffet_vibration":
+        deterministic_metrics = _compute_buffet_vibration_metrics(
+            db=db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            request_certification_result=certification_requested,
+        )
+        deterministic_section = _build_deterministic_buffet_vibration_section(deterministic_metrics)
+        run_llm = False
     else:
         deterministic_section = _build_non_takeoff_deterministic_section(
             mode=selected_mode,
@@ -2549,6 +2187,16 @@ def ai_analysis(
         )
         # Only "general" currently runs routed LLM guidance path.
         run_llm = selected_mode.key == "general"
+
+    if deterministic_metrics is not None:
+        mode_eval = _capability_eval_from_deterministic_metrics(
+            deterministic_metrics,
+            selected_mode,
+        )
+        mode_routing_section = _build_mode_routing_section(
+            mode=selected_mode,
+            capability_eval=mode_eval,
+        )
 
     if run_llm:
         param_names = [r.name for r in stats_rows[:10]]
@@ -2727,6 +2375,9 @@ def ai_analysis(
             mode=selected_mode,
             capability_eval=mode_eval,
             analysis_goal=analysis_goal,
+            deterministic_available=bool(
+                deterministic_metrics is not None and deterministic_metrics.get("available")
+            ),
         )
         final_analysis = (
             mode_routing_section.strip()

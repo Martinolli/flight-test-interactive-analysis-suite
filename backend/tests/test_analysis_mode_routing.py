@@ -56,6 +56,15 @@ def test_get_analysis_modes_returns_catalog_backed_modes(client, auth_headers):
     assert takeoff["capability_status"] == "implemented"
     assert takeoff["authority"] == "deterministic_with_rag_crosscheck"
     assert takeoff["default"] is True
+    landing = next(item for item in payload if item["key"] == "landing")
+    assert landing["capability_status"] == "implemented"
+    assert landing["authority"] == "deterministic_with_rag_crosscheck"
+    performance = next(item for item in payload if item["key"] == "performance")
+    assert performance["capability_status"] == "implemented"
+    assert performance["authority"] == "deterministic_primary"
+    buffet = next(item for item in payload if item["key"] == "buffet_vibration")
+    assert buffet["capability_status"] == "implemented"
+    assert buffet["authority"] == "deterministic_primary"
 
 
 def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
@@ -152,7 +161,7 @@ def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
     assert not reopened["prompt_text"].startswith("[analysis_mode:")
 
 
-def test_ai_analysis_landing_mode_returns_explicit_mode_limited_outcome(
+def test_ai_analysis_landing_mode_returns_deterministic_landing_section_with_guardrails(
     client, db_session, test_user, auth_headers, monkeypatch
 ):
     flight_test = _create_flight_test_with_single_datapoint(db_session, test_user["id"])
@@ -171,8 +180,124 @@ def test_ai_analysis_landing_mode_returns_explicit_mode_limited_outcome(
     body = response.json()
     assert body["analysis_mode"] == "landing"
     assert body["capability_key"] == "landing"
-    assert "is not implemented in this release" in body["analysis"]
-    assert "analysis_mode=landing" in body["analysis"]
+    assert "Deterministic Calculation (Landing Data) [DATA]" in body["analysis"]
+    assert "Weight-on-wheels parameter not found." in body["analysis"]
+    assert "Routing outcome" in body["analysis"]
+
+
+def test_ai_analysis_performance_mode_runs_mode_specific_deterministic_metrics(
+    client, db_session, test_user, auth_headers, monkeypatch
+):
+    flight_test = FlightTest(
+        test_name="Performance Deterministic Test",
+        aircraft_type="F-16",
+        created_by_id=test_user["id"],
+    )
+    db_session.add(flight_test)
+    db_session.commit()
+    db_session.refresh(flight_test)
+
+    gs_param = TestParameter(name="GROUND SPEED", unit="kt")
+    alt_param = TestParameter(name="PRESSURE ALTITUDE", unit="ft")
+    db_session.add(gs_param)
+    db_session.add(alt_param)
+    db_session.commit()
+    db_session.refresh(gs_param)
+    db_session.refresh(alt_param)
+
+    samples = [
+        (datetime(2026, 4, 19, 10, 0, 0), 120.0, 5000.0),
+        (datetime(2026, 4, 19, 10, 0, 5), 135.0, 5125.0),
+        (datetime(2026, 4, 19, 10, 0, 10), 150.0, 5260.0),
+    ]
+    for ts, gs, alt in samples:
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=gs_param.id,
+                timestamp=ts,
+                value=gs,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=alt_param.id,
+                timestamp=ts,
+                value=alt,
+            )
+        )
+    db_session.commit()
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router.func, "stddev", lambda col: documents_router.func.avg(col))
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_takeoff_metrics",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+    )
+
+    response = client.post(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
+        json={"analysis_mode": "performance", "user_prompt": "Provide deterministic performance trends"},
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["analysis_mode"] == "performance"
+    assert body["capability_key"] == "performance_general"
+    assert "Deterministic Calculation (Performance Trends) [DATA]" in body["analysis"]
+    assert "Mean climb rate" in body["analysis"]
+
+
+def test_ai_analysis_buffet_mode_returns_screening_metrics(
+    client, db_session, test_user, auth_headers, monkeypatch
+):
+    flight_test = FlightTest(
+        test_name="Buffet Screening Test",
+        aircraft_type="F-16",
+        created_by_id=test_user["id"],
+    )
+    db_session.add(flight_test)
+    db_session.commit()
+    db_session.refresh(flight_test)
+
+    vib_param = TestParameter(name="AIRFRAME VIBRATION X", unit="g")
+    db_session.add(vib_param)
+    db_session.commit()
+    db_session.refresh(vib_param)
+
+    values = [0.02, 0.03, 0.09, 0.12, 0.2, 0.18, 0.05, 0.04]
+    for idx, value in enumerate(values):
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=vib_param.id,
+                timestamp=datetime(2026, 4, 19, 11, 0, idx),
+                value=value,
+            )
+        )
+    db_session.commit()
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router.func, "stddev", lambda col: documents_router.func.avg(col))
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_takeoff_metrics",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+    )
+
+    response = client.post(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
+        json={"analysis_mode": "buffet_vibration", "user_prompt": "Screen vibration channels"},
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["analysis_mode"] == "buffet_vibration"
+    assert body["capability_key"] == "buffet_vibration"
+    assert "Deterministic Calculation (Buffet/Vibration Screening) [DATA]" in body["analysis"]
+    assert "Channels screened" in body["analysis"]
 
 
 def test_ai_analysis_general_mode_routes_without_takeoff_calculator(

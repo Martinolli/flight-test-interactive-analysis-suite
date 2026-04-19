@@ -2344,3 +2344,78 @@ pnpm -C frontend run build
 
 - Backend tests: `16 passed`
 - Frontend build: `success`
+
+## P2.2 Deterministic Calculators Beyond Takeoff (2026-04-19)
+
+### Completed: modular deterministic analysis framework with landing/performance/buffet support
+
+**Objective:**
+
+- Expand deterministic capability beyond takeoff while preserving `analysis_mode` routing, capability-catalog truth, provenance, and immutable saved-analysis behavior.
+
+**Files changed:**
+
+- `backend/app/analysis/deterministic.py` (new)
+- `backend/app/analysis/__init__.py` (new)
+- `backend/app/routers/documents.py`
+- `backend/app/capabilities.py`
+- `backend/app/analysis_modes.py`
+- `backend/tests/test_analysis_mode_routing.py`
+- `backend/tests/test_capability_catalog.py`
+- `backend/tests/test_deterministic_calculators.py` (new)
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Deterministic module extraction
+   - Moved calculator logic into dedicated backend analysis package:
+     - `compute_takeoff_metrics`
+     - `compute_landing_metrics`
+     - `compute_performance_metrics`
+     - `compute_buffet_vibration_metrics`
+   - Added dedicated section renderers for each deterministic mode.
+   - Router now uses thin wrappers so existing tests/contracts remain stable.
+
+2. New deterministic calculators beyond takeoff
+   - `landing`:
+     - WOW + ground-speed touchdown-to-rollout integration.
+     - bounded estimate (not certification-corrected landing distance).
+   - `performance` (`performance_general`):
+     - bounded deterministic trend metrics (analysis window, climb-rate/altitude and speed trends, optional acceleration summary).
+   - `buffet_vibration`:
+     - deterministic screening summaries (RMS/peak/p95/exceedance style metrics) for support use only.
+     - explicitly not formal flutter/clearance determination.
+
+3. `analysis_mode` routing integration
+   - Added deterministic mode dispatch in AI analysis path for:
+     - `takeoff`
+     - `landing`
+     - `performance`
+     - `buffet_vibration`
+   - Unsupported/other modes keep explicit bounded behavior.
+   - No silent fallback to takeoff for these implemented deterministic modes.
+
+4. Capability-catalog alignment updates
+   - `landing` -> `implemented`, `deterministic_with_rag_crosscheck`
+   - `performance_general` -> `implemented`, `deterministic_primary`
+   - `buffet_vibration` -> `implemented`, `deterministic_primary`
+   - Deterministic capability evaluations now return `allow_with_limitations` by default, preserving explicit engineering boundaries.
+
+5. Engineering wording safeguards
+   - New deterministic sections preserve explicit limitation wording:
+     - approximate/estimated result labels
+     - corrections not applied
+     - applicability boundaries
+     - non-certification framing where relevant
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_capability_catalog.py backend/tests/test_analysis_modes.py backend/tests/test_analysis_mode_routing.py backend/tests/test_deterministic_calculators.py backend/tests/test_deterministic_takeoff_wording.py backend/tests/test_documents_tenancy.py -q
+```
+
+**Result:**
+
+- Backend tests: `32 passed`
