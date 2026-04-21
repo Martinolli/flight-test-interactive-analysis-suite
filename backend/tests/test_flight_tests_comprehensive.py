@@ -975,6 +975,69 @@ bad-time,5000.0
         )
         assert forbidden_list.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_ingestion_session_list_includes_dataset_version_label(
+        self, client, test_user, auth_headers, db_session
+    ):
+        """Upload history payload must expose persisted dataset version label (not PK-derived label)."""
+        flight_test = FlightTest(
+            test_name="Session Label Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
+        )
+        db_session.add(flight_test)
+        db_session.commit()
+        db_session.refresh(flight_test)
+
+        session_with_dataset = IngestionSession(
+            flight_test_id=flight_test.id,
+            filename="with_dataset.csv",
+            file_type="csv",
+            source_format="csv",
+            row_count=10,
+            status="success",
+            uploaded_by_id=test_user["id"],
+        )
+        session_without_dataset = IngestionSession(
+            flight_test_id=flight_test.id,
+            filename="without_dataset.csv",
+            file_type="csv",
+            source_format="csv",
+            row_count=5,
+            status="success",
+            uploaded_by_id=test_user["id"],
+        )
+        db_session.add_all([session_with_dataset, session_without_dataset])
+        db_session.flush()
+
+        dataset_version = DatasetVersion(
+            flight_test_id=flight_test.id,
+            version_number=3,
+            label="v3",
+            status="success",
+            row_count=10,
+            data_points_count=100,
+            source_session_id=session_with_dataset.id,
+            created_by_id=test_user["id"],
+        )
+        db_session.add(dataset_version)
+        db_session.flush()
+
+        session_with_dataset.dataset_version_id = dataset_version.id
+        db_session.add(session_with_dataset)
+        db_session.commit()
+
+        response = client.get(
+            f"/api/flight-tests/{flight_test.id}/ingestion-sessions",
+            headers=auth_headers,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        payload = response.json()
+        by_filename = {item["filename"]: item for item in payload}
+
+        assert by_filename["with_dataset.csv"]["dataset_version_id"] == dataset_version.id
+        assert by_filename["with_dataset.csv"]["dataset_version_label"] == "v3"
+        assert by_filename["without_dataset.csv"]["dataset_version_label"] is None
+
 
 class TestDataRetrieval:
     """Test data point retrieval"""

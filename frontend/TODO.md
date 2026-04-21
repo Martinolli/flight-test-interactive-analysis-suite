@@ -10,6 +10,7 @@
 - [x] P0.1 Upload history from persisted ingestion sessions only
   - Remove remaining synthetic/localStorage operational truth.
   - Render backend status lifecycle + persisted errors.
+  - Upload History dataset column now uses persisted dataset label (`dataset_version_label`) with safe unresolved fallback (`ID <id>` or `—`) instead of formatting DB IDs as version labels.
 - [x] P0.2 Support richer query response contract rendering
   - Prepare UI for structured fields (`assumptions`, `limitations`, `coverage`, etc.) with graceful fallback.
   - Added rendering blocks for summary, assumptions, limitations, calculation notes, recommended-next-queries, and coverage metrics.

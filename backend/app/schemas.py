@@ -170,6 +170,7 @@ class IngestionSessionResponse(BaseModel):
     file_type: str
     source_format: str
     dataset_version_id: Optional[int] = None
+    dataset_version_label: Optional[str] = None
     row_count: Optional[int] = None
     status: str
     error_message: Optional[str] = None

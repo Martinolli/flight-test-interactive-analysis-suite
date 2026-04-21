@@ -28,6 +28,7 @@ export interface UploadRecord {
   id: number;
   flight_test_id: number;
   dataset_version_id?: number | null;
+  dataset_version_label?: string | null;
   filename: string;
   file_type: 'csv';
   source_format?: string;

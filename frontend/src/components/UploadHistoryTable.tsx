@@ -57,6 +57,17 @@ function formatDateTime(dateString: string): string {
 }
 
 export default function UploadHistoryTable({ records, isLoading }: UploadHistoryTableProps) {
+  const formatDatasetLabel = (record: UploadRecord): string => {
+    const persistedLabel = record.dataset_version_label?.trim();
+    if (persistedLabel) {
+      return persistedLabel;
+    }
+    if (record.dataset_version_id) {
+      return `ID ${record.dataset_version_id}`;
+    }
+    return '—';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-10 gap-3 text-gray-400">
@@ -116,7 +127,7 @@ export default function UploadHistoryTable({ records, isLoading }: UploadHistory
                 )}
               </td>
               <td className="px-4 py-3 text-gray-600 text-xs font-medium">
-                {record.dataset_version_id ? `v${record.dataset_version_id}` : '—'}
+                {formatDatasetLabel(record)}
               </td>
               <td className="px-4 py-3">
                 <span className="uppercase text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">

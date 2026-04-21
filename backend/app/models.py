@@ -182,6 +182,13 @@ class IngestionSession(Base):
             f"status={self.status}, filename={self.filename})>"
         )
 
+    @property
+    def dataset_version_label(self) -> str | None:
+        """Convenience label for API responses and UI dataset provenance display."""
+        if self.dataset_version is None:
+            return None
+        return self.dataset_version.label
+
 
 class DataPoint(Base):
     """Data Point model - stores time-series flight test data"""

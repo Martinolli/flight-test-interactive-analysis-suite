@@ -2551,3 +2551,44 @@ pytest backend/tests/test_retrieval_metadata.py backend/tests/test_documents_ten
 **Result:**
 
 - Backend tests: `33 passed`
+
+## Upload History Dataset Label Fidelity Fix (2026-04-21)
+
+### Problem observed
+
+- Upload page showed mismatched dataset labels:
+  - Dataset Versions panel showed correct logical label (for example `v3`)
+  - Upload History table showed `v${dataset_version_id}` (for example `v9`), incorrectly treating DB PK as version label.
+
+### Changes implemented
+
+**Files changed:**
+
+- `backend/app/schemas.py`
+- `backend/app/models.py`
+- `backend/tests/test_flight_tests_comprehensive.py`
+- `frontend/src/services/api.ts`
+- `frontend/src/components/UploadHistoryTable.tsx`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+1. Backend ingestion-session response now includes authoritative dataset label
+   - Added `dataset_version_label` to `IngestionSessionResponse`.
+   - Added `IngestionSession.dataset_version_label` property sourced from linked `DatasetVersion.label`.
+
+2. Upload History UI now renders true dataset label, not PK-derived fake version
+   - Dataset column now resolves in this order:
+     - persisted `dataset_version_label` (example `v3`)
+     - fallback `ID <dataset_version_id>` when label unavailable
+     - fallback `—` when no dataset link exists
+
+3. Regression test coverage
+   - Added backend test proving ingestion session list returns `dataset_version_label` for linked datasets and `null` for unresolved sessions.
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+pnpm -C frontend run build
+```

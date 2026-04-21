@@ -363,6 +363,9 @@
 - [x] CSV-only upload alignment
 - [x] DB migration artifact for `ingestion_sessions` table (`backend/migrations/20260411_add_ingestion_sessions.sql`)
 - [x] Upload-page polling narrowed to active ingestion states only (`pending`/`processing`)
+- [x] Upload History dataset label fidelity on Upload page
+  - Upload History now renders persisted dataset version labels (for example `v3`) instead of formatting DB primary keys as fake labels (for example `v9`).
+  - Backend ingestion-session responses now expose `dataset_version_label` as authoritative provenance.
 - [x] Hybrid retrieval + citation hardening
 - [x] Deterministic takeoff section
 - [x] Responsive AI Standards Query page
