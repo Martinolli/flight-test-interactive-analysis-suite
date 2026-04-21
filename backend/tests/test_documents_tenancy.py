@@ -151,16 +151,35 @@ def test_query_documents_passes_current_user_scope(client, test_user, auth_heade
 
 def test_query_documents_empty_retrieval_returns_structured_response(client, auth_headers, monkeypatch):
     """Empty retrieval should still return full structured response contract."""
+    captured = {}
 
-    def fake_retrieve_hybrid_sources(*, db, question, requested_top_k, owner_user_id):
-        return [], ""
+    def fake_retrieve_hybrid_sources(
+        *,
+        db,
+        question,
+        requested_top_k,
+        owner_user_id,
+        analysis_mode=None,
+        capability_key=None,
+    ):
+        captured["analysis_mode"] = analysis_mode
+        captured["capability_key"] = capability_key
+        return [], "", {
+            "analysis_mode": analysis_mode or "general",
+            "capability_key": capability_key,
+            "mode_filter_enabled": bool(analysis_mode and analysis_mode != "general"),
+            "mode_filter_matched_chunks": 0,
+            "mode_filter_fallback_used": True,
+            "metadata_coverage_ratio": 0.0,
+            "authority_weighting_enabled": True,
+        }
 
     monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
     monkeypatch.setattr(documents_router, "_retrieve_hybrid_sources", fake_retrieve_hybrid_sources)
 
     response = client.post(
         "/api/documents/query",
-        json={"question": "test no sources", "top_k": 4},
+        json={"question": "test no sources", "top_k": 4, "analysis_mode": "landing"},
         headers=auth_headers,
     )
 
@@ -171,6 +190,10 @@ def test_query_documents_empty_retrieval_returns_structured_response(client, aut
     assert "coverage" in body
     assert body["coverage"]["retrieved_sources_count"] == 0
     assert "retrieval_metadata" in body
+    assert captured["analysis_mode"] == "landing"
+    assert captured["capability_key"] == "landing"
+    assert body["retrieval_metadata"]["analysis_mode"] == "landing"
+    assert body["retrieval_metadata"]["capability_key"] == "landing"
 
 
 def test_ai_analysis_persists_analysis_job_and_returns_job_id(

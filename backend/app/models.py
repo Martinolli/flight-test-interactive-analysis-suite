@@ -243,6 +243,13 @@ class Document(Base):
     total_pages = Column(Integer, nullable=True)
     total_chunks = Column(Integer, nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
+    authority_type = Column(String(64), nullable=False, default="handbook")
+    document_revision = Column(String(128), nullable=True)
+    domain_tags_json = Column(Text, nullable=False, default="[]")
+    capability_tags_json = Column(Text, nullable=False, default="[]")
+    aircraft_scope = Column(String(128), nullable=True)
+    system_scope = Column(String(128), nullable=True)
+    source_priority = Column(Integer, nullable=False, default=60)
     status = Column(String(50), default="processing")  # processing | ready | error
     error_message = Column(Text, nullable=True)
     uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)

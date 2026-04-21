@@ -301,8 +301,27 @@
     - report/export compatibility for landing deterministic narrative rendering
   - Kept non-implemented domain boundaries explicit (`flutter` remains bounded/unsupported).
 
-- [ ] P2.3 Add retrieval metadata model for mode-aware RAG
-  - Authority / revision / domain / capability tags with mode pre-filtering.
+- [x] P2.3 Add retrieval metadata model for mode-aware RAG
+  - Added persisted retrieval metadata model on `documents`:
+    - `authority_type`
+    - `document_revision`
+    - `domain_tags_json`
+    - `capability_tags_json`
+    - `aircraft_scope`
+    - `system_scope`
+    - `source_priority`
+  - Added DB migration artifact:
+    - `backend/migrations/20260421_add_document_retrieval_metadata.sql`
+  - Added deterministic metadata derivation/defaulting at upload-time from filename/title/doc_type/description.
+  - Added mode-aware retrieval profile + soft pre-filter/reranking logic in dedicated module:
+    - `backend/app/retrieval_metadata.py`
+  - Retrieval now uses authority/domain/capability/source-priority signals when metadata exists, with safe fallback for sparse/legacy metadata.
+  - Query endpoint supports optional `analysis_mode` for mode-aware RAG retrieval while preserving legacy behavior.
+  - Retrieved sources/snapshots now carry metadata hints for provenance and report/debug alignment.
+  - Added focused tests for:
+    - metadata derivation/defaulting
+    - mode-aware ranking and sparse-metadata fallback
+    - query-mode propagation and retrieval metadata response fields
 
 - [ ] P2.4 Add confidence / coverage / applicability controls
   - Clear blocked-condition signaling in UI and report outputs.
@@ -314,14 +333,14 @@
 
 ## Immediate Execution Order
 
-1. P2.3 — Add retrieval metadata model for mode-aware RAG  
-2. P2.4 — Add confidence / coverage / applicability controls  
+1. P2.4 — Add confidence / coverage / applicability controls  
+2. P2.5 — Add FRAT / mission risk workflow  
 
 - **Reason for this order**
 
 - P1.3 is completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
 - P1.4 and P1.4a are completed for report professionalism + wording hardening.
-- P2.1 routing and P2.2 deterministic expansion are complete; next impact is retrieval metadata + confidence/coverage control hardening.
+- P2.1/P2.2/P2.3 foundations are complete; next impact is confidence/coverage controls and FRAT workflow execution.
 
 ---
 

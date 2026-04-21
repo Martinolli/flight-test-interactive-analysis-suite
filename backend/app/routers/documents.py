@@ -70,6 +70,12 @@ from app.models import (
     TestParameter,
     User,
 )
+from app.retrieval_metadata import (
+    build_retrieval_mode_profile,
+    derive_document_retrieval_metadata,
+    extract_row_retrieval_metadata,
+    rerank_candidates_with_metadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +180,13 @@ class DocumentOut(BaseModel):
     total_pages: Optional[int]
     total_chunks: Optional[int]
     file_size_bytes: Optional[int]
+    authority_type: Optional[str] = None
+    document_revision: Optional[str] = None
+    domain_tags: List[str] = Field(default_factory=list)
+    capability_tags: List[str] = Field(default_factory=list)
+    aircraft_scope: Optional[str] = None
+    system_scope: Optional[str] = None
+    source_priority: Optional[int] = None
     status: str
     error_message: Optional[str]
     created_at: str
@@ -186,6 +199,7 @@ class QueryRequest(BaseModel):
     question: str
     top_k: int = QUERY_TOP_K_DEFAULT
     flight_test_id: Optional[int] = None  # optional context filter
+    analysis_mode: Optional[str] = None
 
 
 class QueryCoverage(BaseModel):
@@ -206,6 +220,13 @@ class QueryRetrievalMetadata(BaseModel):
     lexical_candidates: int
     min_unique_documents: int
     max_chunks_per_document: int
+    analysis_mode: str = "general"
+    capability_key: Optional[str] = None
+    mode_filter_enabled: bool = False
+    mode_filter_matched_chunks: int = 0
+    mode_filter_fallback_used: bool = False
+    metadata_coverage_ratio: float = 0.0
+    authority_weighting_enabled: bool = True
 
 
 class QueryResponse(BaseModel):
@@ -369,6 +390,18 @@ def _build_query_source_legend(sources: List[dict]) -> str:
             + (f", p.{source.get('page_numbers')}" if source.get("page_numbers") else "")
             + (f" — {source.get('section_title')}" if source.get("section_title") else "")
         )
+        metadata_bits: List[str] = []
+        if source.get("authority_type"):
+            metadata_bits.append(f"authority={source.get('authority_type')}")
+        if source.get("document_revision"):
+            metadata_bits.append(f"revision={source.get('document_revision')}")
+        domain_tags = source.get("domain_tags") or []
+        if domain_tags:
+            metadata_bits.append(
+                "domains=" + ",".join(str(tag) for tag in domain_tags[:3])
+            )
+        if metadata_bits:
+            label += f" [{'; '.join(metadata_bits)}]"
         lines.append(f"- {source_id}: {label}")
     return "\n".join(lines)
 
@@ -623,11 +656,21 @@ def _infer_answer_type(question: str, is_risk_assessment: bool) -> str:
 
 
 def _build_source_label(row: Any) -> str:
-    return (
+    base = (
         f"{row.title or row.filename}"
         + (f", p.{row.page_numbers}" if row.page_numbers else "")
         + (f" — {row.section_title}" if row.section_title else "")
     )
+    authority = getattr(row, "authority_type", None)
+    revision = getattr(row, "document_revision", None)
+    if authority or revision:
+        meta = []
+        if authority:
+            meta.append(str(authority))
+        if revision:
+            meta.append(f"rev {revision}")
+        base += f" [{' | '.join(meta)}]"
+    return base
 
 
 def _retrieve_hybrid_sources(
@@ -635,7 +678,9 @@ def _retrieve_hybrid_sources(
     question: str,
     requested_top_k: int,
     owner_user_id: int,
-) -> tuple[list[dict], str]:
+    analysis_mode: Optional[str] = None,
+    capability_key: Optional[str] = None,
+) -> tuple[list[dict], str, dict]:
     """Hybrid retrieval (vector + lexical), returns ranked sources and context text."""
     try:
         query_embedding = embed_text(question)
@@ -656,7 +701,14 @@ def _retrieve_hybrid_sources(
             dc.page_numbers,
             dc.section_title,
             d.filename,
-            d.title
+            d.title,
+            d.authority_type,
+            d.document_revision,
+            d.domain_tags_json,
+            d.capability_tags_json,
+            d.aircraft_scope,
+            d.system_scope,
+            d.source_priority
         FROM document_chunks dc
         JOIN documents d ON d.id = dc.document_id
         WHERE d.status = 'ready'
@@ -687,6 +739,13 @@ def _retrieve_hybrid_sources(
             dc.section_title,
             d.filename,
             d.title,
+            d.authority_type,
+            d.document_revision,
+            d.domain_tags_json,
+            d.capability_tags_json,
+            d.aircraft_scope,
+            d.system_scope,
+            d.source_priority,
             ts_rank_cd(
                 to_tsvector('english', dc.text),
                 websearch_to_tsquery('english', :question)
@@ -714,7 +773,15 @@ def _retrieve_hybrid_sources(
         lexical_rows = []
 
     if not vector_rows and not lexical_rows:
-        return [], ""
+        return [], "", {
+            "analysis_mode": (analysis_mode or "general"),
+            "capability_key": capability_key,
+            "mode_filter_enabled": False,
+            "mode_filter_matched_chunks": 0,
+            "mode_filter_fallback_used": False,
+            "metadata_coverage_ratio": 0.0,
+            "authority_weighting_enabled": True,
+        }
 
     # Reciprocal rank fusion
     rrf_k = 60
@@ -727,11 +794,26 @@ def _retrieve_hybrid_sources(
         row_by_id[row.id] = row
         rrf_scores[row.id] = rrf_scores.get(row.id, 0.0) + (0.8 / (rrf_k + rank))
 
-    ranked_rows = [row_by_id[row_id] for row_id, _ in sorted(
-        rrf_scores.items(),
-        key=lambda item: item[1],
-        reverse=True,
-    )]
+    profile = build_retrieval_mode_profile(analysis_mode, capability_key)
+    candidates = []
+    for row_id, base_score in rrf_scores.items():
+        row = row_by_id[row_id]
+        metadata = extract_row_retrieval_metadata(row)
+        candidates.append(
+            {
+                "id": row_id,
+                "row": row,
+                "base_score": base_score,
+                "metadata": metadata,
+            }
+        )
+    ranked_candidates, retrieval_debug = rerank_candidates_with_metadata(
+        candidates=candidates,
+        profile=profile,
+    )
+    ranked_rows = [item["row"] for item in ranked_candidates]
+    ranked_scores = {item["id"]: item["final_score"] for item in ranked_candidates}
+    ranked_metadata = {item["id"]: item["metadata"] for item in ranked_candidates}
 
     context_limit = min(max(requested_top_k, QUERY_CONTEXT_LIMIT), len(ranked_rows))
     desired_unique_docs = min(QUERY_MIN_UNIQUE_DOCUMENTS, context_limit)
@@ -777,6 +859,7 @@ def _retrieve_hybrid_sources(
     for idx, row in enumerate(context_rows, start=1):
         source_id = f"S{idx}"
         source_label = _build_source_label(row)
+        metadata = ranked_metadata.get(row.id) or extract_row_retrieval_metadata(row)
         sources.append(
             {
                 "source_id": source_id,
@@ -784,13 +867,68 @@ def _retrieve_hybrid_sources(
                 "title": row.title,
                 "page_numbers": row.page_numbers,
                 "section_title": row.section_title,
-                "similarity": round(rrf_scores.get(row.id, 0.0), 4),
+                "similarity": round(ranked_scores.get(row.id, 0.0), 4),
+                "authority_type": metadata.get("authority_type"),
+                "document_revision": metadata.get("document_revision"),
+                "domain_tags": metadata.get("domain_tags") or [],
+                "capability_tags": metadata.get("capability_tags") or [],
+                "aircraft_scope": metadata.get("aircraft_scope"),
+                "system_scope": metadata.get("system_scope"),
+                "source_priority": metadata.get("source_priority"),
                 "text": row.text,
             }
         )
         context_parts.append(f"[{source_id}] {source_label}\n{row.text}")
 
-    return sources, "\n\n---\n\n".join(context_parts)
+    retrieval_debug.update(
+        {
+            "analysis_mode": profile.mode_key,
+            "capability_key": profile.capability_key,
+        }
+    )
+    return sources, "\n\n---\n\n".join(context_parts), retrieval_debug
+
+
+def _normalize_retrieval_result(result: Any) -> tuple[list[dict], str, dict]:
+    if isinstance(result, tuple) and len(result) == 3:
+        sources, context, debug = result
+        return list(sources or []), str(context or ""), dict(debug or {})
+    if isinstance(result, tuple) and len(result) == 2:
+        sources, context = result
+        return list(sources or []), str(context or ""), {}
+    return [], "", {}
+
+
+def _call_retrieve_hybrid_sources(
+    *,
+    db: Session,
+    question: str,
+    requested_top_k: int,
+    owner_user_id: int,
+    analysis_mode: Optional[str] = None,
+    capability_key: Optional[str] = None,
+) -> tuple[list[dict], str, dict]:
+    try:
+        result = _retrieve_hybrid_sources(
+            db=db,
+            question=question,
+            requested_top_k=requested_top_k,
+            owner_user_id=owner_user_id,
+            analysis_mode=analysis_mode,
+            capability_key=capability_key,
+        )
+        return _normalize_retrieval_result(result)
+    except TypeError as exc:
+        if "unexpected keyword argument" not in str(exc):
+            raise
+        # Backward-safe fallback for tests monkeypatching old function signature.
+        result = _retrieve_hybrid_sources(
+            db=db,
+            question=question,
+            requested_top_k=requested_top_k,
+            owner_user_id=owner_user_id,
+        )
+        return _normalize_retrieval_result(result)
 
 
 def _is_certification_result_requested(text_prompt: str) -> bool:
@@ -1289,12 +1427,26 @@ async def upload_document(
     finally:
         await file.close()
 
+    derived_metadata = derive_document_retrieval_metadata(
+        filename=file.filename,
+        title=title or file.filename,
+        doc_type=doc_type,
+        description=description,
+    )
+
     # Create the Document record immediately so the frontend can poll status
     doc = Document(
         filename=file.filename,
         title=title or file.filename,
         doc_type=doc_type,
         description=description,
+        authority_type=derived_metadata["authority_type"],
+        document_revision=derived_metadata["document_revision"],
+        domain_tags_json=json.dumps(derived_metadata["domain_tags"]),
+        capability_tags_json=json.dumps(derived_metadata["capability_tags"]),
+        aircraft_scope=derived_metadata["aircraft_scope"],
+        system_scope=derived_metadata["system_scope"],
+        source_priority=derived_metadata["source_priority"],
         file_size_bytes=file_size,
         status="processing",
         uploaded_by_id=current_user.id,
@@ -1369,12 +1521,25 @@ def query_documents(
     _require_ai_packages()
 
     requested_top_k = max(1, min(20, request.top_k or QUERY_TOP_K_DEFAULT))
+    requested_mode_key = (request.analysis_mode or "general").strip().lower()
+    if requested_mode_key and not get_analysis_mode_definition(requested_mode_key):
+        supported = ", ".join([mode.key for mode in list_analysis_modes()])
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported analysis_mode '{requested_mode_key}'. "
+                f"Supported modes: {supported}."
+            ),
+        )
+    selected_mode = resolve_analysis_mode(requested_mode_key or "general")
 
-    sources, context = _retrieve_hybrid_sources(
+    sources, context, retrieval_debug = _call_retrieve_hybrid_sources(
         db=db,
         question=request.question,
         requested_top_k=requested_top_k,
         owner_user_id=current_user.id,
+        analysis_mode=selected_mode.key,
+        capability_key=selected_mode.capability_key,
     )
     if not sources:
         return QueryResponse(
@@ -1411,6 +1576,13 @@ def query_documents(
                 lexical_candidates=QUERY_LEXICAL_CANDIDATES,
                 min_unique_documents=QUERY_MIN_UNIQUE_DOCUMENTS,
                 max_chunks_per_document=QUERY_MAX_CHUNKS_PER_DOCUMENT,
+                analysis_mode=selected_mode.key,
+                capability_key=selected_mode.capability_key,
+                mode_filter_enabled=bool(retrieval_debug.get("mode_filter_enabled", False)),
+                mode_filter_matched_chunks=int(retrieval_debug.get("mode_filter_matched_chunks", 0)),
+                mode_filter_fallback_used=bool(retrieval_debug.get("mode_filter_fallback_used", False)),
+                metadata_coverage_ratio=float(retrieval_debug.get("metadata_coverage_ratio", 0.0)),
+                authority_weighting_enabled=bool(retrieval_debug.get("authority_weighting_enabled", True)),
             ),
         )
 
@@ -1597,6 +1769,13 @@ def query_documents(
             lexical_candidates=QUERY_LEXICAL_CANDIDATES,
             min_unique_documents=QUERY_MIN_UNIQUE_DOCUMENTS,
             max_chunks_per_document=QUERY_MAX_CHUNKS_PER_DOCUMENT,
+            analysis_mode=selected_mode.key,
+            capability_key=selected_mode.capability_key,
+            mode_filter_enabled=bool(retrieval_debug.get("mode_filter_enabled", False)),
+            mode_filter_matched_chunks=int(retrieval_debug.get("mode_filter_matched_chunks", 0)),
+            mode_filter_fallback_used=bool(retrieval_debug.get("mode_filter_fallback_used", False)),
+            metadata_coverage_ratio=float(retrieval_debug.get("metadata_coverage_ratio", 0.0)),
+            authority_weighting_enabled=bool(retrieval_debug.get("authority_weighting_enabled", True)),
         ),
     )
 
@@ -1865,6 +2044,13 @@ def _serialize_retrieval_snapshot(sources: List[dict], excerpt_chars: int = 320)
                 "page_numbers": source.get("page_numbers"),
                 "section_title": source.get("section_title"),
                 "similarity": source.get("similarity"),
+                "authority_type": source.get("authority_type"),
+                "document_revision": source.get("document_revision"),
+                "domain_tags": source.get("domain_tags") or [],
+                "capability_tags": source.get("capability_tags") or [],
+                "aircraft_scope": source.get("aircraft_scope"),
+                "system_scope": source.get("system_scope"),
+                "source_priority": source.get("source_priority"),
                 "excerpt": (source.get("text") or "")[:excerpt_chars],
             }
         )
@@ -2207,11 +2393,13 @@ def ai_analysis(
             f"Aircraft: {ft.aircraft_type or ''}\n"
             f"Flight test parameter names: {'; '.join(param_names)}"
         )
-        sources, context_text = _retrieve_hybrid_sources(
+        sources, context_text, _retrieval_debug = _call_retrieve_hybrid_sources(
             db=db,
             question=retrieval_question,
             requested_top_k=8,
             owner_user_id=current_user.id,
+            analysis_mode=selected_mode.key,
+            capability_key=selected_mode.capability_key,
         )
 
         if selected_mode.key == "takeoff":
@@ -2428,6 +2616,12 @@ def ai_analysis(
 # ---------------------------------------------------------------------------
 
 def _doc_to_out(doc: Document) -> DocumentOut:
+    domain_tags = _safe_json_load(getattr(doc, "domain_tags_json", "[]"), [])
+    if not isinstance(domain_tags, list):
+        domain_tags = []
+    capability_tags = _safe_json_load(getattr(doc, "capability_tags_json", "[]"), [])
+    if not isinstance(capability_tags, list):
+        capability_tags = []
     return DocumentOut(
         id=doc.id,
         filename=doc.filename,
@@ -2437,6 +2631,13 @@ def _doc_to_out(doc: Document) -> DocumentOut:
         total_pages=doc.total_pages,
         total_chunks=doc.total_chunks,
         file_size_bytes=doc.file_size_bytes,
+        authority_type=getattr(doc, "authority_type", None),
+        document_revision=getattr(doc, "document_revision", None),
+        domain_tags=[str(item) for item in domain_tags if item],
+        capability_tags=[str(item) for item in capability_tags if item],
+        aircraft_scope=getattr(doc, "aircraft_scope", None),
+        system_scope=getattr(doc, "system_scope", None),
+        source_priority=getattr(doc, "source_priority", None),
         status=doc.status,
         error_message=doc.error_message,
         created_at=doc.created_at.isoformat() if doc.created_at else "",

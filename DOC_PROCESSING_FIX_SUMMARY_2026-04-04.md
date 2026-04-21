@@ -2472,3 +2472,82 @@ pytest backend/tests/test_capability_catalog.py backend/tests/test_analysis_mode
 **Result:**
 
 - Backend tests: `38 passed`
+
+## P2.3 Retrieval Metadata Model for Mode-Aware RAG (2026-04-21)
+
+### Completed: persisted metadata + mode-aware retrieval ranking/fallback
+
+**Objective:**
+
+- Improve RAG alignment with `analysis_mode` by introducing persisted retrieval metadata and explainable mode-aware ranking logic.
+
+**Files changed:**
+
+- `backend/app/models.py`
+- `backend/migrations/20260421_add_document_retrieval_metadata.sql`
+- `backend/app/retrieval_metadata.py` (new)
+- `backend/app/routers/documents.py`
+- `backend/tests/test_retrieval_metadata.py` (new)
+- `backend/tests/test_documents_tenancy.py`
+- `TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+**What changed:**
+
+1. Retrieval metadata persistence model
+   - Added document-level persisted fields:
+     - `authority_type`
+     - `document_revision`
+     - `domain_tags_json`
+     - `capability_tags_json`
+     - `aircraft_scope`
+     - `system_scope`
+     - `source_priority`
+   - Added migration:
+     - `20260421_add_document_retrieval_metadata.sql`
+   - Migration includes best-effort legacy defaults/normalization.
+
+2. Metadata assignment/defaulting path
+   - Added deterministic metadata inference during upload from:
+     - filename
+     - title
+     - doc_type
+     - description
+   - Legacy/unclassified documents remain retrievable via safe defaults and fallback logic.
+
+3. Mode-aware retrieval pre-filtering/ranking
+   - Added dedicated retrieval metadata helper module:
+     - `backend/app/retrieval_metadata.py`
+   - Retrieval now applies explainable soft signals:
+     - authority weighting
+     - source priority weighting
+     - revision recency signal (when parsable)
+     - domain/capability match with selected `analysis_mode`
+   - Soft mode-aware pre-filtering is enabled when match coverage exists; automatic fallback is used when metadata is sparse.
+
+4. Query/analysis provenance exposure
+   - Added optional `analysis_mode` to `/api/documents/query` request for mode-aware retrieval.
+   - Query retrieval metadata now includes mode/filter diagnostics:
+     - `analysis_mode`
+     - `capability_key`
+     - `mode_filter_enabled`
+     - `mode_filter_matched_chunks`
+     - `mode_filter_fallback_used`
+     - `metadata_coverage_ratio`
+     - `authority_weighting_enabled`
+   - Retrieved source objects and persisted retrieval snapshots now include metadata hints (authority/revision/domain/capability/scope/priority).
+
+5. Backward compatibility safeguards
+   - Added retrieval call wrapper to preserve compatibility with existing tests and legacy monkeypatched retrieval signatures.
+   - Untagged/legacy docs continue to work through fallback retrieval behavior.
+   - Deterministic calculators, analysis job immutability, and report export flow remain unchanged.
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_retrieval_metadata.py backend/tests/test_documents_tenancy.py backend/tests/test_analysis_mode_routing.py backend/tests/test_admin_report_export.py backend/tests/test_capability_catalog.py -q
+```
+
+**Result:**
+
+- Backend tests: `33 passed`
