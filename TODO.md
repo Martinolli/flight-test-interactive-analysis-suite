@@ -84,27 +84,27 @@
 
 ## P3 — Routing Quality + Domain Deepening
 
-### P3.1 Add prompt-to-mode routing quality guard
+* [x] P3.1 Add prompt-to-mode routing quality guard
 
-* **Reason:** current routing is mode-first and can produce semantically wrong classification when the prompt intent does not match the selected mode.
-* Add prompt/mode mismatch detection before final routing.
-* Examples:
+  * **Reason:** current routing is mode-first and can produce semantically wrong classification when the prompt intent does not match the selected mode.
+  * Add prompt/mode mismatch detection before final routing.
+  * Examples:
 
-  * prompt mentions `aileron`, `stick`, `roll response`, `handling`, `control input`, but selected mode is `takeoff`
-  * prompt requests vibration/load/frequency behavior, but selected mode is `general` or `takeoff`
-* Required behavior:
+    * prompt mentions `aileron`, `stick`, `roll response`, `handling`, `control input`, but selected mode is `takeoff`
+    * prompt requests vibration/load/frequency behavior, but selected mode is `general` or `takeoff`
+  * Required behavior:
 
-  * detect probable mismatch
-  * warn user clearly
-  * suggest better mode(s)
-  * optionally downgrade to safer/general path when appropriate
-* Do not silently run an obviously wrong deterministic mode when the prompt intent is incompatible.
-* Preserve explicit user control; do not over-automate.
-* Add tests for:
+    * detect probable mismatch
+    * warn user clearly
+    * suggest better mode(s)
+    * downgrade strong mismatches from strict deterministic modes to safer general execution with explicit traceability
+  * Do not silently run an obviously wrong deterministic mode when the prompt intent is incompatible.
+  * Preserve explicit user control; do not over-automate.
+  * Add tests for:
 
-  * mode mismatch detection
-  * safe fallback / suggestion behavior
-  * non-regression for correct mode selections
+    * mode mismatch detection
+    * safe fallback / suggestion behavior
+    * non-regression for correct mode selections
 
 ### P3.2 Add handling qualities / control-response workflow
 
@@ -192,12 +192,11 @@
 
 ## Immediate Execution Order
 
-1. **P3.1 — Add prompt-to-mode routing quality guard**
-2. **P3.2 — Add handling qualities / control-response workflow**
-3. **P3.3 — Add atmosphere / air-data engineering support**
-4. **P3.4 — Harden buffet / vibration workflow**
-5. **P3.5 — Add bounded flutter-support pre-screening**
-6. **P3.6 — Expand manual / documentation package**
+1. **P3.2 — Add handling qualities / control-response workflow**
+2. **P3.3 — Add atmosphere / air-data engineering support**
+3. **P3.4 — Harden buffet / vibration workflow**
+4. **P3.5 — Add bounded flutter-support pre-screening**
+5. **P3.6 — Expand manual / documentation package**
 
 ---
 
@@ -227,7 +226,7 @@
 * [x] G3 Capability Definition Gate (after P1.5)
 * [x] G4 Domainization Gate (after P2.1 + first additional deterministic modules)
 * [ ] G5 Mission Decision Gate (after P2.5)
-* [ ] G6 Routing Integrity Gate (after P3.1)
+* [x] G6 Routing Integrity Gate (after P3.1)
 * [ ] G7 Control/Handling Analysis Gate (after P3.2–P3.3)
 
 ---
@@ -286,4 +285,4 @@ These baseline controls should be protected by regression tests.
   * replace enum-style labels with human-readable wording
   * deduplicate repeated limitations/applicability text
   * improve wording for zero-retrieval cases
-* Prompt-to-mode semantic mismatch remains a real product issue and should be addressed early in P3.
+* Prompt-to-mode guard is now enforced with mismatch severity, suggested modes, and strong-mismatch guarded execution metadata.

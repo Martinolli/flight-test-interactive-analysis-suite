@@ -80,7 +80,7 @@ These should be protected from regression.
 
 ## Current Frontend Priority
 
-* [ ] P3.1 Support prompt-to-mode routing quality guard in UI
+* [x] P3.1 Support prompt-to-mode routing quality guard in UI
 
   * Surface prompt/mode mismatch warnings clearly before analysis is run.
   * Examples:
@@ -91,6 +91,7 @@ These should be protected from regression.
 
     * show a clear mismatch warning
     * suggest a better mode when available
+    * surface backend-authoritative mismatch result (selected mode, executed mode, inferred intent)
     * allow the user to keep current mode intentionally, but do not hide the mismatch
   * Keep backend routing truth authoritative; frontend should guide, not invent routing logic.
 
@@ -189,20 +190,19 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P3.1 — Prompt-to-mode routing quality guard UI**
-2. **P3.5 — FRAT usability hardening**
-3. **P3.6 — Report/control readability polish**
-4. **P3.2 — Handling-qualities / control-response frontend workflow**
-5. **P3.4 — Buffet / vibration workflow hardening**
-6. **P3.3 — Atmosphere / air-data support UX**
-7. **P3.7 — Manual / help integration**
+1. **P3.5 — FRAT usability hardening**
+2. **P3.6 — Report/control readability polish**
+3. **P3.2 — Handling-qualities / control-response frontend workflow**
+4. **P3.4 — Buffet / vibration workflow hardening**
+5. **P3.3 — Atmosphere / air-data support UX**
+6. **P3.7 — Manual / help integration**
 
 ---
 
 ## Frontend Notes from Latest Review
 
 * FRAT workflow is operational, but the user needs a clearer checklist and field guidance.
-* AI Analysis mode selection works, but prompt/mode semantic mismatch is still a real UX gap.
+* Prompt/mode mismatch is now surfaced pre-run and with backend-authoritative guard state after run.
 * Current reports expose useful control information, but frontend/report wording still needs polish:
 
   * enum-style labels should become user-friendly

@@ -165,6 +165,118 @@ const QUICK_ANALYSIS_PRESETS: QuickAnalysisPreset[] = [
   },
 ];
 
+type PromptIntentKey =
+  | 'takeoff'
+  | 'landing'
+  | 'performance'
+  | 'buffet_vibration'
+  | 'handling_qualities'
+  | 'general'
+  | 'unknown';
+
+type PromptMismatchSeverity = 'none' | 'soft' | 'strong';
+
+const PROMPT_INTENT_KEYWORDS: Record<Exclude<PromptIntentKey, 'unknown'>, string[]> = {
+  takeoff: ['takeoff', 'rotation', 'ground roll', 'liftoff', 'vr'],
+  landing: ['landing', 'touchdown', 'rollout', 'deceleration', 'approach speed'],
+  performance: ['climb', 'rate of climb', 'climb gradient', 'altitude gain', 'performance'],
+  buffet_vibration: ['vibration', 'buffet', 'load', 'loads', 'frequency', 'flutter', 'rms'],
+  handling_qualities: [
+    'aileron',
+    'stick',
+    'rudder',
+    'elevator',
+    'roll response',
+    'pitch response',
+    'yaw response',
+    'control input',
+    'handling',
+  ],
+  general: ['summary', 'overview', 'general', 'recommendations', 'cross-check'],
+};
+
+const INTENT_TO_MODE: Record<PromptIntentKey, AnalysisModeKey | 'general'> = {
+  takeoff: 'takeoff',
+  landing: 'landing',
+  performance: 'performance',
+  buffet_vibration: 'buffet_vibration',
+  handling_qualities: 'handling_qualities',
+  general: 'general',
+  unknown: 'general',
+};
+
+function inferPromptIntent(prompt: string): { intent: PromptIntentKey; matchedKeywords: string[] } {
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) {
+    return { intent: 'unknown', matchedKeywords: [] };
+  }
+
+  const priority: Array<Exclude<PromptIntentKey, 'unknown'>> = [
+    'handling_qualities',
+    'buffet_vibration',
+    'landing',
+    'takeoff',
+    'performance',
+    'general',
+  ];
+  let bestIntent: PromptIntentKey = 'unknown';
+  let bestMatches: string[] = [];
+
+  for (const intent of priority) {
+    const matched = PROMPT_INTENT_KEYWORDS[intent].filter((keyword) => normalized.includes(keyword));
+    if (matched.length > bestMatches.length) {
+      bestIntent = intent;
+      bestMatches = matched;
+    }
+  }
+
+  return { intent: bestIntent, matchedKeywords: Array.from(new Set(bestMatches)) };
+}
+
+function evaluateLocalPromptModeMismatch(
+  selectedMode: AnalysisModeKey,
+  prompt: string
+): {
+  inferredIntent: PromptIntentKey;
+  matchedKeywords: string[];
+  mismatchSeverity: PromptMismatchSeverity;
+  suggestedMode: AnalysisModeKey | 'general';
+} {
+  const inferred = inferPromptIntent(prompt);
+  const suggestedMode = INTENT_TO_MODE[inferred.intent];
+
+  if (inferred.intent === 'unknown') {
+    return {
+      inferredIntent: inferred.intent,
+      matchedKeywords: inferred.matchedKeywords,
+      mismatchSeverity: 'none',
+      suggestedMode,
+    };
+  }
+  if (suggestedMode === selectedMode) {
+    return {
+      inferredIntent: inferred.intent,
+      matchedKeywords: inferred.matchedKeywords,
+      mismatchSeverity: 'none',
+      suggestedMode,
+    };
+  }
+  if (selectedMode === 'general' || suggestedMode === 'general') {
+    return {
+      inferredIntent: inferred.intent,
+      matchedKeywords: inferred.matchedKeywords,
+      mismatchSeverity: 'soft',
+      suggestedMode,
+    };
+  }
+  return {
+    inferredIntent: inferred.intent,
+    matchedKeywords: inferred.matchedKeywords,
+    mismatchSeverity: 'strong',
+    suggestedMode,
+  };
+}
+
 function statusBadgeClasses(status?: string): string {
   switch (status) {
     case 'implemented':
@@ -410,6 +522,10 @@ function AIAnalysisPanel({
     analysisModes.find((mode) => mode.key === selectedAnalysisMode) ??
     analysisModes.find((mode) => mode.default) ??
     null;
+  const preRunGuard = evaluateLocalPromptModeMismatch(selectedAnalysisMode, userPrompt);
+  const preRunSuggestedModeInfo =
+    analysisModes.find((mode) => mode.key === preRunGuard.suggestedMode) ?? null;
+  const backendPromptGuard = result?.prompt_mode_guard;
 
   useEffect(() => {
     let cancelled = false;
@@ -496,6 +612,19 @@ function AIAnalysisPanel({
   }
 
   async function runAnalysis() {
+    if (preRunGuard.mismatchSeverity === 'strong') {
+      const suggestedLabel = preRunSuggestedModeInfo?.label ?? preRunGuard.suggestedMode;
+      toast.warning(
+        'Prompt/mode mismatch detected',
+        `Prompt cues suggest ${preRunGuard.inferredIntent}. Selected mode is ${selectedAnalysisMode}. Suggested mode: ${suggestedLabel}.`
+      );
+    } else if (preRunGuard.mismatchSeverity === 'soft') {
+      const suggestedLabel = preRunSuggestedModeInfo?.label ?? preRunGuard.suggestedMode;
+      toast.warning(
+        'Prompt/mode alignment warning',
+        `Prompt cues suggest ${preRunGuard.inferredIntent}. Consider mode: ${suggestedLabel}.`
+      );
+    }
     setLoading(true);
     setError('');
     setResult(null);
@@ -544,6 +673,7 @@ function AIAnalysisPanel({
         retrieved_source_ids: job.retrieved_source_ids,
         retrieved_sources_snapshot: job.retrieved_sources_snapshot,
         analysis_controls: job.analysis_controls,
+        prompt_mode_guard: job.prompt_mode_guard,
       });
       if (job.analysis_mode) {
         setSelectedAnalysisMode(job.analysis_mode as AnalysisModeKey);
@@ -644,6 +774,38 @@ function AIAnalysisPanel({
         )}
       </CardHeader>
       <CardContent>
+        {preRunGuard.mismatchSeverity !== 'none' && (
+          <div
+            className={cn(
+              'mb-3 rounded-lg border px-3 py-2 text-xs',
+              preRunGuard.mismatchSeverity === 'strong'
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800'
+            )}
+          >
+            <p className="font-semibold">
+              Prompt-to-mode warning ({preRunGuard.mismatchSeverity})
+            </p>
+            <p className="mt-0.5">
+              Detected intent: <strong>{preRunGuard.inferredIntent}</strong>.
+              {' '}Selected mode: <strong>{selectedAnalysisMode}</strong>.
+              {' '}Suggested mode:{' '}
+              <strong>{preRunSuggestedModeInfo?.label ?? preRunGuard.suggestedMode}</strong>
+              {preRunSuggestedModeInfo ? (
+                <>
+                  {' '}(<span className="capitalize">{preRunSuggestedModeInfo.capability_status}</span>)
+                </>
+              ) : null}
+              .
+            </p>
+            {preRunGuard.matchedKeywords.length > 0 && (
+              <p className="mt-0.5 text-[11px]">
+                Matched cues: {preRunGuard.matchedKeywords.join(', ')}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Prompt input — always visible */}
         <div className="mb-4">
           <textarea
@@ -727,7 +889,7 @@ function AIAnalysisPanel({
               <span>·</span>
               <span>Flight test: {result.flight_test_name}</span>
               <span>·</span>
-              <span>Mode: {result.analysis_mode ?? activeModeFromResult}</span>
+              <span>Mode: {backendPromptGuard?.execution_mode ?? result.analysis_mode ?? activeModeFromResult}</span>
               <span>·</span>
               <span>Narrative citations: {narrativeCitations.length}</span>
               <span>·</span>
@@ -741,6 +903,41 @@ function AIAnalysisPanel({
               Narrative citations are the sources explicitly cited in the visible analysis text. Retrieved sources are
               the full source set saved with this analysis job artifact and used for provenance/reporting.
             </div>
+            {backendPromptGuard && (
+              <div
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-xs',
+                  backendPromptGuard.mismatch_severity === 'strong'
+                    ? 'border-rose-200 bg-rose-50 text-rose-800'
+                    : backendPromptGuard.mismatch_severity === 'soft'
+                      ? 'border-amber-200 bg-amber-50 text-amber-800'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                )}
+              >
+                <p className="font-semibold">
+                  Prompt-to-mode guard: {backendPromptGuard.mismatch_severity}
+                </p>
+                <p className="mt-0.5">
+                  Selected <strong>{backendPromptGuard.selected_mode}</strong>
+                  {' '}• Executed <strong>{backendPromptGuard.execution_mode}</strong>
+                  {' '}• Inferred intent <strong>{backendPromptGuard.inferred_intent}</strong>
+                </p>
+                <p className="mt-0.5">{backendPromptGuard.message}</p>
+                {backendPromptGuard.matched_keywords.length > 0 && (
+                  <p className="mt-0.5 text-[11px]">
+                    Matched cues: {backendPromptGuard.matched_keywords.join(', ')}
+                  </p>
+                )}
+                {backendPromptGuard.suggested_modes.length > 0 && (
+                  <p className="mt-0.5 text-[11px]">
+                    Suggested modes:{' '}
+                    {backendPromptGuard.suggested_modes
+                      .map((mode) => `${mode.key} (${mode.capability_status})`)
+                      .join(' · ')}
+                  </p>
+                )}
+              </div>
+            )}
             {result.analysis_mode && result.analysis_mode !== selectedAnalysisMode && (
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
                 Loaded analysis was generated in mode <strong>{result.analysis_mode}</strong>, while current

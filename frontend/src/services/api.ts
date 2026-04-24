@@ -198,6 +198,25 @@ export interface AIAnalysisResponse {
     mode_filter_fallback_used: boolean;
     metadata_coverage_ratio: number;
   };
+  prompt_mode_guard: {
+    selected_mode: string;
+    inferred_intent: string;
+    matched_keywords: string[];
+    mismatch_severity: 'none' | 'soft' | 'strong';
+    reason_key?: string | null;
+    message: string;
+    suggested_modes: Array<{
+      key: string;
+      label: string;
+      capability_status: string;
+      available_now: boolean;
+      reason: string;
+    }>;
+    proceeded_with_selected_mode: boolean;
+    execution_mode: string;
+    guarded_execution: boolean;
+    auto_downgraded: boolean;
+  };
 }
 
 export interface AnalysisJobResponse {
@@ -252,6 +271,25 @@ export interface AnalysisJobResponse {
     cited_sources_count: number;
     mode_filter_fallback_used: boolean;
     metadata_coverage_ratio: number;
+  };
+  prompt_mode_guard: {
+    selected_mode: string;
+    inferred_intent: string;
+    matched_keywords: string[];
+    mismatch_severity: 'none' | 'soft' | 'strong';
+    reason_key?: string | null;
+    message: string;
+    suggested_modes: Array<{
+      key: string;
+      label: string;
+      capability_status: string;
+      available_now: boolean;
+      reason: string;
+    }>;
+    proceeded_with_selected_mode: boolean;
+    execution_mode: string;
+    guarded_execution: boolean;
+    auto_downgraded: boolean;
   };
 }
 

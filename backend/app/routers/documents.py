@@ -75,6 +75,11 @@ from app.models import (
     TestParameter,
     User,
 )
+from app.prompt_mode_guard import (
+    PromptModeGuardSnapshot,
+    evaluate_prompt_mode_guard,
+    parse_prompt_mode_guard,
+)
 from app.retrieval_metadata import (
     build_retrieval_mode_profile,
     derive_document_retrieval_metadata,
@@ -264,6 +269,7 @@ class AIAnalysisResponse(BaseModel):
     retrieved_source_ids: List[str] = Field(default_factory=list)
     retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
     analysis_controls: AnalysisControlSnapshot
+    prompt_mode_guard: PromptModeGuardSnapshot
 
 
 class AnalysisJobResponse(BaseModel):
@@ -286,6 +292,7 @@ class AnalysisJobResponse(BaseModel):
     retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
     parameter_stats_snapshot: List[dict] = Field(default_factory=list)
     analysis_controls: AnalysisControlSnapshot
+    prompt_mode_guard: PromptModeGuardSnapshot
 
 
 class AnalysisModeOut(BaseModel):
@@ -1863,10 +1870,14 @@ def _build_mode_routing_section(
     *,
     mode: AnalysisModeDefinition,
     capability_eval: CapabilityEvaluation,
+    requested_mode_key: Optional[str] = None,
 ) -> str:
+    requested_mode = get_analysis_mode_definition(requested_mode_key or "")
+    requested_mode_label = requested_mode.label if requested_mode else (requested_mode_key or mode.label)
     lines = [
         "## Analysis Mode Routing",
-        f"- Requested mode: **{mode.key}** ({mode.label})",
+        f"- Requested mode: **{requested_mode_key or mode.key}** ({requested_mode_label})",
+        f"- Executed mode: **{mode.key}** ({mode.label})",
         f"- Capability key: **{capability_eval.capability_key}**",
         f"- Capability status: **{capability_eval.status.value}**",
         f"- Authority classification: **{capability_eval.authority.value}**",
@@ -1939,6 +1950,37 @@ def _build_analysis_controls_section(controls: AnalysisControlSnapshot) -> str:
         lines.append("### Control Warnings")
         for warning in controls.warning_messages:
             lines.append(f"- {warning}")
+    return "\n".join(lines)
+
+
+def _build_prompt_mode_guard_section(guard: PromptModeGuardSnapshot) -> str:
+    lines = [
+        "## Prompt-to-Mode Guard",
+        f"- Selected mode: **{guard.selected_mode}**",
+        f"- Inferred prompt intent: **{guard.inferred_intent}**",
+        f"- Mismatch severity: **{guard.mismatch_severity.value}**",
+        f"- Execution mode: **{guard.execution_mode}**",
+    ]
+    if guard.reason_key:
+        lines.append(f"- Reason key: **{guard.reason_key}**")
+    if guard.matched_keywords:
+        lines.append("- Matched prompt cues: " + ", ".join(guard.matched_keywords))
+    lines.append(f"- Guard note: {guard.message}")
+    if guard.auto_downgraded:
+        lines.append(
+            "- Guard action: strong mismatch detected; execution downgraded to safer mode."
+        )
+    elif guard.guarded_execution:
+        lines.append("- Guard action: strong mismatch warning surfaced.")
+    if guard.suggested_modes:
+        lines.append("")
+        lines.append("### Suggested Modes")
+        for suggestion in guard.suggested_modes:
+            availability = "available now" if suggestion.available_now else "limited"
+            lines.append(
+                f"- **{suggestion.key}** ({suggestion.label})"
+                f" — status: {suggestion.capability_status} ({availability}); {suggestion.reason}"
+            )
     return "\n".join(lines)
 
 
@@ -2126,6 +2168,16 @@ def _analysis_job_to_response(
     selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
     if selected_mode is None:
         selected_mode = resolve_analysis_mode(None)
+    prompt_mode_guard_payload = _safe_json_load(
+        getattr(job, "prompt_mode_guard_json", "{}"),
+        {},
+    )
+    if not isinstance(prompt_mode_guard_payload, dict):
+        prompt_mode_guard_payload = {}
+    prompt_mode_guard = parse_prompt_mode_guard(
+        prompt_mode_guard_payload,
+        selected_mode_key=selected_mode.key,
+    )
     return AIAnalysisResponse(
         analysis=job.analysis_text,
         flight_test_name=flight_test_name,
@@ -2141,6 +2193,7 @@ def _analysis_job_to_response(
         retrieved_source_ids=[str(item) for item in source_ids if item],
         retrieved_sources_snapshot=retrieved_sources_snapshot,
         analysis_controls=analysis_controls,
+        prompt_mode_guard=prompt_mode_guard,
     )
 
 
@@ -2225,6 +2278,16 @@ def get_ai_analysis_job(
     selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
     if selected_mode is None:
         selected_mode = resolve_analysis_mode(None)
+    prompt_mode_guard_payload = _safe_json_load(
+        getattr(job, "prompt_mode_guard_json", "{}"),
+        {},
+    )
+    if not isinstance(prompt_mode_guard_payload, dict):
+        prompt_mode_guard_payload = {}
+    prompt_mode_guard = parse_prompt_mode_guard(
+        prompt_mode_guard_payload,
+        selected_mode_key=selected_mode.key,
+    )
 
     return AnalysisJobResponse(
         id=job.id,
@@ -2246,6 +2309,7 @@ def get_ai_analysis_job(
         retrieved_sources_snapshot=retrieved_sources_snapshot,
         parameter_stats_snapshot=parameter_stats_snapshot,
         analysis_controls=analysis_controls,
+        prompt_mode_guard=prompt_mode_guard,
     )
 
 
@@ -2342,24 +2406,52 @@ def ai_analysis(
             ),
         )
     selected_mode = resolve_analysis_mode(requested_mode_key or None)
+    prompt_mode_guard = evaluate_prompt_mode_guard(
+        selected_mode_key=selected_mode.key,
+        user_prompt=body.user_prompt,
+    )
+    effective_mode = selected_mode
+    if prompt_mode_guard.guarded_execution and selected_mode.key != "general":
+        effective_mode = resolve_analysis_mode("general")
+        prompt_mode_guard = prompt_mode_guard.model_copy(
+            update={
+                "proceeded_with_selected_mode": False,
+                "execution_mode": effective_mode.key,
+                "auto_downgraded": True,
+                "message": (
+                    f"{prompt_mode_guard.message} "
+                    "Execution was downgraded to general guidance to avoid misleading deterministic output."
+                ),
+            }
+        )
+    else:
+        prompt_mode_guard = prompt_mode_guard.model_copy(
+            update={
+                "proceeded_with_selected_mode": True,
+                "execution_mode": effective_mode.key,
+                "auto_downgraded": False,
+            }
+        )
 
     # If the user supplied a specific analysis goal, use it; otherwise use the mode default.
     if body.user_prompt and body.user_prompt.strip():
         analysis_goal = body.user_prompt.strip()
     else:
-        analysis_goal = _default_analysis_goal_for_mode(selected_mode)
+        analysis_goal = _default_analysis_goal_for_mode(effective_mode)
 
     available_signal_names = [str(row.name) for row in stats_rows]
     mode_eval = evaluate_capability_request(
-        selected_mode.capability_key,
+        effective_mode.capability_key,
         available_signals=available_signal_names,
         has_dataset=bool(stats_rows),
         has_standards_context=True,
     )
     mode_routing_section = _build_mode_routing_section(
-        mode=selected_mode,
+        mode=effective_mode,
         capability_eval=mode_eval,
+        requested_mode_key=selected_mode.key,
     )
+    prompt_mode_guard_section = _build_prompt_mode_guard_section(prompt_mode_guard)
 
     analysis_model = os.getenv("ANALYSIS_LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4o-mini"))
     analysis_temperature = max(0.0, min(1.0, float(os.getenv("ANALYSIS_TEMPERATURE", "0.2"))))
@@ -2377,7 +2469,7 @@ def ai_analysis(
     certification_requested = _is_certification_result_requested(analysis_goal)
     deterministic_metrics = None
 
-    if selected_mode.key == "takeoff":
+    if effective_mode.key == "takeoff":
         deterministic_metrics = _compute_takeoff_metrics(
             db=db,
             flight_test_id=flight_test_id,
@@ -2386,7 +2478,7 @@ def ai_analysis(
         )
         deterministic_section = _build_deterministic_takeoff_section(deterministic_metrics)
         run_llm = True
-    elif selected_mode.key == "landing":
+    elif effective_mode.key == "landing":
         deterministic_metrics = _compute_landing_metrics(
             db=db,
             flight_test_id=flight_test_id,
@@ -2395,7 +2487,7 @@ def ai_analysis(
         )
         deterministic_section = _build_deterministic_landing_section(deterministic_metrics)
         run_llm = False
-    elif selected_mode.key == "performance":
+    elif effective_mode.key == "performance":
         deterministic_metrics = _compute_performance_metrics(
             db=db,
             flight_test_id=flight_test_id,
@@ -2404,7 +2496,7 @@ def ai_analysis(
         )
         deterministic_section = _build_deterministic_performance_section(deterministic_metrics)
         run_llm = False
-    elif selected_mode.key == "buffet_vibration":
+    elif effective_mode.key == "buffet_vibration":
         deterministic_metrics = _compute_buffet_vibration_metrics(
             db=db,
             flight_test_id=flight_test_id,
@@ -2415,25 +2507,26 @@ def ai_analysis(
         run_llm = False
     else:
         deterministic_section = _build_non_takeoff_deterministic_section(
-            mode=selected_mode,
+            mode=effective_mode,
             capability_eval=mode_eval,
         )
         # Only "general" currently runs routed LLM guidance path.
-        run_llm = selected_mode.key == "general"
+        run_llm = effective_mode.key == "general"
 
     if deterministic_metrics is not None:
         mode_eval = _capability_eval_from_deterministic_metrics(
             deterministic_metrics,
-            selected_mode,
+            effective_mode,
         )
         mode_routing_section = _build_mode_routing_section(
-            mode=selected_mode,
+            mode=effective_mode,
             capability_eval=mode_eval,
+            requested_mode_key=selected_mode.key,
         )
 
     if run_llm:
         param_names = [r.name for r in stats_rows[:10]]
-        retrieval_focus = _analysis_retrieval_focus_for_mode(selected_mode.key)
+        retrieval_focus = _analysis_retrieval_focus_for_mode(effective_mode.key)
         retrieval_question = (
             f"{analysis_goal}\n"
             f"Focus terms: {retrieval_focus}\n"
@@ -2445,11 +2538,11 @@ def ai_analysis(
             question=retrieval_question,
             requested_top_k=8,
             owner_user_id=current_user.id,
-            analysis_mode=selected_mode.key,
-            capability_key=selected_mode.capability_key,
+            analysis_mode=effective_mode.key,
+            capability_key=effective_mode.capability_key,
         )
 
-        if selected_mode.key == "takeoff":
+        if effective_mode.key == "takeoff":
             system_prompt = (
                 "You are a senior flight test engineer. "
                 "A deterministic takeoff section has already been computed by software and must not be recalculated "
@@ -2491,6 +2584,7 @@ def ai_analysis(
                 f"Test Date: {ft.test_date.strftime('%Y-%m-%d') if ft.test_date else 'Not specified'}\n"
                 f"Description: {ft.description or 'None'}\n\n"
                 f"Selected Analysis Mode: {selected_mode.key} ({selected_mode.label})\n"
+                f"Executed Analysis Mode: {effective_mode.key} ({effective_mode.label})\n"
                 f"Analysis Goal: {analysis_goal}\n\n"
                 f"Parameter Statistics:\n{stats_table}\n\n"
                 "Mode Routing Section (authoritative):\n"
@@ -2528,7 +2622,7 @@ def ai_analysis(
         llm_analysis_text = re.sub(r"(?im)^USED_SOURCES:\s*.*$", "", llm_analysis_text).strip()
 
         # Optional strict citation-density repair for takeoff standards cross-check.
-        if selected_mode.key == "takeoff":
+        if effective_mode.key == "takeoff":
             min_citation_density = max(
                 0.0, min(1.0, float(os.getenv("ANALYSIS_MIN_CITATION_DENSITY", "0.75")))
             )
@@ -2581,7 +2675,7 @@ def ai_analysis(
             cited_sources = []
 
         analysis_controls = evaluate_analysis_controls(
-            mode_key=selected_mode.key,
+            mode_key=effective_mode.key,
             capability_eval=mode_eval,
             deterministic_metrics=deterministic_metrics,
             retrieved_sources=sources,
@@ -2592,6 +2686,8 @@ def ai_analysis(
 
         final_analysis = (
             mode_routing_section.strip()
+            + "\n\n"
+            + prompt_mode_guard_section.strip()
             + "\n\n"
             + analysis_controls_section.strip()
             + "\n\n"
@@ -2616,10 +2712,10 @@ def ai_analysis(
                 f"{final_analysis}\n\n### References\n"
                 "- No inline [Sx] citations were produced by the model for standards claims."
             )
-        persisted_prompt_text = _encode_prompt_with_mode(llm_user_prompt, selected_mode.key)
+        persisted_prompt_text = _encode_prompt_with_mode(llm_user_prompt, effective_mode.key)
     else:
         llm_analysis_text = _build_mode_limited_analysis_text(
-            mode=selected_mode,
+            mode=effective_mode,
             capability_eval=mode_eval,
             analysis_goal=analysis_goal,
             deterministic_available=bool(
@@ -2627,7 +2723,7 @@ def ai_analysis(
             ),
         )
         analysis_controls = evaluate_analysis_controls(
-            mode_key=selected_mode.key,
+            mode_key=effective_mode.key,
             capability_eval=mode_eval,
             deterministic_metrics=deterministic_metrics,
             retrieved_sources=sources,
@@ -2638,6 +2734,8 @@ def ai_analysis(
         final_analysis = (
             mode_routing_section.strip()
             + "\n\n"
+            + prompt_mode_guard_section.strip()
+            + "\n\n"
             + analysis_controls_section.strip()
             + "\n\n"
             + deterministic_section.strip()
@@ -2645,7 +2743,7 @@ def ai_analysis(
             + llm_analysis_text.strip()
             + "\n\n### References\n- This mode path did not run standards retrieval in the current release."
         )
-        persisted_prompt_text = _encode_prompt_with_mode(analysis_goal, selected_mode.key)
+        persisted_prompt_text = _encode_prompt_with_mode(analysis_goal, effective_mode.key)
 
     retrieved_source_ids = [
         str(source.get("source_id"))
@@ -2666,6 +2764,7 @@ def ai_analysis(
         parameters_analysed=len(stats_rows),
         parameter_stats_snapshot_json=json.dumps(parameter_stats_snapshot),
         analysis_controls_json=analysis_controls.model_dump_json(),
+        prompt_mode_guard_json=prompt_mode_guard.model_dump_json(),
         prompt_text=persisted_prompt_text,
         retrieved_source_ids_json=json.dumps(retrieved_source_ids),
         retrieved_sources_snapshot_json=json.dumps(retrieved_sources_snapshot),

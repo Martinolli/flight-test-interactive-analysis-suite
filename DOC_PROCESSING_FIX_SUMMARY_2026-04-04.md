@@ -2762,3 +2762,46 @@ pnpm -C frontend run build
 
 - Backend: all selected tests passed (FRAT lifecycle + regression coverage included).
 - Frontend: production build passed.
+
+## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
+
+### Why this was added
+
+- Analysis requests could run under an obviously mismatched selected mode (example: handling/control prompt while `takeoff` mode selected).
+- This could produce output that looked valid for the wrong engineering mode.
+
+### What changed
+
+**Backend**
+
+- Added prompt-intent guard module:
+  - `backend/app/prompt_mode_guard.py`
+- Added persisted analysis-job snapshot field:
+  - `analysis_jobs.prompt_mode_guard_json`
+  - migration: `backend/migrations/20260424_add_prompt_mode_guard_snapshot.sql`
+- Wired guard into AI analysis flow in `backend/app/routers/documents.py`:
+  - infer prompt intent from bounded heuristics
+  - classify mismatch as `none` / `soft` / `strong`
+  - provide suggested modes with capability-status awareness
+  - for strong mismatch on strict deterministic modes, downgrade execution to safer `general` path with explicit traceability
+  - include `prompt_mode_guard` in:
+    - immediate AI analysis response
+    - reopened saved analysis-job response
+  - persist guard snapshot in `AnalysisJob`
+  - include `Prompt-to-Mode Guard` section in analysis/report text for reproducibility
+
+**Frontend**
+
+- Updated contracts in `frontend/src/services/api.ts` to include `prompt_mode_guard`.
+- Updated AI Analysis panel (`frontend/src/pages/FlightTestDetail.tsx`):
+  - pre-run prompt/mode mismatch warning (soft/strong)
+  - suggestion display before execution
+  - backend-authoritative guard display after execution (selected mode, executed mode, inferred intent, suggested modes)
+  - saved-job reopen now preserves and displays persisted guard snapshot
+
+### Validation targets
+
+- Strong mismatch is visible and traceable instead of silently appearing mode-correct.
+- Suggested modes are capability-aware.
+- Reopened analysis jobs preserve guard provenance.
+- Existing analysis-job/PDF provenance flow remains compatible.
