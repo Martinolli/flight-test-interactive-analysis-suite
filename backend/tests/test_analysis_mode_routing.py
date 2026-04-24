@@ -321,6 +321,8 @@ def test_ai_analysis_buffet_mode_returns_screening_metrics(
     assert body["capability_key"] == "buffet_vibration"
     assert "Deterministic Calculation (Buffet/Vibration Screening) [DATA]" in body["analysis"]
     assert "Channels screened" in body["analysis"]
+    assert "Grouped Screening Summary" in body["analysis"]
+    assert "Frequency-Domain Screening (Bounded)" in body["analysis"]
     assert "Deterministic Calculation (Flight Data) [DATA]" not in body["analysis"]
     assert body["analysis_controls"]["retrieval_coverage"] == "none"
 

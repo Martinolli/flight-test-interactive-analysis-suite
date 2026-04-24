@@ -108,6 +108,9 @@ def _evaluate_deterministic_confidence(
     samples_used = _safe_int(deterministic_metrics.get("samples_used"), -1)
     handling_pairings = _safe_int(deterministic_metrics.get("pairings_analyzed"), -1)
     handling_samples = _safe_int(deterministic_metrics.get("total_pairing_samples"), -1)
+    buffet_channels = _safe_int(deterministic_metrics.get("channels_screened"), -1)
+    buffet_events = len(deterministic_metrics.get("anomaly_windows") or [])
+    buffet_samples = _safe_int(deterministic_metrics.get("samples_used"), -1)
     run_time_s = _safe_float(
         deterministic_metrics.get("run_time_s", deterministic_metrics.get("rollout_time_s")),
         -1.0,
@@ -119,6 +122,19 @@ def _evaluate_deterministic_confidence(
         if handling_pairings >= 1 and handling_samples >= 40:
             return DeterministicConfidence.MEDIUM
         if handling_pairings >= 1:
+            return DeterministicConfidence.LOW
+        return DeterministicConfidence.UNAVAILABLE
+
+    if mode_key == "buffet_vibration":
+        if buffet_channels < 0 and buffet_samples >= 120:
+            return DeterministicConfidence.HIGH
+        if buffet_channels < 0 and buffet_samples >= 40:
+            return DeterministicConfidence.MEDIUM
+        if buffet_channels >= 4 and buffet_samples >= 120:
+            return DeterministicConfidence.HIGH
+        if buffet_channels >= 2 and buffet_samples >= 60:
+            return DeterministicConfidence.MEDIUM
+        if buffet_channels >= 1 and (buffet_events > 0 or buffet_samples >= 20):
             return DeterministicConfidence.LOW
         return DeterministicConfidence.UNAVAILABLE
 

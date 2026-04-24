@@ -135,15 +135,15 @@ These should be protected from regression.
   * explicit assumptions/limitations
 * Keep derived/engineering-calculated values visibly separated from raw telemetry.
 
-### P3.4 Buffet / vibration workflow hardening
+### P3.4 Buffet / vibration workflow hardening ✅
 
-* Improve frontend support for vibration screening results:
+* Backend hardening is now in place and exposed through existing AI analysis/report rendering:
 
   * grouped channel summaries
-  * event-window summaries
-  * anomaly emphasis
-  * clearer “screening only” messaging
-* Do not visually imply flutter clearance or formal substantiation.
+  * dominant-channel ranking
+  * anomaly/event-window summaries
+  * regime segmentation and bounded frequency-screening narrative
+* Frontend keeps screening-only boundary clear and does not imply flutter clearance or formal substantiation.
 
 ### P3.5 FRAT usability hardening
 
@@ -193,9 +193,8 @@ These should be protected from regression.
 
 1. **P3.5 — FRAT usability hardening**
 2. **P3.6 — Report/control readability polish**
-3. **P3.4 — Buffet / vibration workflow hardening**
-4. **P3.3 — Atmosphere / air-data support UX**
-5. **P3.7 — Manual / help integration**
+3. **P3.3 — Atmosphere / air-data support UX**
+4. **P3.7 — Manual / help integration**
 
 ---
 

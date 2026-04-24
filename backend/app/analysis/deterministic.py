@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -1468,6 +1469,196 @@ def compute_performance_metrics(
     )
 
 
+def _classify_buffet_channel_group(name: str, unit: Optional[str]) -> str:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    if "vibration" in n or "buffet" in n or re.search(r"\bvib\b", n):
+        return "structural_vibration"
+    if "accel" in n or u in {"g", "m/s2", "m/s^2"}:
+        return "accelerations"
+    if any(token in n for token in ["roll rate", "pitch rate", "yaw rate"]) or u in {"deg/s", "rad/s"}:
+        return "angular_rates"
+    if any(token in n for token in ["speed", "mach", "dynamic pressure", "qbar", "tas", "cas"]):
+        return "airspeed_response"
+    return "other_response"
+
+
+def _median(values: List[float]) -> Optional[float]:
+    if not values:
+        return None
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2 == 1:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def _series_time_steps_seconds(series: List[Tuple[Any, float]]) -> List[float]:
+    steps: List[float] = []
+    for idx in range(1, len(series)):
+        dt = (series[idx][0] - series[idx - 1][0]).total_seconds()
+        if dt > 0:
+            steps.append(dt)
+    return steps
+
+
+def _estimate_frequency_screening(
+    series: List[Tuple[Any, float]],
+) -> Dict[str, Any]:
+    if len(series) < 32:
+        return {"available": False, "reason": "insufficient_samples"}
+
+    dts = _series_time_steps_seconds(series)
+    if len(dts) < 16:
+        return {"available": False, "reason": "insufficient_timestamp_resolution"}
+    median_dt = _median(dts)
+    if median_dt is None or median_dt <= 0:
+        return {"available": False, "reason": "invalid_sample_interval"}
+
+    cadence_jitter = max(abs(dt - median_dt) / median_dt for dt in dts)
+    if cadence_jitter > 0.25:
+        return {"available": False, "reason": "irregular_sample_cadence"}
+
+    values = [float(v) for _, v in series]
+    mean_val = sum(values) / len(values)
+    centered = [v - mean_val for v in values]
+    if max(abs(v) for v in centered) <= 1e-9:
+        return {"available": False, "reason": "low_signal_variability"}
+
+    downsample_step = max(1, math.ceil(len(centered) / 512))
+    if downsample_step > 1:
+        centered = centered[::downsample_step]
+    n = len(centered)
+    if n < 32:
+        return {"available": False, "reason": "insufficient_samples_after_downsample"}
+
+    effective_dt = median_dt * downsample_step
+    sample_rate_hz = 1.0 / effective_dt
+    max_k = min(n // 2, 128)
+    if max_k < 2:
+        return {"available": False, "reason": "insufficient_frequency_bins"}
+
+    powers: List[Tuple[float, float]] = []
+    two_pi_over_n = 2.0 * math.pi / n
+    for k in range(1, max_k + 1):
+        re_sum = 0.0
+        im_sum = 0.0
+        for idx, value in enumerate(centered):
+            angle = two_pi_over_n * k * idx
+            re_sum += value * math.cos(angle)
+            im_sum -= value * math.sin(angle)
+        power = (re_sum * re_sum + im_sum * im_sum) / (n * n)
+        freq_hz = (k * sample_rate_hz) / n
+        powers.append((freq_hz, power))
+
+    if not powers:
+        return {"available": False, "reason": "no_frequency_energy"}
+    dominant_freq_hz, dominant_power = max(powers, key=lambda item: item[1])
+    if dominant_power <= 1e-12:
+        return {"available": False, "reason": "low_spectral_energy"}
+
+    total_power = sum(power for _, power in powers)
+    low_power = sum(power for freq, power in powers if freq <= 2.0)
+    mid_power = sum(power for freq, power in powers if 2.0 < freq <= 8.0)
+    high_power = sum(power for freq, power in powers if freq > 8.0)
+    band_distribution = {
+        "low_0_2hz": round((low_power / total_power), 4) if total_power > 0 else 0.0,
+        "mid_2_8hz": round((mid_power / total_power), 4) if total_power > 0 else 0.0,
+        "high_gt8hz": round((high_power / total_power), 4) if total_power > 0 else 0.0,
+    }
+    dominant_amplitude = math.sqrt(max(dominant_power, 0.0))
+
+    return {
+        "available": True,
+        "sample_rate_hz": round(sample_rate_hz, 4),
+        "nyquist_hz": round(sample_rate_hz / 2.0, 4),
+        "cadence_jitter_ratio": round(cadence_jitter, 4),
+        "samples_used": n,
+        "dominant_frequency_hz": round(dominant_freq_hz, 4),
+        "dominant_amplitude": round(dominant_amplitude, 6),
+        "band_energy_distribution": band_distribution,
+    }
+
+
+def _build_channel_anomaly_windows(
+    *,
+    series: List[Tuple[Any, float]],
+    mean_val: float,
+    std_val: float,
+    p95_abs: Optional[float],
+    channel_name: str,
+    channel_group: str,
+    channel_unit: Optional[str],
+) -> List[Dict[str, Any]]:
+    if len(series) < 5:
+        return []
+    threshold = max(
+        (3.0 * std_val) if std_val > 0 else 0.0,
+        (0.6 * float(p95_abs)) if p95_abs is not None else 0.0,
+    )
+    if threshold <= 0:
+        return []
+
+    exceedance_indices: List[int] = []
+    for idx, (_, value) in enumerate(series):
+        if abs(value - mean_val) >= threshold:
+            exceedance_indices.append(idx)
+    if not exceedance_indices:
+        return []
+
+    steps = _series_time_steps_seconds(series)
+    median_dt = _median(steps) or 0.0
+    merge_gap_s = max(2.0 * median_dt, 0.25) if median_dt > 0 else 0.5
+
+    windows: List[Tuple[int, int]] = []
+    current_start = exceedance_indices[0]
+    current_end = exceedance_indices[0]
+    for idx in exceedance_indices[1:]:
+        prev_ts = series[current_end][0]
+        current_ts = series[idx][0]
+        gap = (current_ts - prev_ts).total_seconds()
+        if gap <= merge_gap_s:
+            current_end = idx
+        else:
+            windows.append((current_start, current_end))
+            current_start = idx
+            current_end = idx
+    windows.append((current_start, current_end))
+
+    out: List[Dict[str, Any]] = []
+    for start_idx, end_idx in windows:
+        win_series = series[start_idx : end_idx + 1]
+        win_values = [value for _, value in win_series]
+        win_deltas = [abs(v - mean_val) for v in win_values]
+        midpoint_idx = start_idx + ((end_idx - start_idx) // 2)
+        out.append(
+            {
+                "channel_name": channel_name,
+                "channel_group": channel_group,
+                "channel_unit": channel_unit,
+                "start_timestamp": win_series[0][0].isoformat(),
+                "end_timestamp": win_series[-1][0].isoformat(),
+                "midpoint_timestamp": series[midpoint_idx][0].isoformat(),
+                "samples": len(win_series),
+                "peak_abs": round(max(abs(v) for v in win_values), 4),
+                "peak_deviation": round(max(win_deltas), 4),
+                "mean_deviation": round(sum(win_deltas) / len(win_deltas), 4),
+            }
+        )
+    return out
+
+
+def _speed_band(speed_kt: Optional[float], low_cut: Optional[float], high_cut: Optional[float]) -> str:
+    if speed_kt is None or low_cut is None or high_cut is None:
+        return "unspecified"
+    if speed_kt <= low_cut:
+        return "low_speed"
+    if speed_kt <= high_cut:
+        return "mid_speed"
+    return "high_speed"
+
+
 def compute_buffet_vibration_metrics(
     db: Session,
     flight_test_id: int,
@@ -1500,11 +1691,15 @@ def compute_buffet_vibration_metrics(
             has_dataset=False,
         )
 
+    ground_speed_id = _choose_param_id(params, _score_ground_speed)
+    wow_ids = [p["id"] for p in params if _score_wow(p["name"], p.get("unit")) > 0]
+    support_ids = [pid for pid in [ground_speed_id, *wow_ids] if pid is not None]
+
     rows = _load_timeseries_rows(
         db,
         flight_test_id=flight_test_id,
         dataset_version_id=dataset_version_id,
-        parameter_ids=[p["id"] for p in selected],
+        parameter_ids=sorted({*([p["id"] for p in selected]), *support_ids}),
     )
     if not rows:
         return _unavailable_metrics(
@@ -1514,13 +1709,24 @@ def compute_buffet_vibration_metrics(
             has_dataset=False,
         )
 
-    channel_values: Dict[int, List[float]] = {}
+    selected_ids = {p["id"] for p in selected}
+    param_map = {p["id"]: p for p in params}
+    channel_series: Dict[int, List[Tuple[Any, float]]] = defaultdict(list)
+    timeline: Dict[Any, Dict[int, float]] = defaultdict(dict)
+
     for row in rows:
-        channel_values.setdefault(int(row.parameter_id), []).append(float(row.value))
+        pid = int(row.parameter_id)
+        value = float(row.value)
+        ts = row.timestamp
+        timeline[ts][pid] = value
+        if pid in selected_ids:
+            channel_series[pid].append((ts, value))
 
     channel_summaries = []
+    anomaly_windows: List[Dict[str, Any]] = []
     for p in selected:
-        values = channel_values.get(p["id"], [])
+        series = sorted(channel_series.get(p["id"], []), key=lambda item: item[0])
+        values = [value for _, value in series]
         if len(values) < 5:
             continue
         mean_val = sum(values) / len(values)
@@ -1529,10 +1735,33 @@ def compute_buffet_vibration_metrics(
         rms = math.sqrt(sum(v * v for v in values) / len(values))
         abs_values = [abs(v) for v in values]
         p95_abs = _percentile(abs_values, 0.95)
-        exceedance_count = sum(1 for v in values if std_val > 0 and abs(v - mean_val) >= (3.0 * std_val))
+        threshold = max((3.0 * std_val) if std_val > 0 else 0.0, (0.6 * p95_abs) if p95_abs is not None else 0.0)
+        exceedance_count = sum(1 for v in values if threshold > 0 and abs(v - mean_val) >= threshold)
+        group = _classify_buffet_channel_group(p["name"], p.get("unit"))
+        dominance_score = (
+            (max(abs_values) * 0.45)
+            + (rms * 0.35)
+            + ((p95_abs or 0.0) * 0.15)
+            + (float(exceedance_count) * 0.05)
+        )
+        steps = _series_time_steps_seconds(series)
+        median_dt = _median(steps)
+
+        channel_windows = _build_channel_anomaly_windows(
+            series=series,
+            mean_val=mean_val,
+            std_val=std_val,
+            p95_abs=p95_abs,
+            channel_name=p["name"],
+            channel_group=group,
+            channel_unit=p.get("unit"),
+        )
+        anomaly_windows.extend(channel_windows)
         channel_summaries.append(
             {
+                "parameter_id": p["id"],
                 "name": p["name"],
+                "group": group,
                 "unit": p.get("unit"),
                 "samples": len(values),
                 "mean": round(mean_val, 4),
@@ -1541,6 +1770,8 @@ def compute_buffet_vibration_metrics(
                 "peak_abs": round(max(abs_values), 4),
                 "p95_abs": round(p95_abs, 4) if p95_abs is not None else None,
                 "exceedance_count": exceedance_count,
+                "dominance_score": round(dominance_score, 4),
+                "median_dt_s": round(median_dt, 4) if median_dt is not None else None,
             }
         )
 
@@ -1554,11 +1785,164 @@ def compute_buffet_vibration_metrics(
             data_coverage_ok=False,
         )
 
-    channel_summaries.sort(key=lambda item: item["peak_abs"], reverse=True)
+    channel_summaries.sort(key=lambda item: item["dominance_score"], reverse=True)
     dominant = channel_summaries[0]
+
+    grouped_items: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for item in channel_summaries:
+        grouped_items[str(item["group"])].append(item)
+
+    grouped_channel_summaries: List[Dict[str, Any]] = []
+    for group_key, items in grouped_items.items():
+        ranked = sorted(items, key=lambda entry: entry["dominance_score"], reverse=True)
+        grouped_channel_summaries.append(
+            {
+                "group": group_key,
+                "channels": len(ranked),
+                "dominant_channel": ranked[0]["name"],
+                "dominant_peak_abs": ranked[0]["peak_abs"],
+                "total_exceedances": sum(int(entry["exceedance_count"]) for entry in ranked),
+                "mean_rms": round(sum(float(entry["rms"]) for entry in ranked) / len(ranked), 4),
+            }
+        )
+    grouped_channel_summaries.sort(key=lambda item: item["dominant_peak_abs"], reverse=True)
+
+    dominant_channels_ranked: List[Dict[str, Any]] = []
+    for rank, summary in enumerate(channel_summaries[:6], start=1):
+        dominant_channels_ranked.append(
+            {
+                "rank": rank,
+                "name": summary["name"],
+                "group": summary["group"],
+                "unit": summary["unit"],
+                "dominance_score": summary["dominance_score"],
+                "peak_abs": summary["peak_abs"],
+                "rms": summary["rms"],
+                "p95_abs": summary["p95_abs"],
+                "exceedance_count": summary["exceedance_count"],
+            }
+        )
+
+    ordered_timestamps = sorted(timeline.keys())
+    speed_values = [
+        timeline[ts].get(ground_speed_id)
+        for ts in ordered_timestamps
+        if ground_speed_id is not None and timeline[ts].get(ground_speed_id) is not None
+    ]
+    speed_low_cut = _percentile([float(v) for v in speed_values], 0.33) if speed_values else None
+    speed_high_cut = _percentile([float(v) for v in speed_values], 0.67) if speed_values else None
+
+    regime_by_timestamp: Dict[Any, str] = {}
+    regime_by_iso_timestamp: Dict[str, str] = {}
+    regime_accumulator: Dict[str, Dict[str, Any]] = {}
+    for ts in ordered_timestamps:
+        row_values = timeline[ts]
+        speed = row_values.get(ground_speed_id) if ground_speed_id is not None else None
+        wow_values = [row_values[wow_id] for wow_id in wow_ids if wow_id in row_values]
+        wow_mean = (sum(wow_values) / len(wow_values)) if wow_values else None
+        phase = "unknown_phase"
+        if wow_mean is not None:
+            phase = "ground" if _is_ground(float(speed or 0.0), wow_mean) else "airborne"
+        speed_band = _speed_band(float(speed), speed_low_cut, speed_high_cut) if speed is not None else "unspecified"
+        regime_key = f"{phase}_{speed_band}" if speed_band != "unspecified" else phase
+        regime_by_timestamp[ts] = regime_key
+        regime_by_iso_timestamp[ts.isoformat()] = regime_key
+
+        regime = regime_accumulator.setdefault(
+            regime_key,
+            {
+                "samples": 0,
+                "speed_values": [],
+                "wow_values": [],
+                "channel_peak_abs": defaultdict(float),
+            },
+        )
+        regime["samples"] += 1
+        if speed is not None:
+            regime["speed_values"].append(float(speed))
+        if wow_mean is not None:
+            regime["wow_values"].append(float(wow_mean))
+        for summary in channel_summaries:
+            pid = summary.get("parameter_id")
+            if pid is None:
+                continue
+            if pid in row_values:
+                abs_val = abs(float(row_values[pid]))
+                if abs_val > regime["channel_peak_abs"][summary["name"]]:
+                    regime["channel_peak_abs"][summary["name"]] = abs_val
+
+    event_counts_by_regime: Dict[str, int] = defaultdict(int)
+    for window in anomaly_windows:
+        midpoint_raw = window.get("midpoint_timestamp")
+        regime_key = regime_by_iso_timestamp.get(str(midpoint_raw), "unknown_phase")
+        window["regime"] = regime_key
+        event_counts_by_regime[regime_key] += 1
+
+    anomaly_windows.sort(key=lambda item: item["peak_deviation"], reverse=True)
+    anomaly_windows = anomaly_windows[:8]
+
+    regime_segmentation_summary: List[Dict[str, Any]] = []
+    for regime_key, data in regime_accumulator.items():
+        peak_map: Dict[str, float] = data["channel_peak_abs"]
+        dominant_channel_name = None
+        dominant_peak_abs = None
+        if peak_map:
+            dominant_channel_name, dominant_peak_abs = max(peak_map.items(), key=lambda item: item[1])
+        speed_summary = summarize_air_data_series(data["speed_values"]) if data["speed_values"] else None
+        wow_summary = summarize_air_data_series(data["wow_values"]) if data["wow_values"] else None
+        regime_segmentation_summary.append(
+            {
+                "regime": regime_key,
+                "samples": int(data["samples"]),
+                "events_detected": int(event_counts_by_regime.get(regime_key, 0)),
+                "dominant_channel": dominant_channel_name,
+                "dominant_peak_abs": round(float(dominant_peak_abs), 4)
+                if dominant_peak_abs is not None
+                else None,
+                "mean_speed_kt": round(float(speed_summary["mean"]), 3) if speed_summary else None,
+                "mean_wow": round(float(wow_summary["mean"]), 3) if wow_summary else None,
+            }
+        )
+    regime_segmentation_summary.sort(key=lambda item: item["samples"], reverse=True)
+
+    frequency_channel_summaries: List[Dict[str, Any]] = []
+    frequency_skips: List[Dict[str, str]] = []
+    top_frequency_candidates = channel_summaries[:3]
+    for summary in top_frequency_candidates:
+        channel_pid = summary.get("parameter_id")
+        if channel_pid is None:
+            continue
+        series = sorted(channel_series.get(channel_pid, []), key=lambda item: item[0])
+        result = _estimate_frequency_screening(series)
+        if result.get("available"):
+            frequency_channel_summaries.append(
+                {
+                    "channel": summary["name"],
+                    "group": summary["group"],
+                    "unit": summary.get("unit"),
+                    **result,
+                }
+            )
+        else:
+            frequency_skips.append(
+                {
+                    "channel": summary["name"],
+                    "reason": str(result.get("reason", "unknown")),
+                }
+            )
+
+    frequency_screening = {
+        "available": bool(frequency_channel_summaries),
+        "channels_attempted": len(top_frequency_candidates),
+        "channels_analyzed": len(frequency_channel_summaries),
+        "channels_skipped": len(frequency_skips),
+        "channel_summaries": frequency_channel_summaries,
+        "skipped_channels": frequency_skips,
+    }
+
     evaluation = evaluate_capability_request(
         "buffet_vibration",
-        available_signals=["accelerometers"],
+        available_signals=["accelerometers", "angular_rate"],
         has_dataset=True,
         has_time_series_continuity=True,
         data_coverage_ok=True,
@@ -1573,11 +1957,23 @@ def compute_buffet_vibration_metrics(
             "dominant_peak_abs": dominant["peak_abs"],
             "dominant_unit": dominant["unit"],
             "channels_with_exceedances": sum(1 for c in channel_summaries if c["exceedance_count"] > 0),
+            "samples_used": sum(int(c.get("samples", 0)) for c in channel_summaries),
             "channel_summaries": channel_summaries[:6],
+            "grouped_channel_summaries": grouped_channel_summaries,
+            "dominant_channels_ranked": dominant_channels_ranked,
+            "regime_segmentation_summary": regime_segmentation_summary,
+            "anomaly_windows": anomaly_windows,
+            "frequency_screening": frequency_screening,
+            "regime_logic": (
+                "Phase uses WOW threshold (>=0.5 ground / <0.5 airborne) when available; "
+                "speed bands use dataset terciles when ground speed is available."
+            ),
             },
             assumptions=[
                 "This mode performs descriptive screening (RMS/peaks/spread/exceedance) on available vibration-like channels.",
-                "Exceedance markers use a simple 3-sigma-from-mean heuristic per channel.",
+                "Anomaly windows are built from bounded threshold exceedances and merged by short cadence-aware gaps.",
+                "Regime segmentation is a bounded heuristic based on WOW and speed-band cues when available.",
+                "Frequency-domain summaries are produced only when cadence regularity and sample coverage are adequate.",
                 "Output is screening support only and does not represent formal loads substantiation or flutter clearance.",
             ],
         ),
@@ -2182,7 +2578,7 @@ def build_deterministic_buffet_vibration_section(metrics: dict) -> str:
         "",
         "### Result Classification",
         "- Result type: **Deterministic screening summary for buffet/vibration behavior**",
-        "- Classification: **Screening/support output (not formal clearance determination)**",
+        "- Classification: **Screening/support output (not loads substantiation or flutter-clearance determination)**",
         "- Applicability boundary: suitable for pre-screening and anomaly flagging only.",
         "",
         "### Screening Summary",
@@ -2192,6 +2588,7 @@ def build_deterministic_buffet_vibration_section(metrics: dict) -> str:
             f"(peak abs {metrics.get('dominant_peak_abs')} {metrics.get('dominant_unit') or ''})"
         ),
         f"- Channels with exceedance events: **{metrics.get('channels_with_exceedances')}**",
+        f"- Significant anomaly windows captured: **{len(metrics.get('anomaly_windows') or [])}**",
         "",
         "### Channel Highlights",
     ]
@@ -2202,9 +2599,92 @@ def build_deterministic_buffet_vibration_section(metrics: dict) -> str:
                 f"- {channel.get('name')} ({channel.get('unit') or '-'}) -> "
                 f"samples={channel.get('samples')}, rms={channel.get('rms')}, "
                 f"peak_abs={channel.get('peak_abs')}, p95_abs={channel.get('p95_abs')}, "
-                f"exceedances={channel.get('exceedance_count')}"
+                f"exceedances={channel.get('exceedance_count')}, group={channel.get('group')}"
             )
         )
+
+    grouped = metrics.get("grouped_channel_summaries") or []
+    if grouped:
+        lines.extend(["", "### Grouped Screening Summary"])
+        for group in grouped:
+            lines.append(
+                (
+                    f"- {group.get('group')}: channels={group.get('channels')}, "
+                    f"dominant={group.get('dominant_channel')} (peak_abs={group.get('dominant_peak_abs')}), "
+                    f"total_exceedances={group.get('total_exceedances')}, mean_rms={group.get('mean_rms')}"
+                )
+            )
+
+    ranked = metrics.get("dominant_channels_ranked") or []
+    if ranked:
+        lines.extend(["", "### Dominant Channels (Ranked)"])
+        for item in ranked:
+            lines.append(
+                (
+                    f"- #{item.get('rank')} {item.get('name')} [{item.get('group')}] -> "
+                    f"score={item.get('dominance_score')}, peak_abs={item.get('peak_abs')}, "
+                    f"rms={item.get('rms')}, exceedances={item.get('exceedance_count')}"
+                )
+            )
+
+    regime_logic = metrics.get("regime_logic")
+    regimes = metrics.get("regime_segmentation_summary") or []
+    if regimes:
+        lines.extend(["", "### Regime Segmentation"])
+        if regime_logic:
+            lines.append(f"- Regime logic: {regime_logic}")
+        for regime in regimes:
+            lines.append(
+                (
+                    f"- {regime.get('regime')}: samples={regime.get('samples')}, "
+                    f"events={regime.get('events_detected')}, dominant={regime.get('dominant_channel')}, "
+                    f"dominant_peak_abs={regime.get('dominant_peak_abs')}, "
+                    f"mean_speed_kt={regime.get('mean_speed_kt')}, mean_wow={regime.get('mean_wow')}"
+                )
+            )
+
+    windows = metrics.get("anomaly_windows") or []
+    if windows:
+        lines.extend(["", "### Significant Event Windows"])
+        for event in windows:
+            lines.append(
+                (
+                    f"- {event.get('start_timestamp')} -> {event.get('end_timestamp')}: "
+                    f"{event.get('channel_name')} [{event.get('channel_group')}], "
+                    f"peak_abs={event.get('peak_abs')} {event.get('channel_unit') or ''}, "
+                    f"peak_deviation={event.get('peak_deviation')}, samples={event.get('samples')}, "
+                    f"regime={event.get('regime')}"
+                )
+            )
+
+    frequency = metrics.get("frequency_screening") or {}
+    lines.extend(["", "### Frequency-Domain Screening (Bounded)"])
+    if frequency.get("available"):
+        lines.append(
+            f"- Frequency screening available for **{frequency.get('channels_analyzed')}** channel(s) "
+            f"(attempted {frequency.get('channels_attempted')})."
+        )
+        for item in frequency.get("channel_summaries", []):
+            lines.append(
+                (
+                    f"- {item.get('channel')} [{item.get('group')}]: "
+                    f"dominant_frequency={item.get('dominant_frequency_hz')} Hz, "
+                    f"dominant_amplitude={item.get('dominant_amplitude')}, "
+                    f"sample_rate={item.get('sample_rate_hz')} Hz, "
+                    f"cadence_jitter={item.get('cadence_jitter_ratio')}, "
+                    f"bands={item.get('band_energy_distribution')}"
+                )
+            )
+    else:
+        lines.append(
+            f"- Frequency screening unavailable (attempted {frequency.get('channels_attempted', 0)}, "
+            f"analyzed {frequency.get('channels_analyzed', 0)})."
+        )
+    skipped_freq = frequency.get("skipped_channels") or []
+    if skipped_freq:
+        lines.append("- Skipped channels:")
+        for item in skipped_freq:
+            lines.append(f"  - {item.get('channel')}: {item.get('reason')}")
 
     applicability = metrics.get("capability_applicability_boundaries") or []
     limitations = metrics.get("capability_limitations") or []

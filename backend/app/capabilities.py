@@ -418,20 +418,29 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
             key="buffet_vibration",
             label="Buffet and Vibration Support",
             description=(
-                "Deterministic screening support for buffet/vibration behavior from available acceleration channels."
+                "Deterministic structured screening support for buffet/vibration behavior with grouped channels, "
+                "event-window summaries, and bounded regime/frequency indicators."
             ),
             status=CapabilityImplementationStatus.IMPLEMENTED,
             authority=CapabilityAuthority.DETERMINISTIC_PRIMARY,
             required_inputs=CapabilityRequiredInputs(
-                optional_signals=["accelerometers", "frequency_features"],
+                optional_signals=[
+                    "accelerometers",
+                    "angular_rate",
+                    "frequency_features",
+                    "weight_on_wheels",
+                    "ground_speed",
+                ],
             ),
             blocked_rules=[],
             applicability_boundaries=[
-                "Supports pre-screening and anomaly flagging only.",
+                "Supports pre-screening, grouped anomaly review, and bounded event-window interpretation only.",
                 "Not sufficient for formal loads substantiation or flutter clearance determination.",
             ],
             default_limitations=[
                 "Current output is descriptive screening, not a formal spectral/aeroelastic determination.",
+                "Regime segmentation uses bounded heuristic cues (WOW/speed bands) when available.",
+                "Frequency-domain summaries are screening-level and require suitable sample cadence.",
                 "Channel quality, placement, and sampling rates can materially affect screening conclusions.",
                 "Use with dedicated domain methods before making clearance decisions.",
             ],
@@ -442,6 +451,10 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
                     "p95_abs",
                     "exceedance_count",
                     "dominant_channel",
+                    "grouped_channel_summaries",
+                    "anomaly_windows",
+                    "regime_segmentation_summary",
+                    "frequency_screening",
                 ],
                 standards_crosscheck_allowed=True,
             ),

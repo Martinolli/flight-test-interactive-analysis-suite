@@ -145,22 +145,21 @@
     * applicability boundaries and non-calibration limitations
   * Capability catalog and prompt-intent routing keywords were aligned for air-data/performance terminology.
 
-### P3.4 Harden buffet / vibration workflow
+### P3.4 Harden buffet / vibration workflow ✅
 
-* **Reason:** current buffet/vibration mode is useful as screening, but still preliminary.
-* Expand toward:
+* **Completed:** buffet/vibration deterministic workflow is now structured and engineering-readable as bounded screening support.
+* Delivered hardening includes:
 
-  * regime-aware screening
-  * channel grouping
-  * event-window analysis
-  * better anomaly segmentation
-  * optional first frequency-domain summaries if data quality supports it
-* Preserve strict boundary:
+  * grouped channel summaries and dominant-channel ranking
+  * regime-aware segmentation using bounded WOW/speed cues
+  * significant anomaly/event-window summaries
+  * bounded optional frequency-domain screening with cadence-quality guards and explicit skips
+* Preserved strict boundary:
 
-  * screening/support only unless stronger validated methods are added
+  * screening/support only
   * not loads substantiation
   * not flutter clearance
-* Improve report wording and evidence traceability for this mode.
+* Narrative/report wording updated for screening-only positioning and clearer traceability.
 
 ### P3.5 Add bounded flutter-support pre-screening
 
@@ -196,9 +195,8 @@
 
 ## Immediate Execution Order
 
-1. **P3.4 — Harden buffet / vibration workflow**
-2. **P3.5 — Add bounded flutter-support pre-screening**
-3. **P3.6 — Expand manual / documentation package**
+1. **P3.5 — Add bounded flutter-support pre-screening**
+2. **P3.6 — Expand manual / documentation package**
 
 ---
 
@@ -214,7 +212,7 @@
 * Prompt-to-mode guard is now enforced with explicit mismatch severity and guarded execution.
 * Handling/control-response mode is now a bounded deterministic workflow with explicit non-certification boundaries.
 * Atmosphere / air-data support is now available as a bounded deterministic kernel inside performance mode.
-* Buffet/vibration should be hardened before any flutter-support pre-screening.
+* Buffet/vibration hardening is complete and now provides the bounded base required for flutter-support pre-screening.
 * Manual/documentation expansion should continue in parallel when practical, but it becomes much more valuable after FRAT and P3.1/P3.2 stabilization.
 
 ---

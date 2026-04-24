@@ -1,5 +1,6 @@
 """Unit tests for modular deterministic calculators introduced in P2.2."""
 
+import math
 from datetime import datetime, timedelta
 
 from app.analysis import (
@@ -185,8 +186,78 @@ def test_buffet_vibration_calculator_returns_screening_output(db_session, test_u
     assert result["capability_key"] == "buffet_vibration"
     assert result["channels_screened"] >= 1
     assert len(result["channel_summaries"]) >= 1
+    assert isinstance(result.get("grouped_channel_summaries"), list)
+    assert isinstance(result.get("dominant_channels_ranked"), list)
+    assert isinstance(result.get("regime_segmentation_summary"), list)
+    assert isinstance(result.get("anomaly_windows"), list)
+    assert isinstance(result.get("frequency_screening"), dict)
     assert "deterministic_metrics" in result
     assert len(result["deterministic_assumptions"]) > 0
+
+
+def test_buffet_vibration_calculator_exposes_regime_event_and_frequency_summaries(
+    db_session, test_user
+):
+    flight_test = _make_flight_test(db_session, test_user["id"], "Buffet Hardening Test")
+    vib = _make_parameter(db_session, "AIRFRAME VIBRATION X", "g")
+    roll_rate = _make_parameter(db_session, "ROLL RATE", "deg/s")
+    wow = _make_parameter(db_session, "WEIGHT ON WHEELS", "")
+    gs = _make_parameter(db_session, "GROUND SPEED", "kt")
+
+    base_ts = datetime(2026, 4, 24, 11, 0, 0)
+    for i in range(80):
+        ts = base_ts + timedelta(milliseconds=100 * i)
+        vib_val = 0.08 * math.sin(2.0 * math.pi * 1.2 * (i / 10.0))
+        if i in {42, 43, 44}:
+            vib_val += 0.7
+        rr_val = 2.0 * math.sin(2.0 * math.pi * 0.8 * (i / 10.0))
+        wow_val = 1.0 if i < 25 else 0.0
+        gs_val = 20.0 + (1.6 * i)
+
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=vib.id,
+                timestamp=ts,
+                value=vib_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=roll_rate.id,
+                timestamp=ts,
+                value=rr_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=wow.id,
+                timestamp=ts,
+                value=wow_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=gs.id,
+                timestamp=ts,
+                value=gs_val,
+            )
+        )
+    db_session.commit()
+
+    result = compute_buffet_vibration_metrics(db_session, flight_test.id)
+    assert result["available"] is True
+    assert result["channels_screened"] >= 2
+    assert len(result["grouped_channel_summaries"]) >= 1
+    assert len(result["dominant_channels_ranked"]) >= 1
+    assert len(result["regime_segmentation_summary"]) >= 1
+    assert any("ground" in item["regime"] or "airborne" in item["regime"] for item in result["regime_segmentation_summary"])
+    assert len(result["anomaly_windows"]) >= 1
+    assert "regime" in result["anomaly_windows"][0]
+    assert result["frequency_screening"]["channels_attempted"] >= 1
 
 
 def test_handling_qualities_calculator_returns_control_response_pairings(db_session, test_user):

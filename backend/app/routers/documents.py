@@ -2010,7 +2010,7 @@ def _analysis_retrieval_focus_for_mode(mode_key: str) -> str:
         "landing": "landing distance touchdown braking deceleration runway procedures standards",
         "performance": "performance flight envelope climb cruise drag thrust air-data atmosphere mach cas tas density altitude standards",
         "handling_qualities": "handling qualities controllability stability pilot workload flying qualities",
-        "buffet_vibration": "buffet vibration structural response instrumentation standards",
+        "buffet_vibration": "buffet vibration loads screening structural response event windows frequency-domain screening instrumentation standards",
         "flutter": "flutter aeroelastic stability modal analysis safety limitations",
         "propulsion_systems": "propulsion engine performance thrust fuel system monitoring limits",
         "electrical_systems": "electrical system monitoring loads generators buses protections standards",
@@ -2032,6 +2032,13 @@ def _default_analysis_goal_for_mode(mode: AnalysisModeDefinition) -> str:
             "(1) deterministic pairing summary, (2) coupling and lag observations, "
             "(3) anomaly indicators, (4) explicit limitations and applicability boundaries, "
             "(5) recommended follow-up checks."
+        )
+    if mode.key == "buffet_vibration":
+        return (
+            "Produce a bounded buffet/vibration screening assessment with: "
+            "(1) grouped and ranked channel summary, (2) regime segmentation notes, "
+            "(3) significant anomaly/event windows, (4) frequency-domain screening if available, "
+            "(5) explicit screening-only limitations."
         )
     if mode.key == "performance":
         return (

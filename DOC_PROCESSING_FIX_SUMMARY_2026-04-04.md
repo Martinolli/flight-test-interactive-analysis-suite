@@ -2941,3 +2941,67 @@ pnpm -C frontend run build
 
 - Atmosphere/air-data outputs are bounded engineering support summaries from available telemetry.
 - They are **not** a formal pitot-static calibration package and do not claim certification-corrected air-data determination.
+
+## P3.4 Buffet / Vibration Workflow Hardening (2026-04-24)
+
+### Why this was added
+
+- Existing buffet/vibration mode was useful but still too flat for engineering screening review.
+- Needed clearer structure for dominant channels, regime context, and event-level anomaly summaries while staying explicitly non-certification.
+
+### What changed
+
+**Backend deterministic module hardening**
+
+- Extended `compute_buffet_vibration_metrics(...)` in `backend/app/analysis/deterministic.py` with:
+  - channel grouping (`structural_vibration`, `accelerations`, `angular_rates`, `airspeed_response`, `other_response`)
+  - dominant-channel ranking via bounded deterministic dominance score
+  - anomaly/event-window extraction with cadence-aware window merge
+  - regime segmentation using bounded WOW + speed-band cues where available
+  - bounded optional frequency-domain screening (dominant frequency + band-energy summary) with cadence/coverage guards
+- Added structured outputs:
+  - `grouped_channel_summaries`
+  - `dominant_channels_ranked`
+  - `regime_segmentation_summary`
+  - `anomaly_windows`
+  - `frequency_screening`
+  - `regime_logic`
+
+**Narrative/report wording hardening**
+
+- Extended buffet deterministic narrative section (`build_deterministic_buffet_vibration_section(...)`) to include:
+  - grouped screening summary
+  - dominant channels (ranked)
+  - regime segmentation
+  - significant event windows
+  - bounded frequency-domain summary and explicit skipped-channel reasons
+- Strengthened screening-only wording:
+  - not loads substantiation
+  - not flutter-clearance determination
+
+**Capability and controls alignment**
+
+- Updated `buffet_vibration` capability definition in `backend/app/capabilities.py`:
+  - expanded optional signals (`angular_rate`, `weight_on_wheels`, `ground_speed`)
+  - updated applicability/limitations for regime and frequency screening boundaries
+  - expanded output contract fields
+- Updated deterministic confidence logic in `backend/app/analysis_controls.py` for buffet-specific structured metrics.
+- Updated buffet mode retrieval focus and default analysis goal text in `backend/app/routers/documents.py`.
+
+### Tests / validation
+
+```powershell
+pytest backend/tests/test_deterministic_calculators.py backend/tests/test_analysis_mode_routing.py backend/tests/test_capability_catalog.py backend/tests/test_analysis_controls.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend focused suite passed (`31 passed`).
+- Frontend production build passed.
+
+### Engineering boundary (explicit)
+
+- Buffet/vibration output is a bounded deterministic screening workflow for trend/anomaly support.
+- It is **not** formal loads substantiation.
+- It is **not** flutter clearance or formal aeroelastic determination.

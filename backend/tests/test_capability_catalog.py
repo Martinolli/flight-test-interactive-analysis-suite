@@ -101,6 +101,9 @@ def test_buffet_vibration_capability_is_deterministic_screening_only():
     assert cap is not None
     assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
     assert cap.authority == CapabilityAuthority.DETERMINISTIC_PRIMARY
+    assert "ground_speed" in cap.required_inputs.optional_signals
+    assert "weight_on_wheels" in cap.required_inputs.optional_signals
+    assert "frequency_screening" in cap.output_contract.deterministic_metrics
 
     evaluation = evaluate_capability_request(
         "buffet_vibration",
@@ -110,9 +113,9 @@ def test_buffet_vibration_capability_is_deterministic_screening_only():
         data_coverage_ok=True,
     )
     assert evaluation.outcome == CapabilityOutcome.ALLOW_WITH_LIMITATIONS
-    assert "not sufficient for formal loads substantiation" in " ".join(
-        evaluation.applicability_boundaries
-    ).lower()
+    combined = " ".join(evaluation.applicability_boundaries).lower()
+    assert "not sufficient for formal loads substantiation" in combined
+    assert "event-window" in combined
 
 
 def test_handling_qualities_capability_is_bounded_deterministic():
