@@ -138,6 +138,18 @@ def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
     body = response.json()
     assert body["analysis_mode"] == "takeoff"
     assert body["capability_key"] == "takeoff"
+    assert body["analysis_controls"]["deterministic_confidence"] in {
+        "high",
+        "medium",
+        "low",
+        "unavailable",
+    }
+    assert body["analysis_controls"]["retrieval_coverage"] in {
+        "strong",
+        "moderate",
+        "weak",
+        "none",
+    }
     assert isinstance(body.get("retrieved_sources_snapshot"), list)
     assert len(body["retrieved_sources_snapshot"]) == 1
     assert body["retrieved_sources_snapshot"][0]["source_id"] == "S1"
@@ -159,6 +171,12 @@ def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
     assert reopened["analysis_mode"] == "takeoff"
     assert reopened["capability_key"] == "takeoff"
     assert not reopened["prompt_text"].startswith("[analysis_mode:")
+    assert reopened["analysis_controls"]["result_strength"] in {
+        "bounded",
+        "authoritative",
+        "advisory",
+        "blocked",
+    }
 
 
 def test_ai_analysis_landing_mode_returns_deterministic_landing_section_with_guardrails(
@@ -300,6 +318,7 @@ def test_ai_analysis_buffet_mode_returns_screening_metrics(
     assert "Deterministic Calculation (Buffet/Vibration Screening) [DATA]" in body["analysis"]
     assert "Channels screened" in body["analysis"]
     assert "Deterministic Calculation (Flight Data) [DATA]" not in body["analysis"]
+    assert body["analysis_controls"]["retrieval_coverage"] == "none"
 
 
 def test_ai_analysis_general_mode_routes_without_takeoff_calculator(
@@ -364,6 +383,7 @@ def test_ai_analysis_general_mode_routes_without_takeoff_calculator(
     assert body["capability_key"] == "general_standards_query"
     assert "Deterministic Takeoff Computation" not in body["analysis"]
     assert "analysis_mode=general" in body["analysis"]
+    assert body["analysis_controls"]["applicability_status"] == "advisory_only"
 
 
 def test_ai_analysis_rejects_unknown_analysis_mode(

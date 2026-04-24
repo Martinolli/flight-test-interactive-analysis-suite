@@ -2592,3 +2592,67 @@ pytest backend/tests/test_retrieval_metadata.py backend/tests/test_documents_ten
 pytest backend/tests/test_flight_tests_comprehensive.py -q
 pnpm -C frontend run build
 ```
+
+## P2.4 Confidence / Coverage / Applicability Controls (2026-04-24)
+
+### Completed
+
+- Added a structured backend control model for analysis outputs:
+  - `deterministic_confidence` (`high|medium|low|unavailable`)
+  - `retrieval_coverage` (`strong|moderate|weak|none`)
+  - `applicability_status` (`fully_applicable|partially_applicable|advisory_only|not_applicable`)
+  - `warning_level` (`none|info|caution|high`)
+  - `result_strength` (`authoritative|bounded|advisory|blocked`)
+  - `blocking_or_downgrade_reason` + warning messages
+
+### Persistence / immutability
+
+- Added persisted analysis-job field:
+  - `analysis_jobs.analysis_controls_json`
+- Added migration artifact:
+  - `backend/migrations/20260424_add_analysis_controls_snapshot.sql`
+- Saved jobs and reopen-by-ID flow now return immutable `analysis_controls` from persisted artifact snapshot.
+
+### AI analysis output integration
+
+- AI analysis now computes control status from:
+  - capability-evaluation outcome
+  - deterministic-availability/coverage signals
+  - retrieval coverage signals (retrieved/cited counts + mode-filter debug metadata)
+- Analysis narrative now includes:
+  - `Confidence / Coverage / Applicability Controls` section
+  - explicit control warnings for blocked/partial/weak-support states
+
+### Report integration
+
+- PDF report `Analysis Summary` now includes:
+  - result strength
+  - deterministic confidence
+  - retrieval coverage
+  - applicability status
+  - warning level
+  - blocking/downgrade reason
+- Adds a control notice paragraph when warning level is `caution` or `high`.
+
+### Files changed (P2.4)
+
+- `backend/app/analysis_controls.py` (new)
+- `backend/app/models.py`
+- `backend/app/routers/documents.py`
+- `backend/app/routers/admin.py`
+- `backend/migrations/20260424_add_analysis_controls_snapshot.sql` (new)
+- `backend/tests/test_analysis_controls.py` (new)
+- `backend/tests/test_documents_tenancy.py`
+- `backend/tests/test_analysis_mode_routing.py`
+- `backend/tests/test_admin_report_export.py`
+- `frontend/src/services/api.ts`
+- `TODO.md`
+- `frontend/TODO.md`
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_analysis_controls.py backend/tests/test_documents_tenancy.py backend/tests/test_analysis_mode_routing.py backend/tests/test_admin_report_export.py -q
+pnpm -C frontend run build
+```

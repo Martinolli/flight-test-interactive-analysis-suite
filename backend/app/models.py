@@ -331,6 +331,7 @@ class AnalysisJob(Base):
     model_version = Column(String(128), nullable=True)
     parameters_analysed = Column(Integer, nullable=False, default=0)
     parameter_stats_snapshot_json = Column(Text, nullable=False, default="[]")
+    analysis_controls_json = Column(Text, nullable=False, default="{}")
     prompt_text = Column(Text, nullable=False)
     retrieved_source_ids_json = Column(Text, nullable=False, default="[]")
     retrieved_sources_snapshot_json = Column(Text, nullable=False, default="[]")

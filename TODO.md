@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 02
 
-**Last updated:** 2026-04-19
+**Last updated:** 2026-04-24
 **Scope:** Backend + Frontend + LLM/RAG + Reporting
 **Plan basis:** aligned to `TODO_REV_01.md`, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, current `TODO.md`, and post-P0.3 audit findings
 
@@ -323,8 +323,12 @@
     - mode-aware ranking and sparse-metadata fallback
     - query-mode propagation and retrieval metadata response fields
 
-- [ ] P2.4 Add confidence / coverage / applicability controls
-  - Clear blocked-condition signaling in UI and report outputs.
+- [x] P2.4 Add confidence / coverage / applicability controls
+  - Added unified backend control snapshot model (`deterministic_confidence`, `retrieval_coverage`, `applicability_status`, `warning_level`, `result_strength`, downgrade reason).
+  - Analysis responses and saved analysis jobs now persist immutable control snapshots (`analysis_controls_json`) and return `analysis_controls` in API payloads.
+  - AI analysis narrative now includes a dedicated control summary block; weak/blocked conditions are explicitly surfaced.
+  - PDF report analysis summary now includes control fields (result strength, confidence, coverage, applicability, warning level, downgrade reason) plus control notice for caution/high.
+  - Added focused tests for deterministic confidence, retrieval coverage, applicability outcomes, warning severity, and saved-job/report compatibility.
 
 - [ ] P2.5 Add FRAT / mission risk workflow
   - Deterministic scoring, hard-stops, approval/finalization, immutable snapshot export.
@@ -333,14 +337,13 @@
 
 ## Immediate Execution Order
 
-1. P2.4 — Add confidence / coverage / applicability controls  
-2. P2.5 — Add FRAT / mission risk workflow  
+1. P2.5 — Add FRAT / mission risk workflow  
 
 - **Reason for this order**
 
 - P1.3 is completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
 - P1.4 and P1.4a are completed for report professionalism + wording hardening.
-- P2.1/P2.2/P2.3 foundations are complete; next impact is confidence/coverage controls and FRAT workflow execution.
+- P2.1/P2.2/P2.3/P2.4 foundations are complete; next impact is FRAT workflow execution.
 
 ---
 

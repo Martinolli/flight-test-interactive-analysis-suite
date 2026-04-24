@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
+from app.analysis_controls import parse_analysis_controls
 from app.auth import get_current_superuser, get_password_hash
 from app.capabilities import get_capability_definition
 from app.database import get_db
@@ -94,6 +95,17 @@ def _load_retrieved_sources_snapshot(analysis_job: AnalysisJob) -> List[dict]:
     if not isinstance(data, list):
         return []
     return [row for row in data if isinstance(row, dict)]
+
+
+def _load_analysis_controls_snapshot(analysis_job: AnalysisJob) -> Dict[str, Any]:
+    raw = analysis_job.analysis_controls_json or "{}"
+    try:
+        data = json.loads(raw)
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    return parse_analysis_controls(data).model_dump()
 
 
 def _format_float(value: Any, decimals: int = 3) -> str:
@@ -200,6 +212,12 @@ def _analysis_summary_dict(
             "model": "—",
             "parameters_analysed": _format_int(len(stats_snapshot)),
             "retrieved_sources": _format_int(len(retrieved_sources_snapshot)),
+            "result_strength": "—",
+            "deterministic_confidence": "—",
+            "retrieval_coverage": "—",
+            "applicability_status": "—",
+            "warning_level": "—",
+            "downgrade_reason": "—",
             "output_sha256": "—",
         }
 
@@ -211,6 +229,8 @@ def _analysis_summary_dict(
     model_line = _sanitize_pdf_text(analysis_job.model_name or "—")
     if analysis_job.model_version:
         model_line = f"{model_line} ({_sanitize_pdf_text(analysis_job.model_version)})"
+    controls = _load_analysis_controls_snapshot(analysis_job)
+    downgrade_reason = controls.get("blocking_or_downgrade_reason") or "—"
 
     return {
         "analysis_job_id": str(analysis_job.id),
@@ -218,6 +238,16 @@ def _analysis_summary_dict(
         "model": model_line,
         "parameters_analysed": _format_int(analysis_job.parameters_analysed),
         "retrieved_sources": _format_int(len(retrieved_sources_snapshot)),
+        "result_strength": _sanitize_pdf_text(str(controls.get("result_strength", "—"))),
+        "deterministic_confidence": _sanitize_pdf_text(
+            str(controls.get("deterministic_confidence", "—"))
+        ),
+        "retrieval_coverage": _sanitize_pdf_text(str(controls.get("retrieval_coverage", "—"))),
+        "applicability_status": _sanitize_pdf_text(
+            str(controls.get("applicability_status", "—"))
+        ),
+        "warning_level": _sanitize_pdf_text(str(controls.get("warning_level", "—"))),
+        "downgrade_reason": _sanitize_pdf_text(str(downgrade_reason)),
         "output_sha256": analysis_job.output_sha256 or "—",
     }
 
@@ -863,6 +893,12 @@ def _build_pdf(
         [Paragraph("Model", meta_label_style), Paragraph(analysis_summary["model"], meta_value_style)],
         [Paragraph("Parameters Analysed", meta_label_style), Paragraph(analysis_summary["parameters_analysed"], meta_value_style)],
         [Paragraph("Retrieved Sources", meta_label_style), Paragraph(analysis_summary["retrieved_sources"], meta_value_style)],
+        [Paragraph("Result Strength", meta_label_style), Paragraph(analysis_summary["result_strength"], meta_value_style)],
+        [Paragraph("Deterministic Confidence", meta_label_style), Paragraph(analysis_summary["deterministic_confidence"], meta_value_style)],
+        [Paragraph("Retrieval Coverage", meta_label_style), Paragraph(analysis_summary["retrieval_coverage"], meta_value_style)],
+        [Paragraph("Applicability Status", meta_label_style), Paragraph(analysis_summary["applicability_status"], meta_value_style)],
+        [Paragraph("Warning Level", meta_label_style), Paragraph(analysis_summary["warning_level"], meta_value_style)],
+        [Paragraph("Blocking/Downgrade Reason", meta_label_style), Paragraph(analysis_summary["downgrade_reason"], body_style)],
         [Paragraph("Output Hash (SHA-256)", meta_label_style), Paragraph(_sanitize_pdf_text(analysis_summary["output_sha256"]), body_style)],
     ]
     analysis_table = Table(analysis_rows, colWidths=[4.0 * cm, 13.0 * cm])
@@ -874,6 +910,16 @@ def _build_pdf(
         ("PADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(analysis_table)
+    if analysis_summary["warning_level"] in {"caution", "high"}:
+        story.append(
+            Paragraph(
+                (
+                    "Control notice: analysis warning level is "
+                    f"{analysis_summary['warning_level']}. Interpret conclusions within stated applicability boundaries."
+                ),
+                body_style,
+            )
+        )
     story.append(Spacer(1, 0.2 * cm))
 
     # ---- 4) Key charts / figures ----

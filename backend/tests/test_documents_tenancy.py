@@ -294,6 +294,18 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     assert isinstance(body.get("retrieved_sources_snapshot"), list)
     assert len(body["retrieved_sources_snapshot"]) == 1
     assert body["retrieved_sources_snapshot"][0]["source_id"] == "S1"
+    assert body["analysis_controls"]["result_strength"] in {
+        "bounded",
+        "authoritative",
+        "advisory",
+        "blocked",
+    }
+    assert body["analysis_controls"]["applicability_status"] in {
+        "fully_applicable",
+        "partially_applicable",
+        "advisory_only",
+        "not_applicable",
+    }
 
     persisted_job = (
         db_session.query(AnalysisJob)
@@ -310,6 +322,14 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     assert stats_snapshot[0]["name"] == "TEST_SPEED"
     assert stats_snapshot[0]["sample_count"] == 1
     assert stats_snapshot[0]["avg_val"] == 100.0
+    controls_snapshot = json.loads(persisted_job.analysis_controls_json or "{}")
+    assert isinstance(controls_snapshot, dict)
+    assert controls_snapshot.get("result_strength") in {
+        "bounded",
+        "authoritative",
+        "advisory",
+        "blocked",
+    }
 
 
 def test_ai_analysis_uses_requested_dataset_version_and_persists_dataset_version_id(
@@ -528,6 +548,22 @@ def test_get_ai_analysis_job_returns_persisted_snapshot_not_live_recompute(
         model_version=None,
         parameters_analysed=1,
         parameter_stats_snapshot_json=json.dumps(persisted_snapshot),
+        analysis_controls_json=json.dumps(
+            {
+                "deterministic_confidence": "medium",
+                "retrieval_coverage": "none",
+                "applicability_status": "partially_applicable",
+                "warning_level": "caution",
+                "result_strength": "bounded",
+                "blocking_or_downgrade_reason": "certification_corrections_missing",
+                "warning_messages": ["Output is downgraded to a partial estimate."],
+                "deterministic_available": True,
+                "retrieved_sources_count": 0,
+                "cited_sources_count": 0,
+                "mode_filter_fallback_used": False,
+                "metadata_coverage_ratio": 0.0,
+            }
+        ),
         prompt_text="prompt",
         retrieved_source_ids_json='["S1"]',
         retrieved_sources_snapshot_json="[]",
@@ -562,3 +598,8 @@ def test_get_ai_analysis_job_returns_persisted_snapshot_not_live_recompute(
     body = response.json()
     assert body["parameters_analysed"] == 1
     assert body["parameter_stats_snapshot"] == persisted_snapshot
+    assert body["analysis_controls"]["result_strength"] == "bounded"
+    assert (
+        body["analysis_controls"]["blocking_or_downgrade_reason"]
+        == "certification_corrections_missing"
+    )

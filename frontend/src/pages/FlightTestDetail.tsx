@@ -543,6 +543,7 @@ function AIAnalysisPanel({
         created_at: job.created_at,
         retrieved_source_ids: job.retrieved_source_ids,
         retrieved_sources_snapshot: job.retrieved_sources_snapshot,
+        analysis_controls: job.analysis_controls,
       });
       if (job.analysis_mode) {
         setSelectedAnalysisMode(job.analysis_mode as AnalysisModeKey);

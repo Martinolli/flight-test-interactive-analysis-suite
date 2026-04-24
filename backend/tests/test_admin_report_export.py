@@ -199,6 +199,22 @@ def test_build_pdf_contains_professional_sections_and_provenance_block(db_sessio
                 }
             ]
         ),
+        analysis_controls_json=json.dumps(
+            {
+                "deterministic_confidence": "medium",
+                "retrieval_coverage": "moderate",
+                "applicability_status": "partially_applicable",
+                "warning_level": "caution",
+                "result_strength": "bounded",
+                "blocking_or_downgrade_reason": "certification_corrections_missing",
+                "warning_messages": ["Output is downgraded to a partial estimate."],
+                "deterministic_available": True,
+                "retrieved_sources_count": 1,
+                "cited_sources_count": 1,
+                "mode_filter_fallback_used": False,
+                "metadata_coverage_ratio": 0.9,
+            }
+        ),
         output_sha256="f" * 64,
         analysis_text=(
             "## Findings\n"
@@ -232,6 +248,8 @@ def test_build_pdf_contains_professional_sections_and_provenance_block(db_sessio
     assert b"Provenance statement: This PDF reflects persisted analysis job artifacts." in pdf_bytes
     assert b"Dataset Label" in pdf_bytes
     assert dataset_version.label.encode() in pdf_bytes
+    assert b"Result Strength" in pdf_bytes
+    assert b"Applicability Status" in pdf_bytes
 
 
 def test_build_pdf_takeoff_context_includes_result_classification_and_limitations(

@@ -180,6 +180,24 @@ export interface AIAnalysisResponse {
     similarity?: number;
     excerpt?: string;
   }>;
+  analysis_controls: {
+    deterministic_confidence: 'high' | 'medium' | 'low' | 'unavailable';
+    retrieval_coverage: 'strong' | 'moderate' | 'weak' | 'none';
+    applicability_status:
+      | 'fully_applicable'
+      | 'partially_applicable'
+      | 'advisory_only'
+      | 'not_applicable';
+    warning_level: 'none' | 'info' | 'caution' | 'high';
+    result_strength: 'authoritative' | 'bounded' | 'advisory' | 'blocked';
+    blocking_or_downgrade_reason?: string | null;
+    warning_messages: string[];
+    deterministic_available: boolean;
+    retrieved_sources_count: number;
+    cited_sources_count: number;
+    mode_filter_fallback_used: boolean;
+    metadata_coverage_ratio: number;
+  };
 }
 
 export interface AnalysisJobResponse {
@@ -217,6 +235,24 @@ export interface AnalysisJobResponse {
     similarity?: number;
     excerpt?: string;
   }>;
+  analysis_controls: {
+    deterministic_confidence: 'high' | 'medium' | 'low' | 'unavailable';
+    retrieval_coverage: 'strong' | 'moderate' | 'weak' | 'none';
+    applicability_status:
+      | 'fully_applicable'
+      | 'partially_applicable'
+      | 'advisory_only'
+      | 'not_applicable';
+    warning_level: 'none' | 'info' | 'caution' | 'high';
+    result_strength: 'authoritative' | 'bounded' | 'advisory' | 'blocked';
+    blocking_or_downgrade_reason?: string | null;
+    warning_messages: string[];
+    deterministic_available: boolean;
+    retrieved_sources_count: number;
+    cited_sources_count: number;
+    mode_filter_fallback_used: boolean;
+    metadata_coverage_ratio: number;
+  };
 }
 
 export interface AnalysisModeInfo {

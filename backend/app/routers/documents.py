@@ -43,6 +43,11 @@ from app.analysis import (
     compute_performance_metrics as _compute_performance_metrics_impl,
     compute_takeoff_metrics as _compute_takeoff_metrics_impl,
 )
+from app.analysis_controls import (
+    AnalysisControlSnapshot,
+    evaluate_analysis_controls,
+    parse_analysis_controls,
+)
 from app.analysis_modes import (
     AnalysisModeDefinition,
     analysis_mode_authority,
@@ -258,6 +263,7 @@ class AIAnalysisResponse(BaseModel):
     created_at: str
     retrieved_source_ids: List[str] = Field(default_factory=list)
     retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
+    analysis_controls: AnalysisControlSnapshot
 
 
 class AnalysisJobResponse(BaseModel):
@@ -279,6 +285,7 @@ class AnalysisJobResponse(BaseModel):
     retrieved_source_ids: List[str] = Field(default_factory=list)
     retrieved_sources_snapshot: List[dict] = Field(default_factory=list)
     parameter_stats_snapshot: List[dict] = Field(default_factory=list)
+    analysis_controls: AnalysisControlSnapshot
 
 
 class AnalysisModeOut(BaseModel):
@@ -1912,6 +1919,29 @@ def _build_non_takeoff_deterministic_section(
     return "\n".join(lines)
 
 
+def _build_analysis_controls_section(controls: AnalysisControlSnapshot) -> str:
+    lines = [
+        "## Confidence / Coverage / Applicability Controls",
+        f"- Result strength: **{controls.result_strength.value}**",
+        f"- Deterministic confidence: **{controls.deterministic_confidence.value}**",
+        f"- Retrieval coverage: **{controls.retrieval_coverage.value}**",
+        f"- Applicability status: **{controls.applicability_status.value}**",
+        f"- Warning level: **{controls.warning_level.value}**",
+        f"- Retrieved sources: **{controls.retrieved_sources_count}**",
+        f"- Narrative citations: **{controls.cited_sources_count}**",
+    ]
+    if controls.blocking_or_downgrade_reason:
+        lines.append(
+            f"- Blocking/downgrade reason: **{controls.blocking_or_downgrade_reason}**"
+        )
+    if controls.warning_messages:
+        lines.append("")
+        lines.append("### Control Warnings")
+        for warning in controls.warning_messages:
+            lines.append(f"- {warning}")
+    return "\n".join(lines)
+
+
 def _analysis_retrieval_focus_for_mode(mode_key: str) -> str:
     focus_map = {
         "takeoff": "takeoff distance ground roll liftoff runway acceleration weight on wheels procedures certification",
@@ -2085,6 +2115,13 @@ def _analysis_job_to_response(
     retrieved_sources_snapshot = _safe_json_load(job.retrieved_sources_snapshot_json, [])
     if not isinstance(retrieved_sources_snapshot, list):
         retrieved_sources_snapshot = []
+    analysis_controls_payload = _safe_json_load(
+        getattr(job, "analysis_controls_json", "{}"),
+        {},
+    )
+    if not isinstance(analysis_controls_payload, dict):
+        analysis_controls_payload = {}
+    analysis_controls = parse_analysis_controls(analysis_controls_payload)
     analysis_mode, _clean_prompt = _decode_prompt_mode(job.prompt_text or "")
     selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
     if selected_mode is None:
@@ -2103,6 +2140,7 @@ def _analysis_job_to_response(
         created_at=job.created_at.isoformat() if job.created_at else "",
         retrieved_source_ids=[str(item) for item in source_ids if item],
         retrieved_sources_snapshot=retrieved_sources_snapshot,
+        analysis_controls=analysis_controls,
     )
 
 
@@ -2176,6 +2214,13 @@ def get_ai_analysis_job(
     parameter_stats_snapshot = _safe_json_load(job.parameter_stats_snapshot_json, [])
     if not isinstance(parameter_stats_snapshot, list):
         parameter_stats_snapshot = []
+    analysis_controls_payload = _safe_json_load(
+        getattr(job, "analysis_controls_json", "{}"),
+        {},
+    )
+    if not isinstance(analysis_controls_payload, dict):
+        analysis_controls_payload = {}
+    analysis_controls = parse_analysis_controls(analysis_controls_payload)
     analysis_mode, clean_prompt_text = _decode_prompt_mode(job.prompt_text or "")
     selected_mode = get_analysis_mode_definition(analysis_mode) if analysis_mode else None
     if selected_mode is None:
@@ -2200,6 +2245,7 @@ def get_ai_analysis_job(
         retrieved_source_ids=[str(item) for item in retrieved_source_ids if item],
         retrieved_sources_snapshot=retrieved_sources_snapshot,
         parameter_stats_snapshot=parameter_stats_snapshot,
+        analysis_controls=analysis_controls,
     )
 
 
@@ -2325,6 +2371,7 @@ def ai_analysis(
     sources: List[dict] = []
     cited_sources: List[dict] = []
     context_text = ""
+    retrieval_debug: Dict[str, Any] = {}
     run_llm = False
 
     certification_requested = _is_certification_result_requested(analysis_goal)
@@ -2393,7 +2440,7 @@ def ai_analysis(
             f"Aircraft: {ft.aircraft_type or ''}\n"
             f"Flight test parameter names: {'; '.join(param_names)}"
         )
-        sources, context_text, _retrieval_debug = _call_retrieve_hybrid_sources(
+        sources, context_text, retrieval_debug = _call_retrieve_hybrid_sources(
             db=db,
             question=retrieval_question,
             requested_top_k=8,
@@ -2533,8 +2580,20 @@ def ai_analysis(
         else:
             cited_sources = []
 
+        analysis_controls = evaluate_analysis_controls(
+            mode_key=selected_mode.key,
+            capability_eval=mode_eval,
+            deterministic_metrics=deterministic_metrics,
+            retrieved_sources=sources,
+            cited_source_ids=inline_source_ids,
+            retrieval_debug=retrieval_debug,
+        )
+        analysis_controls_section = _build_analysis_controls_section(analysis_controls)
+
         final_analysis = (
             mode_routing_section.strip()
+            + "\n\n"
+            + analysis_controls_section.strip()
             + "\n\n"
             + deterministic_section.strip()
             + "\n\n"
@@ -2567,8 +2626,19 @@ def ai_analysis(
                 deterministic_metrics is not None and deterministic_metrics.get("available")
             ),
         )
+        analysis_controls = evaluate_analysis_controls(
+            mode_key=selected_mode.key,
+            capability_eval=mode_eval,
+            deterministic_metrics=deterministic_metrics,
+            retrieved_sources=sources,
+            cited_source_ids=[],
+            retrieval_debug=retrieval_debug,
+        )
+        analysis_controls_section = _build_analysis_controls_section(analysis_controls)
         final_analysis = (
             mode_routing_section.strip()
+            + "\n\n"
+            + analysis_controls_section.strip()
             + "\n\n"
             + deterministic_section.strip()
             + "\n\n"
@@ -2595,6 +2665,7 @@ def ai_analysis(
         model_version=os.getenv("ANALYSIS_MODEL_VERSION"),
         parameters_analysed=len(stats_rows),
         parameter_stats_snapshot_json=json.dumps(parameter_stats_snapshot),
+        analysis_controls_json=analysis_controls.model_dump_json(),
         prompt_text=persisted_prompt_text,
         retrieved_source_ids_json=json.dumps(retrieved_source_ids),
         retrieved_sources_snapshot_json=json.dumps(retrieved_sources_snapshot),
