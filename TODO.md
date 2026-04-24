@@ -106,27 +106,27 @@
     * safe fallback / suggestion behavior
     * non-regression for correct mode selections
 
-### P3.2 Add handling qualities / control-response workflow
+* [x] P3.2 Add handling qualities / control-response workflow
 
-* **Reason:** current datasets already contain useful control and response parameters:
+  * **Reason:** current datasets already contain useful control and response parameters:
 
-  * aileron deflection
-  * stick position
-  * rudder/elevator
-  * roll/pitch/yaw rates
-  * attitude response
-* Implement a first bounded handling-qualities mode:
+    * aileron deflection
+    * stick position
+    * rudder/elevator
+    * roll/pitch/yaw rates
+    * attitude response
+  * Implemented a bounded handling-qualities mode:
 
-  * control-input range summaries
-  * response trend/correlation summaries
-  * lag/trend observations
-  * anomaly flagging
-* Keep output explicitly bounded:
+    * control-input range summaries
+    * response trend/correlation summaries
+    * lag/trend observations
+    * anomaly flagging
+  * Keep output explicitly bounded:
 
-  * not formal Cooper-Harper determination
-  * not full certification handling-qualities substantiation
-* Add capability-catalog alignment and explicit applicability boundaries.
-* Prefer deterministic summaries first, with RAG as supporting interpretation.
+    * not formal Cooper-Harper determination
+    * not full certification handling-qualities substantiation
+  * Capability catalog aligned with explicit applicability boundaries.
+  * Deterministic summaries first, with RAG as supporting interpretation.
 
 ### P3.3 Add atmosphere / air-data engineering support
 
@@ -192,11 +192,10 @@
 
 ## Immediate Execution Order
 
-1. **P3.2 — Add handling qualities / control-response workflow**
-2. **P3.3 — Add atmosphere / air-data engineering support**
-3. **P3.4 — Harden buffet / vibration workflow**
-4. **P3.5 — Add bounded flutter-support pre-screening**
-5. **P3.6 — Expand manual / documentation package**
+1. **P3.3 — Add atmosphere / air-data engineering support**
+2. **P3.4 — Harden buffet / vibration workflow**
+3. **P3.5 — Add bounded flutter-support pre-screening**
+4. **P3.6 — Expand manual / documentation package**
 
 ---
 
@@ -212,10 +211,10 @@
 * The biggest current product gap is now routing quality:
 
   * prompt intent can still mismatch selected mode
-* After routing quality hardening, the most natural domain expansion for the available datasets is handling qualities / control-response.
+* Handling/control-response mode is now a bounded deterministic workflow with explicit non-certification boundaries.
 * Atmosphere / air-data support should come before deeper vibration/flutter expansion because it strengthens engineering kernels broadly.
 * Buffet/vibration should be hardened before any flutter-support pre-screening.
-* Manual/documentation expansion should continue in parallel when practical, but it becomes much more valuable after FRAT and P3.1/P3.2 stabilize.
+* Manual/documentation expansion should continue in parallel when practical, but it becomes much more valuable after FRAT and P3.1/P3.2 stabilization.
 
 ---
 

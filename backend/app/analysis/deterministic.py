@@ -5,6 +5,10 @@ P2.2 scope:
 - keep takeoff as deterministic reference implementation
 - add bounded deterministic calculators for landing, performance, buffet/vibration
 - keep capability-catalog guardrails as source-of-truth for applicability/limitations
+
+P3.2 scope:
+- add bounded deterministic handling/control-response workflow
+- keep handling-qualities outputs explicit and non-certification
 """
 
 from __future__ import annotations
@@ -197,6 +201,211 @@ def _score_vibration_channel(name: str, unit: Optional[str]) -> float:
     if u in {"g", "m/s2", "m/s^2", "deg/s", "rad/s"}:
         score += 2
     return score
+
+
+def _score_aileron(name: str, unit: Optional[str]) -> float:
+    del unit
+    n = (name or "").lower()
+    score = 0.0
+    if "aileron" in n:
+        score += 8
+    if "deflection" in n or "position" in n or "command" in n:
+        score += 2
+    return score
+
+
+def _score_elevator(name: str, unit: Optional[str]) -> float:
+    del unit
+    n = (name or "").lower()
+    score = 0.0
+    if "elevator" in n:
+        score += 8
+    if "deflection" in n or "position" in n or "command" in n:
+        score += 2
+    return score
+
+
+def _score_rudder(name: str, unit: Optional[str]) -> float:
+    del unit
+    n = (name or "").lower()
+    score = 0.0
+    if "rudder" in n:
+        score += 8
+    if "deflection" in n or "position" in n or "command" in n:
+        score += 2
+    return score
+
+
+def _score_stick_lateral(name: str, unit: Optional[str]) -> float:
+    del unit
+    n = (name or "").lower()
+    score = 0.0
+    if "stick" in n:
+        score += 3
+    if "lateral" in n or "roll" in n:
+        score += 5
+    if "position" in n or "input" in n:
+        score += 1
+    return score
+
+
+def _score_stick_longitudinal(name: str, unit: Optional[str]) -> float:
+    del unit
+    n = (name or "").lower()
+    score = 0.0
+    if "stick" in n:
+        score += 3
+    if "longitudinal" in n or "pitch" in n:
+        score += 5
+    if "position" in n or "input" in n:
+        score += 1
+    return score
+
+
+def _score_roll_rate(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "roll rate" in n:
+        score += 8
+    if re.search(r"\broll\b", n) and ("rate" in n or "/s" in n):
+        score += 4
+    if re.search(r"\bp\b", n) and ("rate" in n or "deg/s" in u):
+        score += 2
+    if score > 0 and ("deg/s" in u or "rad/s" in u):
+        score += 1
+    return score
+
+
+def _score_pitch_rate(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "pitch rate" in n:
+        score += 8
+    if re.search(r"\bpitch\b", n) and ("rate" in n or "/s" in n):
+        score += 4
+    if re.search(r"\bq\b", n) and ("rate" in n or "deg/s" in u):
+        score += 2
+    if score > 0 and ("deg/s" in u or "rad/s" in u):
+        score += 1
+    return score
+
+
+def _score_yaw_rate(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "yaw rate" in n:
+        score += 8
+    if re.search(r"\byaw\b", n) and ("rate" in n or "/s" in n):
+        score += 4
+    if re.search(r"\br\b", n) and ("rate" in n or "deg/s" in u):
+        score += 2
+    if score > 0 and ("deg/s" in u or "rad/s" in u):
+        score += 1
+    return score
+
+
+def _score_roll_angle(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "roll angle" in n or "bank angle" in n:
+        score += 8
+    if "roll" in n and "angle" in n:
+        score += 4
+    if score > 0 and "deg" in u:
+        score += 1
+    return score
+
+
+def _score_pitch_angle(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "pitch angle" in n:
+        score += 8
+    if "pitch" in n and "angle" in n:
+        score += 4
+    if score > 0 and "deg" in u:
+        score += 1
+    return score
+
+
+def _score_heading(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "heading" in n:
+        score += 8
+    if "yaw angle" in n:
+        score += 6
+    if "yaw" in n and "angle" in n:
+        score += 4
+    if score > 0 and "deg" in u:
+        score += 1
+    return score
+
+
+def _basic_stats(values: List[float]) -> Optional[dict]:
+    if not values:
+        return None
+    mean_val = sum(values) / len(values)
+    variance = sum((v - mean_val) ** 2 for v in values) / len(values)
+    std_val = math.sqrt(max(variance, 0.0))
+    return {
+        "min": min(values),
+        "max": max(values),
+        "mean": mean_val,
+        "std": std_val,
+    }
+
+
+def _pearson_corr(xs: List[float], ys: List[float]) -> Optional[float]:
+    if len(xs) != len(ys) or len(xs) < 3:
+        return None
+    x_mean = sum(xs) / len(xs)
+    y_mean = sum(ys) / len(ys)
+    cov = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
+    var_x = sum((x - x_mean) ** 2 for x in xs)
+    var_y = sum((y - y_mean) ** 2 for y in ys)
+    denom = math.sqrt(var_x * var_y)
+    if denom <= 0:
+        return None
+    return cov / denom
+
+
+def _best_sample_lag(xs: List[float], ys: List[float], max_lag: int = 3) -> Tuple[Optional[int], Optional[float]]:
+    best_lag: Optional[int] = None
+    best_corr: Optional[float] = None
+    for lag in range(-max_lag, max_lag + 1):
+        if lag >= 0:
+            x_slice = xs[: len(xs) - lag] if lag > 0 else xs
+            y_slice = ys[lag:]
+        else:
+            x_slice = xs[-lag:]
+            y_slice = ys[: len(ys) + lag]
+        if len(x_slice) < 5 or len(y_slice) < 5:
+            continue
+        corr = _pearson_corr(x_slice, y_slice)
+        if corr is None:
+            continue
+        if best_corr is None or abs(corr) > abs(best_corr):
+            best_lag = lag
+            best_corr = corr
+    return best_lag, best_corr
+
+
+def _count_abrupt_steps(values: List[float]) -> int:
+    if len(values) < 4:
+        return 0
+    deltas = [values[i] - values[i - 1] for i in range(1, len(values))]
+    stats = _basic_stats(deltas)
+    if not stats or stats["std"] <= 0:
+        return 0
+    threshold = 3.0 * stats["std"]
+    return sum(1 for delta in deltas if abs(delta - stats["mean"]) >= threshold)
 
 
 def _is_ground(speed_kt: float, wow_value: Optional[float], threshold: float = 0.5) -> bool:
@@ -982,6 +1191,291 @@ def compute_buffet_vibration_metrics(
     )
 
 
+def compute_handling_qualities_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    """Compute bounded deterministic handling/control-response metrics."""
+    del request_certification_result
+    params = _load_parameter_catalog(db, flight_test_id, dataset_version_id)
+    if not params:
+        return _unavailable_metrics(
+            capability_key="handling_qualities",
+            reason="No parameters found for flight test.",
+            available_signals=[],
+            has_dataset=False,
+        )
+
+    controls: Dict[str, Optional[int]] = {
+        "aileron": _choose_param_id(params, _score_aileron),
+        "elevator": _choose_param_id(params, _score_elevator),
+        "rudder": _choose_param_id(params, _score_rudder),
+        "stick_lateral": _choose_param_id(params, _score_stick_lateral),
+        "stick_longitudinal": _choose_param_id(params, _score_stick_longitudinal),
+    }
+    responses: Dict[str, Optional[int]] = {
+        "roll_rate": _choose_param_id(params, _score_roll_rate),
+        "pitch_rate": _choose_param_id(params, _score_pitch_rate),
+        "yaw_rate": _choose_param_id(params, _score_yaw_rate),
+        "roll_angle": _choose_param_id(params, _score_roll_angle),
+        "pitch_angle": _choose_param_id(params, _score_pitch_angle),
+        "heading": _choose_param_id(params, _score_heading),
+    }
+
+    selected_ids = {
+        pid
+        for pid in [*controls.values(), *responses.values()]
+        if pid is not None
+    }
+    available_signals = set()
+    if any(controls.values()):
+        available_signals.add("control_input")
+    if any(responses.values()):
+        available_signals.add("attitude_response")
+    if any(responses.get(key) is not None for key in ["roll_rate", "pitch_rate", "yaw_rate"]):
+        available_signals.add("angular_rate")
+
+    if not any(controls.values()):
+        return _unavailable_metrics(
+            capability_key="handling_qualities",
+            reason="No control-input channels were detected (aileron/elevator/rudder/stick).",
+            available_signals=available_signals,
+            has_dataset=True,
+        )
+    if not any(responses.values()):
+        return _unavailable_metrics(
+            capability_key="handling_qualities",
+            reason="No response channels were detected (rates/angles/heading).",
+            available_signals=available_signals,
+            has_dataset=True,
+        )
+
+    rows = _load_timeseries_rows(
+        db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        parameter_ids=selected_ids,
+    )
+    if not rows:
+        return _unavailable_metrics(
+            capability_key="handling_qualities",
+            reason="No datapoints found for detected handling/control-response channels.",
+            available_signals=available_signals,
+            has_dataset=True,
+            has_time_series_continuity=False,
+            data_coverage_ok=False,
+        )
+
+    param_map = {p["id"]: p for p in params}
+    timeline: Dict[Any, Dict[int, float]] = {}
+    for row in rows:
+        timeline.setdefault(row.timestamp, {})[int(row.parameter_id)] = float(row.value)
+    ordered_timestamps = sorted(timeline.keys())
+
+    control_channel_summaries = []
+    for key, pid in controls.items():
+        if pid is None:
+            continue
+        values = [timeline[ts][pid] for ts in ordered_timestamps if pid in timeline[ts]]
+        stats = _basic_stats(values)
+        if not stats:
+            continue
+        control_channel_summaries.append(
+            {
+                "key": key,
+                "name": param_map.get(pid, {}).get("name"),
+                "unit": param_map.get(pid, {}).get("unit"),
+                "samples": len(values),
+                "min": round(stats["min"], 4),
+                "max": round(stats["max"], 4),
+                "mean": round(stats["mean"], 4),
+                "std": round(stats["std"], 4),
+            }
+        )
+
+    response_channel_summaries = []
+    for key, pid in responses.items():
+        if pid is None:
+            continue
+        values = [timeline[ts][pid] for ts in ordered_timestamps if pid in timeline[ts]]
+        stats = _basic_stats(values)
+        if not stats:
+            continue
+        response_channel_summaries.append(
+            {
+                "key": key,
+                "name": param_map.get(pid, {}).get("name"),
+                "unit": param_map.get(pid, {}).get("unit"),
+                "samples": len(values),
+                "min": round(stats["min"], 4),
+                "max": round(stats["max"], 4),
+                "mean": round(stats["mean"], 4),
+                "std": round(stats["std"], 4),
+            }
+        )
+
+    pairing_specs: List[Tuple[str, str]] = [
+        ("aileron", "roll_rate"),
+        ("aileron", "roll_angle"),
+        ("stick_lateral", "roll_rate"),
+        ("stick_lateral", "roll_angle"),
+        ("elevator", "pitch_rate"),
+        ("elevator", "pitch_angle"),
+        ("stick_longitudinal", "pitch_rate"),
+        ("stick_longitudinal", "pitch_angle"),
+        ("rudder", "yaw_rate"),
+        ("rudder", "heading"),
+    ]
+
+    pairing_results = []
+    for control_key, response_key in pairing_specs:
+        control_id = controls.get(control_key)
+        response_id = responses.get(response_key)
+        if control_id is None or response_id is None:
+            continue
+        control_samples: List[float] = []
+        response_samples: List[float] = []
+        for ts in ordered_timestamps:
+            values = timeline.get(ts, {})
+            if control_id in values and response_id in values:
+                control_samples.append(values[control_id])
+                response_samples.append(values[response_id])
+        if len(control_samples) < 8:
+            continue
+
+        control_stats = _basic_stats(control_samples)
+        response_stats = _basic_stats(response_samples)
+        if not control_stats or not response_stats:
+            continue
+
+        corr = _pearson_corr(control_samples, response_samples)
+        lag_samples, lag_corr = _best_sample_lag(control_samples, response_samples, max_lag=3)
+
+        directionality = "undetermined"
+        if corr is not None:
+            if corr >= 0.35:
+                directionality = "positive_coupling"
+            elif corr <= -0.35:
+                directionality = "inverse_coupling"
+            else:
+                directionality = "weak_coupling"
+
+        ctrl_centered = [value - control_stats["mean"] for value in control_samples]
+        rsp_centered = [value - response_stats["mean"] for value in response_samples]
+        alignment_hits = sum(
+            1
+            for ctrl_value, rsp_value in zip(ctrl_centered, rsp_centered)
+            if (ctrl_value * rsp_value) >= 0
+        )
+        sign_alignment_ratio = alignment_hits / len(control_samples) if control_samples else 0.0
+
+        anomaly_flags: List[str] = []
+        response_outlier_count = 0
+        if response_stats["std"] > 0:
+            response_outlier_count = sum(
+                1
+                for value in response_samples
+                if abs(value - response_stats["mean"]) >= (3.0 * response_stats["std"])
+            )
+        if response_outlier_count > 0:
+            anomaly_flags.append(
+                f"response_outliers={response_outlier_count}"
+            )
+        abrupt_control_steps = _count_abrupt_steps(control_samples)
+        abrupt_response_steps = _count_abrupt_steps(response_samples)
+        if abrupt_control_steps > 0:
+            anomaly_flags.append(f"abrupt_control_steps={abrupt_control_steps}")
+        if abrupt_response_steps > 0:
+            anomaly_flags.append(f"abrupt_response_steps={abrupt_response_steps}")
+        if corr is not None and abs(corr) < 0.2:
+            anomaly_flags.append("low_correlation")
+
+        pairing_results.append(
+            {
+                "pairing_key": f"{control_key}->{response_key}",
+                "control_channel_name": param_map.get(control_id, {}).get("name"),
+                "response_channel_name": param_map.get(response_id, {}).get("name"),
+                "control_unit": param_map.get(control_id, {}).get("unit"),
+                "response_unit": param_map.get(response_id, {}).get("unit"),
+                "samples": len(control_samples),
+                "control_min": round(control_stats["min"], 4),
+                "control_max": round(control_stats["max"], 4),
+                "control_mean": round(control_stats["mean"], 4),
+                "control_std": round(control_stats["std"], 4),
+                "response_min": round(response_stats["min"], 4),
+                "response_max": round(response_stats["max"], 4),
+                "response_mean": round(response_stats["mean"], 4),
+                "response_std": round(response_stats["std"], 4),
+                "pearson_correlation": round(corr, 4) if corr is not None else None,
+                "directionality": directionality,
+                "best_lag_samples": lag_samples,
+                "best_lag_correlation": round(lag_corr, 4) if lag_corr is not None else None,
+                "sign_alignment_ratio": round(sign_alignment_ratio, 3),
+                "anomaly_flags": anomaly_flags,
+            }
+        )
+
+    if not pairing_results:
+        return _unavailable_metrics(
+            capability_key="handling_qualities",
+            reason="No valid control-response pairing had enough synchronized samples.",
+            available_signals=available_signals,
+            has_dataset=True,
+            has_time_series_continuity=True,
+            data_coverage_ok=False,
+        )
+
+    pairing_results.sort(
+        key=lambda item: abs(item.get("pearson_correlation") or 0.0),
+        reverse=True,
+    )
+    strongest_pairing = pairing_results[0]
+    aggregated_anomalies = sorted(
+        {
+            flag
+            for pairing in pairing_results
+            for flag in (pairing.get("anomaly_flags") or [])
+        }
+    )
+
+    evaluation = evaluate_capability_request(
+        "handling_qualities",
+        available_signals=available_signals,
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=True,
+            metrics={
+                "available": True,
+                "pairings_analyzed": len(pairing_results),
+                "pairing_results": pairing_results[:8],
+                "control_channels_used": [item["name"] for item in control_channel_summaries if item.get("name")],
+                "response_channels_used": [item["name"] for item in response_channel_summaries if item.get("name")],
+                "control_channel_summaries": control_channel_summaries[:8],
+                "response_channel_summaries": response_channel_summaries[:8],
+                "strongest_pairing": strongest_pairing.get("pairing_key"),
+                "strongest_abs_correlation": round(
+                    abs(strongest_pairing.get("pearson_correlation") or 0.0), 4
+                ),
+                "total_pairing_samples": sum(int(item.get("samples", 0)) for item in pairing_results),
+                "anomaly_flags": aggregated_anomalies[:10],
+            },
+            assumptions=[
+                "Control-response pairing uses deterministic channel-name heuristics and synchronized timestamp overlap.",
+                "Correlation and lag indicators are bounded trend metrics and do not represent full system-identification dynamics.",
+                "Anomaly flags use simple statistical thresholds (3-sigma and abrupt-step heuristics).",
+                "Output is a bounded engineering handling/control-response assessment, not a formal handling-qualities certification rating.",
+            ],
+        ),
+        evaluation,
+    )
+
+
 def _build_unavailable_section(title: str, metrics: dict) -> str:
     lines = [
         title,
@@ -1268,6 +1762,73 @@ def build_deterministic_buffet_vibration_section(metrics: dict) -> str:
                 f"exceedances={channel.get('exceedance_count')}"
             )
         )
+
+    applicability = metrics.get("capability_applicability_boundaries") or []
+    limitations = metrics.get("capability_limitations") or []
+    if applicability:
+        lines.extend(["", "### Applicability Boundaries"])
+        for item in applicability:
+            lines.append(f"- {item}")
+    if limitations:
+        lines.extend(["", "### Limitations"])
+        for item in limitations:
+            lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
+            lines.append(f"- {item}")
+    return "\n".join(lines)
+
+
+def build_deterministic_handling_qualities_section(metrics: dict) -> str:
+    if not metrics.get("available"):
+        return _build_unavailable_section(
+            "## Deterministic Calculation (Handling / Control-Response) [DATA]",
+            metrics,
+        )
+
+    lines = [
+        "## Deterministic Calculation (Handling / Control-Response) [DATA]",
+        "",
+        "### Result Classification",
+        "- Result type: **Bounded control-response deterministic assessment**",
+        "- Classification: **Engineering trend/interaction summary (not formal handling-qualities certification substantiation)**",
+        "- Applicability boundary: valid for available synchronized control-input and response channels only.",
+        "",
+        "### Coverage Summary",
+        f"- Pairings analyzed: **{metrics.get('pairings_analyzed', 0)}**",
+        f"- Total pairing samples: **{metrics.get('total_pairing_samples', 0)}**",
+        f"- Strongest pairing (by absolute correlation): **{metrics.get('strongest_pairing', 'n/a')}**",
+        f"- Strongest absolute correlation: **{metrics.get('strongest_abs_correlation', 'n/a')}**",
+        "",
+        "### Channels Used",
+        "- Control channels: "
+        + (", ".join(metrics.get("control_channels_used") or []) or "none"),
+        "- Response channels: "
+        + (", ".join(metrics.get("response_channels_used") or []) or "none"),
+        "",
+        "### Pairing Highlights",
+    ]
+
+    for pairing in metrics.get("pairing_results", []):
+        lines.append(
+            (
+                f"- {pairing.get('pairing_key')} "
+                f"({pairing.get('control_channel_name')} -> {pairing.get('response_channel_name')}): "
+                f"samples={pairing.get('samples')}, corr={pairing.get('pearson_correlation')}, "
+                f"directionality={pairing.get('directionality')}, lag_samples={pairing.get('best_lag_samples')}, "
+                f"lag_corr={pairing.get('best_lag_correlation')}, "
+                f"sign_alignment={pairing.get('sign_alignment_ratio')}, "
+                f"anomalies={', '.join(pairing.get('anomaly_flags') or []) or 'none'}"
+            )
+        )
+
+    aggregated_anomalies = metrics.get("anomaly_flags") or []
+    if aggregated_anomalies:
+        lines.extend(["", "### Aggregated Anomaly Flags"])
+        for flag in aggregated_anomalies:
+            lines.append(f"- {flag}")
 
     applicability = metrics.get("capability_applicability_boundaries") or []
     limitations = metrics.get("capability_limitations") or []

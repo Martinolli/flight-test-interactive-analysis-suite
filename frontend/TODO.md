@@ -110,16 +110,16 @@ These should be protected from regression.
 * Prevent UI from giving false confidence when prompt and selected mode do not align.
 * Do not auto-switch mode silently.
 
-### P3.2 Handling-qualities / control-response frontend workflow
+### P3.2 Handling-qualities / control-response frontend workflow ✅
 
-* Add frontend entry point for future handling-qualities mode when backend supports it.
-* Prepare UI pattern for:
+* Added frontend entry point for handling-qualities mode.
+* UI pattern now supports:
 
   * control input channels
   * response channels
   * selected signal mapping
   * bounded interpretation notes
-* Likely surfaces:
+* Implemented surfaces:
 
   * Flight Test Detail AI panel
   * Parameters page integration
@@ -192,10 +192,9 @@ These should be protected from regression.
 
 1. **P3.5 — FRAT usability hardening**
 2. **P3.6 — Report/control readability polish**
-3. **P3.2 — Handling-qualities / control-response frontend workflow**
-4. **P3.4 — Buffet / vibration workflow hardening**
-5. **P3.3 — Atmosphere / air-data support UX**
-6. **P3.7 — Manual / help integration**
+3. **P3.4 — Buffet / vibration workflow hardening**
+4. **P3.3 — Atmosphere / air-data support UX**
+5. **P3.7 — Manual / help integration**
 
 ---
 
@@ -203,6 +202,7 @@ These should be protected from regression.
 
 * FRAT workflow is operational, but the user needs a clearer checklist and field guidance.
 * Prompt/mode mismatch is now surfaced pre-run and with backend-authoritative guard state after run.
+* Handling/control-response mode is now exposed in AI Analysis quick options with bounded deterministic backend support.
 * Current reports expose useful control information, but frontend/report wording still needs polish:
 
   * enum-style labels should become user-friendly

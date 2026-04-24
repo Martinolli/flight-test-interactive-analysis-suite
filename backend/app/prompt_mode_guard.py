@@ -124,7 +124,13 @@ _INTENT_TO_MODE: Dict[PromptIntent, str] = {
     PromptIntent.UNKNOWN: "general",
 }
 
-_STRICT_DETERMINISTIC_MODES = {"takeoff", "landing", "performance", "buffet_vibration"}
+_STRICT_DETERMINISTIC_MODES = {
+    "takeoff",
+    "landing",
+    "performance",
+    "buffet_vibration",
+    "handling_qualities",
+}
 
 _INTENT_PRIORITY: List[PromptIntent] = [
     PromptIntent.HANDLING_QUALITIES,

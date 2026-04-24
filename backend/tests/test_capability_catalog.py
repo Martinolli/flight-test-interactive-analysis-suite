@@ -110,3 +110,33 @@ def test_buffet_vibration_capability_is_deterministic_screening_only():
     assert "not sufficient for formal loads substantiation" in " ".join(
         evaluation.applicability_boundaries
     ).lower()
+
+
+def test_handling_qualities_capability_is_bounded_deterministic():
+    cap = get_capability_definition("handling_qualities")
+    assert cap is not None
+    assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
+    assert cap.authority == CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK
+    assert "control_input" in cap.required_inputs.required_signals
+    assert "attitude_response" in cap.required_inputs.required_signals
+
+    blocked_eval = evaluate_capability_request(
+        "handling_qualities",
+        available_signals=["control_input"],
+        has_dataset=True,
+    )
+    assert blocked_eval.outcome == CapabilityOutcome.BLOCKED
+    assert blocked_eval.reason_key == "missing_required_signals"
+    assert "attitude_response" in blocked_eval.missing_required_signals
+
+    allowed_eval = evaluate_capability_request(
+        "handling_qualities",
+        available_signals=["control_input", "attitude_response", "angular_rate"],
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    assert allowed_eval.outcome == CapabilityOutcome.ALLOW_WITH_LIMITATIONS
+    combined = " ".join(allowed_eval.applicability_boundaries).lower()
+    assert "control-response trend assessment" in combined
+    assert "not equivalent to formal handling-qualities certification" in combined

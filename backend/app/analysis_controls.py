@@ -106,10 +106,21 @@ def _evaluate_deterministic_confidence(
 
     sample_intervals = _safe_int(deterministic_metrics.get("sample_intervals_used"), -1)
     samples_used = _safe_int(deterministic_metrics.get("samples_used"), -1)
+    handling_pairings = _safe_int(deterministic_metrics.get("pairings_analyzed"), -1)
+    handling_samples = _safe_int(deterministic_metrics.get("total_pairing_samples"), -1)
     run_time_s = _safe_float(
         deterministic_metrics.get("run_time_s", deterministic_metrics.get("rollout_time_s")),
         -1.0,
     )
+
+    if mode_key == "handling_qualities":
+        if handling_pairings >= 3 and handling_samples >= 120:
+            return DeterministicConfidence.HIGH
+        if handling_pairings >= 1 and handling_samples >= 40:
+            return DeterministicConfidence.MEDIUM
+        if handling_pairings >= 1:
+            return DeterministicConfidence.LOW
+        return DeterministicConfidence.UNAVAILABLE
 
     if sample_intervals >= 25 or samples_used >= 120:
         return DeterministicConfidence.HIGH
@@ -292,7 +303,13 @@ def evaluate_analysis_controls(
     if not reason and retrieval_coverage == RetrievalCoverage.NONE:
         if applicability_status == ApplicabilityStatus.ADVISORY_ONLY:
             reason = "retrieval_coverage_none_advisory"
-        elif mode_key in {"takeoff", "landing", "performance", "buffet_vibration"}:
+        elif mode_key in {
+            "takeoff",
+            "landing",
+            "performance",
+            "buffet_vibration",
+            "handling_qualities",
+        }:
             reason = "retrieval_coverage_none"
 
     warning_messages: List[str] = []

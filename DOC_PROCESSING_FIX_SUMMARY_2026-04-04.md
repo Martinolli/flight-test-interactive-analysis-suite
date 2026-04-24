@@ -2805,3 +2805,67 @@ pnpm -C frontend run build
 - Suggested modes are capability-aware.
 - Reopened analysis jobs preserve guard provenance.
 - Existing analysis-job/PDF provenance flow remains compatible.
+
+## P3.2 Handling Qualities / Control-Response Workflow (2026-04-24)
+
+### Why this was added
+
+- P3.1 guard started correctly identifying control-response intent (aileron/stick/handling prompts), but the backend still lacked a real handling workflow.
+- This created a capability gap: intent detection existed, but mode execution was still limited.
+
+### What changed
+
+**Backend deterministic analysis**
+
+- Added bounded handling/control-response calculator:
+  - `compute_handling_qualities_metrics(...)`
+  - `build_deterministic_handling_qualities_section(...)`
+  - file: `backend/app/analysis/deterministic.py`
+- Added deterministic control/response channel scoring and pairing heuristics:
+  - controls: aileron, elevator, rudder, stick lateral/longitudinal
+  - responses: roll/pitch/yaw rates, roll/pitch angles, heading
+- Added bounded pairing metrics:
+  - synchronized sample count
+  - control/response min/max/mean/std
+  - Pearson correlation
+  - bounded sample-lag correlation summary
+  - sign-alignment indicator
+  - simple anomaly flags (outliers, abrupt steps, low-correlation)
+- Added handling deterministic report section with explicit non-certification wording.
+
+**Routing and capability alignment**
+
+- Routed `analysis_mode=handling_qualities` through the new deterministic workflow in:
+  - `backend/app/routers/documents.py`
+- Handling mode now runs deterministic section first and can still use mode-aware RAG interpretation.
+- Updated capability catalog (`backend/app/capabilities.py`):
+  - `handling_qualities` moved from `partial` to bounded `implemented`
+  - authority set to deterministic-with-RAG-crosscheck
+  - required signal semantics clarified (`control_input`, `attitude_response`)
+  - explicit blocked rules and applicability boundaries added
+- Updated signal normalization for handling-related semantics.
+- Updated prompt-guard strict deterministic set to include `handling_qualities`.
+- Updated analysis-control logic so handling mode gets meaningful deterministic confidence handling.
+
+**Frontend**
+
+- Added handling quick option chip in AI Analysis panel:
+  - `Handling / Control Response`
+  - file: `frontend/src/pages/FlightTestDetail.tsx`
+- Existing prompt-to-mode guard + mode-truth UI remains in place.
+
+### Validation
+
+- Backend tests passed:
+  - `backend/tests/test_deterministic_calculators.py`
+  - `backend/tests/test_capability_catalog.py`
+  - `backend/tests/test_analysis_mode_routing.py`
+  - `backend/tests/test_analysis_modes.py`
+  - `backend/tests/test_prompt_mode_guard.py`
+- Frontend build passed:
+  - `pnpm -C frontend run build`
+
+### Engineering boundary (explicit)
+
+- Handling output is a bounded deterministic control-response assessment.
+- It is **not** a formal handling-qualities certification package and does not claim Cooper-Harper/MIL compliance substantiation.

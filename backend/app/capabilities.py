@@ -299,19 +299,65 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
         "handling_qualities": CapabilityDefinition(
             key="handling_qualities",
             label="Handling Qualities",
-            description="Handling qualities assessment scaffold; deterministic scoring not yet implemented.",
-            status=CapabilityImplementationStatus.PARTIAL,
-            authority=CapabilityAuthority.RAG_GUIDANCE_ONLY,
-            required_inputs=CapabilityRequiredInputs(
-                optional_signals=["control_surface_positions", "attitude_rates", "pilot_inputs"],
+            description=(
+                "Deterministic bounded control-response assessment from available control-input and "
+                "attitude/response channels, with optional standards-context interpretation."
             ),
-            blocked_rules=[],
-            applicability_boundaries=[
-                "Current output is guidance-only and not a formal handling-qualities rating."
+            status=CapabilityImplementationStatus.IMPLEMENTED,
+            authority=CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK,
+            required_inputs=CapabilityRequiredInputs(
+                required_signals=["control_input", "attitude_response"],
+                required_dataset_conditions=["synchronized_control_response_samples"],
+                optional_signals=[
+                    "angular_rate",
+                    "aileron",
+                    "elevator",
+                    "rudder",
+                    "stick_position",
+                    "roll_rate",
+                    "pitch_rate",
+                    "yaw_rate",
+                    "roll_angle",
+                    "pitch_angle",
+                    "heading",
+                ],
+            ),
+            blocked_rules=[
+                BlockedConditionRule(
+                    reason_key="missing_required_signals",
+                    description="Control-input and response channels are required.",
+                    user_message=(
+                        "Handling deterministic analysis requires at least one control-input channel and "
+                        "at least one response channel."
+                    ),
+                    outcome=CapabilityOutcome.BLOCKED,
+                ),
+                BlockedConditionRule(
+                    reason_key="insufficient_data_coverage",
+                    description="Control/response overlap is insufficient for bounded deterministic pairing.",
+                    user_message=(
+                        "Insufficient synchronized control-response coverage for bounded handling assessment."
+                    ),
+                    outcome=CapabilityOutcome.BLOCKED,
+                ),
             ],
-            default_limitations=["Formal rating methods are outside current implemented scope."],
+            applicability_boundaries=[
+                "Valid for bounded control-response trend assessment from available synchronized telemetry channels.",
+                "Not equivalent to formal handling-qualities certification or Cooper-Harper substantiation.",
+            ],
+            default_limitations=[
+                "Pairing uses deterministic channel-name heuristics and available synchronized samples.",
+                "Correlation/lag indicators are bounded engineering trends, not full dynamic system-identification.",
+                "Use with dedicated handling-qualities methods before making certification claims.",
+            ],
             output_contract=CapabilityOutputContract(
-                deterministic_metrics=[],
+                deterministic_metrics=[
+                    "pairings_analyzed",
+                    "pairing_results",
+                    "strongest_pairing",
+                    "strongest_abs_correlation",
+                    "anomaly_flags",
+                ],
                 standards_crosscheck_allowed=True,
             ),
         ),
@@ -471,6 +517,42 @@ def _normalize_signal_key(raw_signal: str) -> str:
         return "weight_on_wheels"
     if any(token in s for token in ["longitudinal_acceleration", "longitudinal accel", "x_accel", "x accel"]):
         return "longitudinal_acceleration"
+    if any(
+        token in s
+        for token in [
+            "control_input",
+            "control input",
+            "pilot_input",
+            "pilot input",
+            "aileron",
+            "elevator",
+            "rudder",
+            "stick",
+        ]
+    ):
+        return "control_input"
+    if any(
+        token in s
+        for token in [
+            "attitude_response",
+            "attitude response",
+            "roll_rate",
+            "roll rate",
+            "pitch_rate",
+            "pitch rate",
+            "yaw_rate",
+            "yaw rate",
+            "roll_angle",
+            "roll angle",
+            "pitch_angle",
+            "pitch angle",
+            "heading",
+            "yaw angle",
+        ]
+    ):
+        return "attitude_response"
+    if any(token in s for token in ["angular_rate", "angular rate", "p_rate", "q_rate", "r_rate"]):
+        return "angular_rate"
     if s in {"time_reference", "time"}:
         return "time_reference"
     return s.replace(" ", "_")

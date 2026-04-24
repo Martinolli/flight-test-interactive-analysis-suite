@@ -65,6 +65,9 @@ def test_get_analysis_modes_returns_catalog_backed_modes(client, auth_headers):
     buffet = next(item for item in payload if item["key"] == "buffet_vibration")
     assert buffet["capability_status"] == "implemented"
     assert buffet["authority"] == "deterministic_primary"
+    handling = next(item for item in payload if item["key"] == "handling_qualities")
+    assert handling["capability_status"] == "implemented"
+    assert handling["authority"] == "deterministic_with_rag_crosscheck"
 
 
 def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
@@ -384,6 +387,111 @@ def test_ai_analysis_general_mode_routes_without_takeoff_calculator(
     assert "Deterministic Takeoff Computation" not in body["analysis"]
     assert "analysis_mode=general" in body["analysis"]
     assert body["analysis_controls"]["applicability_status"] == "advisory_only"
+
+
+def test_ai_analysis_handling_mode_runs_deterministic_control_response_path(
+    client, db_session, test_user, auth_headers, monkeypatch
+):
+    flight_test = _create_flight_test_with_single_datapoint(db_session, test_user["id"])
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router.func, "stddev", lambda col: documents_router.func.avg(col))
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_takeoff_metrics",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("takeoff calculator must not run for handling mode")
+        ),
+    )
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_handling_qualities_metrics",
+        lambda **kwargs: {
+            "available": True,
+            "capability_key": "handling_qualities",
+            "capability_outcome": "allow_with_limitations",
+            "capability_authority": "deterministic_with_rag_crosscheck",
+            "capability_status": "implemented",
+            "capability_applicability_boundaries": [
+                "Bounded control-response trend summary only."
+            ],
+            "capability_limitations": [
+                "Not a formal certification handling-qualities rating."
+            ],
+            "pairings_analyzed": 2,
+            "pairing_results": [
+                {
+                    "pairing_key": "aileron->roll_rate",
+                    "control_channel_name": "AILERON DEFLECTION",
+                    "response_channel_name": "ROLL RATE",
+                    "samples": 42,
+                    "pearson_correlation": 0.72,
+                    "directionality": "positive_coupling",
+                    "best_lag_samples": 1,
+                    "best_lag_correlation": 0.76,
+                    "sign_alignment_ratio": 0.78,
+                    "anomaly_flags": [],
+                }
+            ],
+            "strongest_pairing": "aileron->roll_rate",
+            "strongest_abs_correlation": 0.72,
+            "control_channels_used": ["AILERON DEFLECTION", "STICK POSITION"],
+            "response_channels_used": ["ROLL RATE"],
+            "anomaly_flags": [],
+            "deterministic_assumptions": ["Bounded deterministic handling summary."],
+        },
+    )
+    monkeypatch.setattr(
+        documents_router,
+        "_build_deterministic_handling_qualities_section",
+        lambda metrics: (
+            "## Deterministic Calculation (Handling / Control-Response) [DATA]\n"
+            "- Pairings analyzed: 2\n"
+            "- Not formal handling-qualities certification substantiation."
+        ),
+    )
+
+    class _FakeMessage:
+        content = "Handling interpretation narrative."
+
+    class _FakeChoice:
+        message = _FakeMessage()
+
+    class _FakeCompletion:
+        choices = [_FakeChoice()]
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs):
+            return _FakeCompletion()
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        chat = _FakeChat()
+
+    monkeypatch.setattr(documents_router, "get_openai_client", lambda: _FakeClient())
+    monkeypatch.setattr(
+        documents_router,
+        "_call_retrieve_hybrid_sources",
+        lambda **kwargs: ([], "", {}),
+    )
+
+    response = client.post(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
+        json={
+            "analysis_mode": "handling_qualities",
+            "user_prompt": "Analyze aileron deflection and roll-rate control response behavior.",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["analysis_mode"] == "handling_qualities"
+    assert body["capability_key"] == "handling_qualities"
+    assert "Deterministic Calculation (Handling / Control-Response) [DATA]" in body["analysis"]
+    assert "Not formal handling-qualities certification substantiation." in body["analysis"]
 
 
 def test_ai_analysis_prompt_guard_strong_mismatch_downgrades_takeoff_to_general(

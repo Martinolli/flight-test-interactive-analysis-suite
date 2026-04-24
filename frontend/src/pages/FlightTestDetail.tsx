@@ -154,6 +154,11 @@ const QUICK_ANALYSIS_PRESETS: QuickAnalysisPreset[] = [
     text: 'Analyse the climb performance: rate of climb, climb gradient, engine parameters during climb, and fuel consumption.',
   },
   {
+    label: 'Handling / Control Response',
+    mode: 'handling_qualities',
+    text: 'Analyse control-response behavior using available control inputs (aileron, elevator, rudder, stick) and response channels (roll/pitch/yaw rates and angles), including coupling trends, lag cues, and anomalies.',
+  },
+  {
     label: 'Vibration & Loads',
     mode: 'buffet_vibration',
     text: 'Analyse structural loads and vibration data: identify any abnormal load factors, vibration frequencies, or exceedances of structural limits.',

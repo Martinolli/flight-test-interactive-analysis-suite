@@ -35,10 +35,12 @@ from sqlalchemy.orm import Session
 
 from app.analysis import (
     build_deterministic_buffet_vibration_section as _build_deterministic_buffet_vibration_section_impl,
+    build_deterministic_handling_qualities_section as _build_deterministic_handling_qualities_section_impl,
     build_deterministic_landing_section as _build_deterministic_landing_section_impl,
     build_deterministic_performance_section as _build_deterministic_performance_section_impl,
     build_deterministic_takeoff_section as _build_deterministic_takeoff_section_impl,
     compute_buffet_vibration_metrics as _compute_buffet_vibration_metrics_impl,
+    compute_handling_qualities_metrics as _compute_handling_qualities_metrics_impl,
     compute_landing_metrics as _compute_landing_metrics_impl,
     compute_performance_metrics as _compute_performance_metrics_impl,
     compute_takeoff_metrics as _compute_takeoff_metrics_impl,
@@ -1034,6 +1036,24 @@ def _build_deterministic_buffet_vibration_section(metrics: dict) -> str:
     return _build_deterministic_buffet_vibration_section_impl(metrics)
 
 
+def _compute_handling_qualities_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    return _compute_handling_qualities_metrics_impl(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        request_certification_result=request_certification_result,
+    )
+
+
+def _build_deterministic_handling_qualities_section(metrics: dict) -> str:
+    return _build_deterministic_handling_qualities_section_impl(metrics)
+
+
 # ---------------------------------------------------------------------------
 # Helper: parse and chunk a PDF with Docling
 # ---------------------------------------------------------------------------
@@ -2006,6 +2026,13 @@ def _default_analysis_goal_for_mode(mode: AnalysisModeDefinition) -> str:
             "(2) Parameter Analysis with notable observations, "
             "(3) Potential Anomalies or Concerns, (4) Recommendations."
         )
+    if mode.key == "handling_qualities":
+        return (
+            "Produce a handling/control-response engineering assessment with: "
+            "(1) deterministic pairing summary, (2) coupling and lag observations, "
+            "(3) anomaly indicators, (4) explicit limitations and applicability boundaries, "
+            "(5) recommended follow-up checks."
+        )
     if mode.key == "general":
         return (
             "Produce a structured engineering interpretation with standards cross-check, "
@@ -2505,6 +2532,15 @@ def ai_analysis(
         )
         deterministic_section = _build_deterministic_buffet_vibration_section(deterministic_metrics)
         run_llm = False
+    elif effective_mode.key == "handling_qualities":
+        deterministic_metrics = _compute_handling_qualities_metrics(
+            db=db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            request_certification_result=certification_requested,
+        )
+        deterministic_section = _build_deterministic_handling_qualities_section(deterministic_metrics)
+        run_llm = True
     else:
         deterministic_section = _build_non_takeoff_deterministic_section(
             mode=effective_mode,

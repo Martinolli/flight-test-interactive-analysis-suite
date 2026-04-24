@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from app.analysis import (
     compute_buffet_vibration_metrics,
+    compute_handling_qualities_metrics,
     compute_landing_metrics,
     compute_performance_metrics,
     compute_takeoff_metrics,
@@ -186,3 +187,61 @@ def test_buffet_vibration_calculator_returns_screening_output(db_session, test_u
     assert len(result["channel_summaries"]) >= 1
     assert "deterministic_metrics" in result
     assert len(result["deterministic_assumptions"]) > 0
+
+
+def test_handling_qualities_calculator_returns_control_response_pairings(db_session, test_user):
+    flight_test = _make_flight_test(db_session, test_user["id"], "Handling Calc Test")
+    stick = _make_parameter(db_session, "STICK LATERAL POSITION", "deg")
+    roll_rate = _make_parameter(db_session, "ROLL RATE", "deg/s")
+
+    base_ts = datetime(2026, 4, 20, 9, 0, 0)
+    stick_values = [-3.0, -2.2, -1.1, 0.0, 1.0, 2.3, 3.4, 4.2, 5.1, 6.0]
+    roll_values = [-7.0, -5.2, -2.9, -0.3, 1.9, 4.4, 6.8, 8.4, 10.2, 11.7]
+    for i, (control_val, response_val) in enumerate(zip(stick_values, roll_values)):
+        ts = base_ts + timedelta(seconds=i)
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=stick.id,
+                timestamp=ts,
+                value=control_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=roll_rate.id,
+                timestamp=ts,
+                value=response_val,
+            )
+        )
+    db_session.commit()
+
+    result = compute_handling_qualities_metrics(db_session, flight_test.id)
+    assert result["available"] is True
+    assert result["capability_key"] == "handling_qualities"
+    assert result["pairings_analyzed"] >= 1
+    assert len(result["pairing_results"]) >= 1
+    assert result["strongest_pairing"] is not None
+    assert len(result["deterministic_assumptions"]) > 0
+
+
+def test_handling_qualities_calculator_blocks_when_response_channels_missing(db_session, test_user):
+    flight_test = _make_flight_test(db_session, test_user["id"], "Handling Missing Response")
+    stick = _make_parameter(db_session, "STICK LATERAL POSITION", "deg")
+    base_ts = datetime(2026, 4, 20, 9, 30, 0)
+    for i, value in enumerate([-2.5, -1.0, 0.0, 1.5, 2.8, 3.1]):
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=stick.id,
+                timestamp=base_ts + timedelta(seconds=i),
+                value=value,
+            )
+        )
+    db_session.commit()
+
+    result = compute_handling_qualities_metrics(db_session, flight_test.id)
+    assert result["available"] is False
+    assert result["capability_key"] == "handling_qualities"
+    assert result["capability_reason_key"] == "missing_required_signals"

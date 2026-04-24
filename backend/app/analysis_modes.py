@@ -51,7 +51,7 @@ _ANALYSIS_MODES: Dict[str, AnalysisModeDefinition] = {
     "handling_qualities": AnalysisModeDefinition(
         key="handling_qualities",
         label="Handling Qualities",
-        description="Handling qualities mode routing.",
+        description="Bounded deterministic control-response handling analysis with explicit limitations.",
         capability_key="handling_qualities",
     ),
     "buffet_vibration": AnalysisModeDefinition(
