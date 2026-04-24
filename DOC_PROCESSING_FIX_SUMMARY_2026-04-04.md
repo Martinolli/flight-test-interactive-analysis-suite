@@ -2656,3 +2656,109 @@ pnpm -C frontend run build
 pytest backend/tests/test_analysis_controls.py backend/tests/test_documents_tenancy.py backend/tests/test_analysis_mode_routing.py backend/tests/test_admin_report_export.py -q
 pnpm -C frontend run build
 ```
+
+## P2.5 FRAT / Mission Risk Workflow (2026-04-24)
+
+### Completed
+
+- Added first operational FRAT workflow with deterministic scoring, hard-stop override logic, approval/finalization lifecycle, and immutable export.
+
+### Backend domain model + migration
+
+**Files changed:**
+
+- `backend/app/models.py`
+- `backend/migrations/20260424_add_frat_assessments.sql`
+
+**What changed:**
+
+- Added persisted `frat_assessments` entity with:
+  - `flight_test_id`, optional `dataset_version_id`
+  - workflow `status`
+  - persisted `input_snapshot_json`
+  - persisted `score_snapshot_json`
+  - persisted `hard_stop_snapshot_json`
+  - approval/rejection/finalization metadata
+  - immutable `finalized_snapshot_json`
+
+### Deterministic FRAT engine
+
+**File changed:**
+
+- `backend/app/frat.py`
+
+**What changed:**
+
+- Added explicit deterministic FRAT scoring model:
+  - category scoring
+  - manual adjustment
+  - analysis-control-derived penalty (consumes P2.4 controls)
+  - risk band + recommendation
+- Added hard-stop rules that override score recommendation to `no_go`.
+- Added lifecycle transition map for backend-enforced workflow states.
+
+### FRAT API workflow + immutable export
+
+**Files changed:**
+
+- `backend/app/routers/frat.py`
+- `backend/app/main.py`
+- `backend/app/routers/flight_tests.py`
+
+**What changed:**
+
+- New FRAT API surface:
+  - `POST /api/frat/assessments`
+  - `GET /api/frat/flight-tests/{flight_test_id}/assessments`
+  - `GET /api/frat/assessments/{assessment_id}`
+  - `PUT /api/frat/assessments/{assessment_id}`
+  - `POST /api/frat/assessments/{assessment_id}/score`
+  - `POST /api/frat/assessments/{assessment_id}/approve`
+  - `POST /api/frat/assessments/{assessment_id}/reject`
+  - `POST /api/frat/assessments/{assessment_id}/finalize`
+  - `GET /api/frat/assessments/{assessment_id}/report.pdf`
+  - `GET /api/frat/flight-tests/{flight_test_id}/analysis-jobs` (for evidence linking)
+- Finalization now persists immutable snapshot payload used by FRAT PDF export.
+- Finalized FRAT assessments are immutable in API updates.
+- Flight-test deletion now explicitly deletes FRAT rows before dataset-version deletion to avoid FK-order failures.
+
+### Frontend FRAT workspace (bounded first implementation)
+
+**Files changed:**
+
+- `frontend/src/pages/Frat.tsx` (new)
+- `frontend/src/App.tsx`
+- `frontend/src/components/Sidebar.tsx`
+- `frontend/src/services/api.ts`
+
+**What changed:**
+
+- Added new `/frat` page with:
+  - flight-test scoped FRAT assessment list
+  - open-by-ID flow
+  - draft input form (categories, flags, authority, notes)
+  - linked analysis-job evidence selector
+  - deterministic score execution
+  - hard-stop visibility
+  - approve/reject/finalize actions
+  - immutable finalized PDF export
+- Added sidebar navigation entry: `FRAT Risk`.
+- Added frontend API contracts for all FRAT endpoints.
+
+### Tests and validation
+
+**Files changed:**
+
+- `backend/tests/test_frat_workflow.py` (new)
+
+**Validation run:**
+
+```powershell
+pytest backend/tests/test_frat_workflow.py backend/tests/test_analysis_mode_routing.py backend/tests/test_flight_tests_comprehensive.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend: all selected tests passed (FRAT lifecycle + regression coverage included).
+- Frontend: production build passed.

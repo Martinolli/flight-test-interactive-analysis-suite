@@ -20,6 +20,7 @@ from app.models import (
     DataPoint,
     DatasetVersion,
     FlightTest,
+    FratAssessment,
     IngestionSession,
     TestParameter,
     User,
@@ -418,13 +419,17 @@ async def delete_flight_test(
         # Delete dependent rows explicitly in a safe order for current model graph:
         # 1) data points
         # 2) analysis jobs
-        # 3) dataset versions
-        # 4) ingestion sessions
-        # 5) flight test
+        # 3) FRAT assessments (may point to dataset versions)
+        # 4) dataset versions
+        # 5) ingestion sessions
+        # 6) flight test
         db.query(DataPoint).filter(DataPoint.flight_test_id == test_id).delete(
             synchronize_session=False
         )
         db.query(AnalysisJob).filter(AnalysisJob.flight_test_id == test_id).delete(
+            synchronize_session=False
+        )
+        db.query(FratAssessment).filter(FratAssessment.flight_test_id == test_id).delete(
             synchronize_session=False
         )
         db.query(DatasetVersion).filter(

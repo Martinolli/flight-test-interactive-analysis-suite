@@ -270,6 +270,90 @@ export interface AnalysisModeInfo {
   default: boolean;
 }
 
+export type FratAssessmentStatus =
+  | 'draft'
+  | 'scored'
+  | 'needs_review'
+  | 'approved'
+  | 'rejected'
+  | 'finalized';
+
+export interface FratAnalysisJobReference {
+  id: number;
+  analysis_mode: string;
+  capability_key?: string | null;
+  dataset_version_id?: number | null;
+  model_name?: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface FratAssessment {
+  id: number;
+  flight_test_id: number;
+  dataset_version_id?: number | null;
+  assessment_name?: string | null;
+  status: FratAssessmentStatus | string;
+  analysis_reference_ids: number[];
+  input_snapshot: {
+    categories?: Record<string, { score?: number; notes?: string }>;
+    manual_adjustment?: number;
+    critical_flags?: Record<string, boolean>;
+    requested_decision_authority?: 'authoritative' | 'advisory' | string;
+    reviewer_notes?: string;
+    override_note?: string;
+  };
+  score_snapshot: {
+    category_scores?: Record<string, number>;
+    base_score?: number;
+    manual_adjustment?: number;
+    analysis_indicator_score?: number;
+    total_score?: number;
+    risk_band?: string;
+    recommendation?: string;
+    hard_stop_triggered?: boolean;
+    hard_stops?: Array<{
+      code?: string;
+      severity?: string;
+      message?: string;
+      source?: string;
+    }>;
+    analysis_controls_used?: number;
+    model_notes?: string[];
+  };
+  hard_stop_snapshot: Array<{
+    code?: string;
+    severity?: string;
+    message?: string;
+    source?: string;
+  }>;
+  approval_notes?: string | null;
+  approved_by_id?: number | null;
+  approved_at?: string | null;
+  rejected_by_id?: number | null;
+  rejected_at?: string | null;
+  finalized_by_id?: number | null;
+  finalized_at?: string | null;
+  created_by_id: number;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface FratAssessmentCreatePayload {
+  flight_test_id: number;
+  dataset_version_id?: number | null;
+  assessment_name?: string | null;
+  analysis_job_ids?: number[];
+  inputs?: Record<string, unknown>;
+}
+
+export interface FratAssessmentUpdatePayload {
+  dataset_version_id?: number | null;
+  assessment_name?: string | null;
+  analysis_job_ids?: number[];
+  inputs?: Record<string, unknown>;
+}
+
 // ─── Admin Types ──────────────────────────────────────────────────────────────
 
 export interface AdminUser {
@@ -568,6 +652,94 @@ export class ApiService {
     return this.request<AnalysisJobResponse>(
       `/api/documents/flight-tests/${flightTestId}/ai-analysis/jobs/${analysisJobId}`
     );
+  }
+
+  // ─── FRAT / Mission Risk ────────────────────────────────────────────────
+
+  static async getFlightTestAnalysisJobs(
+    flightTestId: number
+  ): Promise<FratAnalysisJobReference[]> {
+    return this.request<FratAnalysisJobReference[]>(
+      `/api/frat/flight-tests/${flightTestId}/analysis-jobs`
+    );
+  }
+
+  static async getFratAssessments(flightTestId: number): Promise<FratAssessment[]> {
+    return this.request<FratAssessment[]>(`/api/frat/flight-tests/${flightTestId}/assessments`);
+  }
+
+  static async getFratAssessment(assessmentId: number): Promise<FratAssessment> {
+    return this.request<FratAssessment>(`/api/frat/assessments/${assessmentId}`);
+  }
+
+  static async createFratAssessment(
+    payload: FratAssessmentCreatePayload
+  ): Promise<FratAssessment> {
+    return this.request<FratAssessment>('/api/frat/assessments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async updateFratAssessment(
+    assessmentId: number,
+    payload: FratAssessmentUpdatePayload
+  ): Promise<FratAssessment> {
+    return this.request<FratAssessment>(`/api/frat/assessments/${assessmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async scoreFratAssessment(assessmentId: number): Promise<FratAssessment> {
+    return this.request<FratAssessment>(`/api/frat/assessments/${assessmentId}/score`, {
+      method: 'POST',
+    });
+  }
+
+  static async approveFratAssessment(
+    assessmentId: number,
+    notes?: string
+  ): Promise<FratAssessment> {
+    return this.request<FratAssessment>(`/api/frat/assessments/${assessmentId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes ?? null }),
+    });
+  }
+
+  static async rejectFratAssessment(
+    assessmentId: number,
+    notes?: string
+  ): Promise<FratAssessment> {
+    return this.request<FratAssessment>(`/api/frat/assessments/${assessmentId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes ?? null }),
+    });
+  }
+
+  static async finalizeFratAssessment(
+    assessmentId: number,
+    notes?: string
+  ): Promise<FratAssessment> {
+    return this.request<FratAssessment>(`/api/frat/assessments/${assessmentId}/finalize`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes ?? null }),
+    });
+  }
+
+  static async exportFratAssessmentPDF(assessmentId: number): Promise<Blob> {
+    const token = AuthService.getAccessToken();
+    const response = await fetch(`${API_BASE_URL}/api/frat/assessments/${assessmentId}/report.pdf`, {
+      method: 'GET',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'FRAT PDF export failed' }));
+      throw new Error(err.detail || `FRAT PDF export failed with status ${response.status}`);
+    }
+    return response.blob();
   }
 
   // ─── PDF Export ───────────────────────────────────────────────────────────

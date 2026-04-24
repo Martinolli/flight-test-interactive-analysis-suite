@@ -330,20 +330,49 @@
   - PDF report analysis summary now includes control fields (result strength, confidence, coverage, applicability, warning level, downgrade reason) plus control notice for caution/high.
   - Added focused tests for deterministic confidence, retrieval coverage, applicability outcomes, warning severity, and saved-job/report compatibility.
 
-- [ ] P2.5 Add FRAT / mission risk workflow
-  - Deterministic scoring, hard-stops, approval/finalization, immutable snapshot export.
+- [x] P2.5 Add FRAT / mission risk workflow
+  - Added persisted backend FRAT model (`frat_assessments`) + migration:
+    - assessment lifecycle state
+    - input snapshot
+    - score snapshot
+    - hard-stop snapshot
+    - approval/finalization metadata
+    - finalized immutable snapshot payload
+  - Added deterministic FRAT scoring engine (`backend/app/frat.py`):
+    - category scoring + manual adjustment
+    - analysis-control-derived penalty
+    - risk band + recommendation
+    - explicit hard-stop override rules
+  - Added FRAT API router (`/api/frat/*`) with backend-enforced workflow:
+    - create/list/get/update draft
+    - score
+    - approve/reject/finalize transitions
+    - finalized immutable PDF export
+    - flight-test-scoped analysis-job reference listing for evidence linking
+  - Added frontend FRAT workspace (`/frat`):
+    - draft input editing
+    - linked analysis selection
+    - score + hard-stop visibility
+    - approve/reject/finalize controls
+    - finalized PDF download
+  - Added focused regression coverage for:
+    - FRAT lifecycle transitions
+    - hard-stop approval block behavior
+    - finalization immutability
+    - analysis-job reference mode decoding
+    - deletion cascade safety with FRAT rows
 
 ---
 
 ## Immediate Execution Order
 
-1. P2.5 — Add FRAT / mission risk workflow  
+1. P2.6 — AI mitigation drafting assistant (advisory only)
 
 - **Reason for this order**
 
 - P1.3 is completed with linked cursor, thresholds, event markers, compare-dataset overlays, and improved export fidelity.
 - P1.4 and P1.4a are completed for report professionalism + wording hardening.
-- P2.1/P2.2/P2.3/P2.4 foundations are complete; next impact is FRAT workflow execution.
+- P2.1/P2.2/P2.3/P2.4/P2.5 are complete; next impact is mitigation-assistant guidance flow (P2.6).
 
 ---
 

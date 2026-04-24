@@ -9,6 +9,7 @@ import {
   BookOpen,
   Sparkles,
   ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +31,7 @@ export default function Sidebar({ children }: SidebarProps) {
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
         { name: 'Upload Data', href: '/upload', icon: Upload },
         { name: 'Parameters', href: '/parameters', icon: BarChart3 },
+        { name: 'FRAT Risk', href: '/frat', icon: ShieldAlert },
       ],
     },
     {

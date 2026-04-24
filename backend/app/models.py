@@ -99,6 +99,11 @@ class FlightTest(Base):
         back_populates="flight_test",
         cascade="all, delete-orphan",
     )
+    frat_assessments = relationship(
+        "FratAssessment",
+        back_populates="flight_test",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return (
@@ -393,9 +398,60 @@ class DatasetVersion(Base):
         foreign_keys="IngestionSession.dataset_version_id",
     )
     analysis_jobs = relationship("AnalysisJob", back_populates="dataset_version")
+    frat_assessments = relationship("FratAssessment", back_populates="dataset_version")
 
     def __repr__(self):
         return (
             f"<DatasetVersion(id={self.id}, flight_test_id={self.flight_test_id}, "
             f"version_number={self.version_number}, status={self.status})>"
+        )
+
+
+class FratAssessment(Base):
+    """Persisted FRAT / mission-risk workflow artifact."""
+
+    __tablename__ = "frat_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flight_test_id = Column(
+        Integer,
+        ForeignKey("flight_tests.id"),
+        nullable=False,
+        index=True,
+    )
+    dataset_version_id = Column(
+        Integer,
+        ForeignKey("dataset_versions.id"),
+        nullable=True,
+        index=True,
+    )
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="draft")
+    assessment_name = Column(String(255), nullable=True)
+    analysis_reference_ids_json = Column(Text, nullable=False, default="[]")
+    input_snapshot_json = Column(Text, nullable=False, default="{}")
+    score_snapshot_json = Column(Text, nullable=False, default="{}")
+    hard_stop_snapshot_json = Column(Text, nullable=False, default="[]")
+    approval_notes = Column(Text, nullable=True)
+    approved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    rejected_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    rejected_at = Column(DateTime(timezone=True), nullable=True)
+    finalized_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    finalized_at = Column(DateTime(timezone=True), nullable=True)
+    finalized_snapshot_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    flight_test = relationship("FlightTest", back_populates="frat_assessments")
+    dataset_version = relationship("DatasetVersion", back_populates="frat_assessments")
+    created_by = relationship("User", foreign_keys=[created_by_id], backref="frat_assessments")
+    approved_by = relationship("User", foreign_keys=[approved_by_id], backref="approved_frat_assessments")
+    rejected_by = relationship("User", foreign_keys=[rejected_by_id], backref="rejected_frat_assessments")
+    finalized_by = relationship("User", foreign_keys=[finalized_by_id], backref="finalized_frat_assessments")
+
+    def __repr__(self):
+        return (
+            f"<FratAssessment(id={self.id}, flight_test_id={self.flight_test_id}, "
+            f"status={self.status})>"
         )

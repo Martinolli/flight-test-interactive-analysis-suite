@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import DocumentLibrary from './pages/DocumentLibrary';
 import AIQuery from './pages/AIQuery';
 import AdminUsers from './pages/AdminUsers';
+import Frat from './pages/Frat';
 
 function App() {
   return (
@@ -71,6 +72,12 @@ function App() {
         <Route path="/admin/users">
           <ProtectedRoute>
             <AdminUsers />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/frat">
+          <ProtectedRoute>
+            <Frat />
           </ProtectedRoute>
         </Route>
 
