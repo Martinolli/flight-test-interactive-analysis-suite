@@ -146,3 +146,24 @@ def test_handling_qualities_capability_is_bounded_deterministic():
     combined = " ".join(allowed_eval.applicability_boundaries).lower()
     assert "control-response trend assessment" in combined
     assert "not equivalent to formal handling-qualities certification" in combined
+
+
+def test_flutter_support_capability_is_bounded_and_non_clearance():
+    cap = get_capability_definition("flutter_support")
+    assert cap is not None
+    assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
+    assert cap.authority == CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK
+    assert "frequency_features" in cap.required_inputs.optional_signals
+    assert "concern_indicators" in cap.output_contract.deterministic_metrics
+
+    evaluation = evaluate_capability_request(
+        "flutter_support",
+        available_signals=["accelerometers", "angular_rate", "airspeed_context"],
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    assert evaluation.outcome == CapabilityOutcome.ALLOW_WITH_LIMITATIONS
+    combined = " ".join(evaluation.applicability_boundaries).lower()
+    assert "pre-screening" in combined
+    assert "not sufficient for flutter clearance" in combined

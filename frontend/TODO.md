@@ -145,7 +145,19 @@ These should be protected from regression.
   * regime segmentation and bounded frequency-screening narrative
 * Frontend keeps screening-only boundary clear and does not imply flutter clearance or formal substantiation.
 
-### P3.5 FRAT usability hardening
+### P3.5 Flutter-support pre-screening UX alignment ✅
+
+* Added frontend-facing support for bounded flutter mode usage:
+
+  * `Flutter Support Pre-screen` quick analysis preset in AI Analysis panel
+  * local prompt-intent detection now distinguishes `flutter` from generic buffet/vibration intent
+  * mode suggestions align better with backend prompt-mode guard for aeroelastic/flutter prompts
+* UX boundary preserved:
+
+  * flutter mode is presented as screening/support workflow, not clearance-capable certification workflow
+  * capability-status badges remain backend-truth-driven
+
+### P3.5a FRAT usability hardening
 
 * Improve FRAT input clarity and operator guidance.
 * Add a clear user checklist / guided sequence for FRAT workflow:
@@ -191,10 +203,10 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P3.5 — FRAT usability hardening**
-2. **P3.6 — Report/control readability polish**
-3. **P3.3 — Atmosphere / air-data support UX**
-4. **P3.7 — Manual / help integration**
+1. **P3.6 — Report/control readability polish**
+2. **P3.7 — Manual / help integration**
+3. **P3.5a — FRAT usability hardening**
+4. **P3.3 — Atmosphere / air-data support UX**
 
 ---
 
@@ -203,6 +215,7 @@ These should be protected from regression.
 * FRAT workflow is operational, but the user needs a clearer checklist and field guidance.
 * Prompt/mode mismatch is now surfaced pre-run and with backend-authoritative guard state after run.
 * Handling/control-response mode is now exposed in AI Analysis quick options with bounded deterministic backend support.
+* Flutter-support pre-screening mode is now exposed in AI Analysis quick options with bounded non-clearance wording.
 * Current reports expose useful control information, but frontend/report wording still needs polish:
 
   * enum-style labels should become user-friendly

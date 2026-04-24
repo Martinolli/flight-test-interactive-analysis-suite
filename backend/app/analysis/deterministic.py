@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 import re
 from collections import defaultdict
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -1503,6 +1504,26 @@ def _series_time_steps_seconds(series: List[Tuple[Any, float]]) -> List[float]:
     return steps
 
 
+def _lookup_nearest_series_value(
+    series: List[Tuple[Any, float]],
+    target_ts: datetime,
+    *,
+    max_gap_s: float = 0.75,
+) -> Optional[float]:
+    if not series:
+        return None
+    best_value: Optional[float] = None
+    best_gap: Optional[float] = None
+    for ts, value in series:
+        gap = abs((ts - target_ts).total_seconds())
+        if best_gap is None or gap < best_gap:
+            best_gap = gap
+            best_value = float(value)
+    if best_gap is None or best_gap > max_gap_s:
+        return None
+    return best_value
+
+
 def _estimate_frequency_screening(
     series: List[Tuple[Any, float]],
 ) -> Dict[str, Any]:
@@ -1975,6 +1996,307 @@ def compute_buffet_vibration_metrics(
                 "Regime segmentation is a bounded heuristic based on WOW and speed-band cues when available.",
                 "Frequency-domain summaries are produced only when cadence regularity and sample coverage are adequate.",
                 "Output is screening support only and does not represent formal loads substantiation or flutter clearance.",
+            ],
+        ),
+        evaluation,
+    )
+
+
+def compute_flutter_support_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    """Compute bounded flutter-support pre-screening from available telemetry."""
+    del request_certification_result
+
+    params = _load_parameter_catalog(db, flight_test_id, dataset_version_id)
+    if not params:
+        return _unavailable_metrics(
+            capability_key="flutter_support",
+            reason="No parameters found for flight test.",
+            available_signals=[],
+            has_dataset=False,
+        )
+
+    buffet = compute_buffet_vibration_metrics(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        request_certification_result=False,
+    )
+    if not buffet.get("available"):
+        return _unavailable_metrics(
+            capability_key="flutter_support",
+            reason=(
+                "Flutter-support pre-screening requires vibration/response channels; "
+                "baseline buffet/vibration screening is unavailable."
+            ),
+            available_signals=[],
+            has_dataset=True,
+            has_time_series_continuity=False,
+            data_coverage_ok=False,
+        )
+
+    channel_summaries = list(buffet.get("channel_summaries") or [])
+    grouped_summaries = list(buffet.get("grouped_channel_summaries") or [])
+    anomaly_windows = sorted(
+        list(buffet.get("anomaly_windows") or []),
+        key=lambda item: float(item.get("peak_deviation") or 0.0),
+        reverse=True,
+    )
+    dominant_ranked = list(buffet.get("dominant_channels_ranked") or [])
+    regimes = list(buffet.get("regime_segmentation_summary") or [])
+    frequency = dict(buffet.get("frequency_screening") or {})
+
+    available_signals = set()
+    groups = {str(item.get("group") or "") for item in channel_summaries}
+    if groups.intersection({"accelerations", "structural_vibration"}):
+        available_signals.add("accelerometers")
+    if "angular_rates" in groups:
+        available_signals.add("angular_rate")
+    if bool(frequency.get("available")):
+        available_signals.add("frequency_features")
+
+    ground_speed_id = _choose_param_id(params, _score_ground_speed)
+    cas_id = _choose_param_id(params, _score_cas)
+    tas_id = _choose_param_id(params, _score_tas)
+    mach_id = _choose_param_id(params, _score_mach)
+    altitude_id = _choose_param_id(params, _score_pressure_altitude)
+    wow_ids = [p["id"] for p in params if _score_wow(p["name"], p.get("unit")) > 0]
+
+    support_ids = {
+        pid
+        for pid in [ground_speed_id, cas_id, tas_id, mach_id, altitude_id, *wow_ids]
+        if pid is not None
+    }
+    support_series: Dict[int, List[Tuple[Any, float]]] = defaultdict(list)
+    if support_ids:
+        support_rows = _load_timeseries_rows(
+            db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            parameter_ids=support_ids,
+        )
+        for row in support_rows:
+            support_series[int(row.parameter_id)].append((row.timestamp, float(row.value)))
+        for pid in list(support_series.keys()):
+            support_series[pid].sort(key=lambda item: item[0])
+
+    if any(pid is not None for pid in [ground_speed_id, cas_id, tas_id, mach_id]):
+        available_signals.add("airspeed_context")
+    if altitude_id is not None:
+        available_signals.add("altitude_context")
+    if wow_ids:
+        available_signals.add("weight_on_wheels")
+
+    dominant_windows: List[Dict[str, Any]] = []
+    for window in anomaly_windows[:5]:
+        midpoint_raw = window.get("midpoint_timestamp")
+        midpoint_dt: Optional[datetime] = None
+        if isinstance(midpoint_raw, str):
+            try:
+                midpoint_dt = datetime.fromisoformat(midpoint_raw)
+            except ValueError:
+                midpoint_dt = None
+        context: Dict[str, Optional[float]] = {
+            "ground_speed_kt": None,
+            "cas_kt": None,
+            "tas_kt": None,
+            "mach": None,
+            "pressure_altitude_ft": None,
+            "mean_wow": None,
+        }
+        if midpoint_dt is not None:
+            if ground_speed_id is not None:
+                context["ground_speed_kt"] = _lookup_nearest_series_value(
+                    support_series.get(ground_speed_id, []), midpoint_dt
+                )
+            if cas_id is not None:
+                context["cas_kt"] = _lookup_nearest_series_value(
+                    support_series.get(cas_id, []), midpoint_dt
+                )
+            if tas_id is not None:
+                context["tas_kt"] = _lookup_nearest_series_value(
+                    support_series.get(tas_id, []), midpoint_dt
+                )
+            if mach_id is not None:
+                context["mach"] = _lookup_nearest_series_value(
+                    support_series.get(mach_id, []), midpoint_dt
+                )
+            if altitude_id is not None:
+                context["pressure_altitude_ft"] = _lookup_nearest_series_value(
+                    support_series.get(altitude_id, []), midpoint_dt
+                )
+            wow_values = [
+                _lookup_nearest_series_value(support_series.get(wid, []), midpoint_dt)
+                for wid in wow_ids
+            ]
+            wow_values = [value for value in wow_values if value is not None]
+            if wow_values:
+                context["mean_wow"] = round(sum(wow_values) / len(wow_values), 4)
+
+        dominant_windows.append(
+            {
+                "start_timestamp": window.get("start_timestamp"),
+                "end_timestamp": window.get("end_timestamp"),
+                "channel_name": window.get("channel_name"),
+                "channel_group": window.get("channel_group"),
+                "regime": window.get("regime"),
+                "peak_abs": window.get("peak_abs"),
+                "peak_deviation": window.get("peak_deviation"),
+                "samples": window.get("samples"),
+                "context": {
+                    key: (round(float(value), 4) if value is not None else None)
+                    for key, value in context.items()
+                },
+            }
+        )
+
+    concern_indicators: List[Dict[str, Any]] = []
+    high_speed_regimes = [
+        item
+        for item in regimes
+        if int(item.get("events_detected") or 0) > 0
+        and "high_speed" in str(item.get("regime") or "")
+    ]
+    if high_speed_regimes:
+        concern_indicators.append(
+            {
+                "key": "high_speed_regime_event_concentration",
+                "severity": "high",
+                "message": (
+                    "Anomaly windows are concentrated in high-speed regimes; dedicated flutter investigation is recommended."
+                ),
+                "evidence_count": len(high_speed_regimes),
+            }
+        )
+    if len(anomaly_windows) >= 4:
+        concern_indicators.append(
+            {
+                "key": "multiple_significant_event_windows",
+                "severity": "caution",
+                "message": "Multiple significant oscillatory windows were detected across screened channels.",
+                "evidence_count": len(anomaly_windows),
+            }
+        )
+
+    channels_with_exceedances = int(buffet.get("channels_with_exceedances") or 0)
+    if channels_with_exceedances >= 3:
+        concern_indicators.append(
+            {
+                "key": "multi_channel_exceedance_pattern",
+                "severity": "caution",
+                "message": (
+                    "Exceedance patterns are present in several channels, indicating elevated oscillatory activity."
+                ),
+                "evidence_count": channels_with_exceedances,
+            }
+        )
+
+    frequency_highlights: List[Dict[str, Any]] = []
+    repeated_peak_channels = 0
+    repeated_peak_value: Optional[float] = None
+    freq_items = list(frequency.get("channel_summaries") or [])
+    if freq_items:
+        freq_values = [
+            float(item.get("dominant_frequency_hz"))
+            for item in freq_items
+            if item.get("dominant_frequency_hz") is not None
+        ]
+        for item in freq_items[:4]:
+            frequency_highlights.append(
+                {
+                    "channel": item.get("channel"),
+                    "group": item.get("group"),
+                    "dominant_frequency_hz": item.get("dominant_frequency_hz"),
+                    "dominant_amplitude": item.get("dominant_amplitude"),
+                    "band_energy_distribution": item.get("band_energy_distribution"),
+                }
+            )
+        if freq_values:
+            for seed in freq_values:
+                cluster = [value for value in freq_values if abs(value - seed) <= 0.6]
+                if len(cluster) > repeated_peak_channels:
+                    repeated_peak_channels = len(cluster)
+                    repeated_peak_value = sum(cluster) / len(cluster)
+        if repeated_peak_channels >= 2 and repeated_peak_value is not None:
+            concern_indicators.append(
+                {
+                    "key": "repeated_narrow_band_frequency_peak",
+                    "severity": "caution",
+                    "message": (
+                        "Repeated dominant frequency peaks were observed across channels; verify with dedicated flutter methods."
+                    ),
+                    "evidence_count": repeated_peak_channels,
+                    "dominant_cluster_hz": round(repeated_peak_value, 4),
+                }
+            )
+
+    concern_level = "low"
+    if any(str(item.get("severity")) == "high" for item in concern_indicators):
+        concern_level = "elevated"
+    elif len(concern_indicators) >= 2:
+        concern_level = "moderate"
+    elif len(concern_indicators) == 1:
+        concern_level = "watch"
+
+    regime_context = [
+        {
+            "regime": item.get("regime"),
+            "events_detected": item.get("events_detected"),
+            "dominant_channel": item.get("dominant_channel"),
+            "dominant_peak_abs": item.get("dominant_peak_abs"),
+            "mean_speed_kt": item.get("mean_speed_kt"),
+            "mean_wow": item.get("mean_wow"),
+        }
+        for item in sorted(
+            regimes,
+            key=lambda value: int(value.get("events_detected") or 0),
+            reverse=True,
+        )[:5]
+    ]
+
+    evaluation = evaluate_capability_request(
+        "flutter_support",
+        available_signals=available_signals,
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    return _result_with_capability(
+        DeterministicCalculatorResult(
+            available=True,
+            metrics={
+                "available": True,
+                "screening_basis": "flutter_support_pre_screening",
+                "source_screening_mode": "buffet_vibration_hardened",
+                "channels_screened": int(buffet.get("channels_screened") or 0),
+                "channels_screened_names": [item.get("name") for item in channel_summaries if item.get("name")],
+                "channel_groups_screened": sorted(
+                    {str(item.get("group")) for item in channel_summaries if item.get("group")}
+                ),
+                "dominant_channels_ranked": dominant_ranked[:5],
+                "dominant_windows": dominant_windows,
+                "regime_context_summary": regime_context,
+                "frequency_screening_highlights": frequency_highlights,
+                "concern_indicators": concern_indicators,
+                "concern_indicator_count": len(concern_indicators),
+                "concern_level": concern_level,
+                "channels_with_exceedances": channels_with_exceedances,
+                "samples_used": int(buffet.get("samples_used") or 0),
+                "follow_up_recommendation": (
+                    "Escalate to dedicated aeroelastic/flutter engineering review before any envelope expansion decisions."
+                    if concern_level in {"elevated", "moderate"}
+                    else "Continue bounded monitoring and corroborate with dedicated flutter methods for formal decisions."
+                ),
+            },
+            assumptions=[
+                "Flutter-support mode reuses deterministic buffet/vibration screening metrics and bounded regime/frequency cues.",
+                "Concern indicators are heuristic pre-screening observations and do not represent formal aeroelastic instability determination.",
+                "Frequency-domain highlights are screening-level and require suitable sample cadence/instrument quality.",
+                "Output is engineering-support pre-screening only; formal flutter clearance requires dedicated methods and evidence.",
             ],
         ),
         evaluation,
@@ -2685,6 +3007,121 @@ def build_deterministic_buffet_vibration_section(metrics: dict) -> str:
         lines.append("- Skipped channels:")
         for item in skipped_freq:
             lines.append(f"  - {item.get('channel')}: {item.get('reason')}")
+
+    applicability = metrics.get("capability_applicability_boundaries") or []
+    limitations = metrics.get("capability_limitations") or []
+    if applicability:
+        lines.extend(["", "### Applicability Boundaries"])
+        for item in applicability:
+            lines.append(f"- {item}")
+    if limitations:
+        lines.extend(["", "### Limitations"])
+        for item in limitations:
+            lines.append(f"- {item}")
+    assumptions = metrics.get("deterministic_assumptions") or []
+    if assumptions:
+        lines.extend(["", "### Assumptions"])
+        for item in assumptions:
+            lines.append(f"- {item}")
+    return "\n".join(lines)
+
+
+def build_deterministic_flutter_support_section(metrics: dict) -> str:
+    if not metrics.get("available"):
+        return _build_unavailable_section(
+            "## Deterministic Calculation (Flutter-Support Pre-Screening) [DATA]",
+            metrics,
+        )
+
+    concern_level = str(metrics.get("concern_level") or "low")
+    lines = [
+        "## Deterministic Calculation (Flutter-Support Pre-Screening) [DATA]",
+        "",
+        "### Result Classification",
+        "- Result type: **Flutter-support deterministic pre-screening summary**",
+        "- Classification: **Bounded engineering support only**",
+        "- This output is **not** flutter clearance, **not** modal-identification certification, and **not** aeroelastic substantiation.",
+        "- Applicability boundary: suitable only for pre-screening concern cues and follow-up planning.",
+        "",
+        "### Screening Coverage",
+        f"- Channels screened: **{metrics.get('channels_screened')}**",
+        "- Channel groups: "
+        + (", ".join(metrics.get("channel_groups_screened") or []) or "n/a"),
+        f"- Samples used: **{metrics.get('samples_used', 'n/a')}**",
+        f"- Concern level: **{concern_level}**",
+        "",
+        "### Dominant Channels",
+    ]
+
+    for item in metrics.get("dominant_channels_ranked", []):
+        lines.append(
+            (
+                f"- #{item.get('rank')} {item.get('name')} [{item.get('group')}] -> "
+                f"peak_abs={item.get('peak_abs')}, rms={item.get('rms')}, "
+                f"exceedances={item.get('exceedance_count')}"
+            )
+        )
+
+    windows = metrics.get("dominant_windows") or []
+    if windows:
+        lines.extend(["", "### Significant Screening Windows"])
+        for event in windows:
+            context = event.get("context") or {}
+            lines.append(
+                (
+                    f"- {event.get('start_timestamp')} -> {event.get('end_timestamp')}: "
+                    f"{event.get('channel_name')} [{event.get('channel_group')}], "
+                    f"peak_abs={event.get('peak_abs')}, peak_deviation={event.get('peak_deviation')}, "
+                    f"regime={event.get('regime')}, "
+                    f"Mach={context.get('mach')}, CAS={context.get('cas_kt')}, "
+                    f"TAS={context.get('tas_kt')}, GS={context.get('ground_speed_kt')}, "
+                    f"PA={context.get('pressure_altitude_ft')}, WOW={context.get('mean_wow')}"
+                )
+            )
+
+    regime_summary = metrics.get("regime_context_summary") or []
+    if regime_summary:
+        lines.extend(["", "### Regime Context Summary"])
+        for item in regime_summary:
+            lines.append(
+                (
+                    f"- {item.get('regime')}: events={item.get('events_detected')}, "
+                    f"dominant={item.get('dominant_channel')}, peak_abs={item.get('dominant_peak_abs')}, "
+                    f"mean_speed_kt={item.get('mean_speed_kt')}, mean_wow={item.get('mean_wow')}"
+                )
+            )
+
+    frequency = metrics.get("frequency_screening_highlights") or []
+    lines.extend(["", "### Frequency Screening Highlights (Bounded)"])
+    if frequency:
+        for item in frequency:
+            lines.append(
+                (
+                    f"- {item.get('channel')} [{item.get('group')}]: "
+                    f"dominant_frequency={item.get('dominant_frequency_hz')} Hz, "
+                    f"dominant_amplitude={item.get('dominant_amplitude')}, "
+                    f"band_energy={item.get('band_energy_distribution')}"
+                )
+            )
+    else:
+        lines.append("- No bounded frequency highlights were available for this pre-screening run.")
+
+    concern_indicators = metrics.get("concern_indicators") or []
+    lines.extend(["", "### Concern Indicators"])
+    if concern_indicators:
+        for item in concern_indicators:
+            lines.append(
+                (
+                    f"- [{item.get('severity')}] {item.get('message')} "
+                    f"(key={item.get('key')}, evidence_count={item.get('evidence_count')})"
+                )
+            )
+    else:
+        lines.append("- No strong flutter-support concern indicators were triggered by bounded screening rules.")
+
+    if metrics.get("follow_up_recommendation"):
+        lines.extend(["", "### Follow-Up Recommendation"])
+        lines.append(f"- {metrics.get('follow_up_recommendation')}")
 
     applicability = metrics.get("capability_applicability_boundaries") or []
     limitations = metrics.get("capability_limitations") or []

@@ -114,3 +114,36 @@ def test_blocked_takeoff_controls_escalate_to_high_and_blocked():
     assert controls.warning_level == WarningLevel.HIGH
     assert controls.result_strength == ResultStrength.BLOCKED
     assert controls.blocking_or_downgrade_reason == "missing_required_signals"
+
+
+def test_flutter_controls_escalate_warning_when_concern_indicators_are_high():
+    capability_eval = evaluate_capability_request(
+        "flutter_support",
+        available_signals=["accelerometers", "angular_rate", "airspeed_context"],
+        has_dataset=True,
+        has_time_series_continuity=True,
+        data_coverage_ok=True,
+    )
+    controls = evaluate_analysis_controls(
+        mode_key="flutter",
+        capability_eval=capability_eval,
+        deterministic_metrics={
+            "available": True,
+            "channels_screened": 4,
+            "samples_used": 180,
+            "concern_level": "elevated",
+            "concern_indicator_count": 2,
+            "concern_indicators": [{"severity": "high", "key": "high_speed_regime_event_concentration"}],
+            "dominant_windows": [{"channel_name": "AIRFRAME VIBRATION"}],
+        },
+        retrieved_sources=[],
+        cited_source_ids=[],
+        retrieval_debug={},
+    )
+
+    assert controls.deterministic_confidence in {
+        DeterministicConfidence.MEDIUM,
+        DeterministicConfidence.HIGH,
+    }
+    assert controls.warning_level == WarningLevel.HIGH
+    assert controls.result_strength in {ResultStrength.BOUNDED, ResultStrength.BLOCKED}

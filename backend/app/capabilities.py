@@ -462,19 +462,43 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
         "flutter_support": CapabilityDefinition(
             key="flutter_support",
             label="Flutter Support",
-            description="Flutter-support pre-assessment scaffold; clearance computation not implemented.",
-            status=CapabilityImplementationStatus.BLOCKED,
-            authority=CapabilityAuthority.NOT_SUPPORTED,
+            description=(
+                "Deterministic flutter-support pre-screening from oscillatory telemetry cues, "
+                "with explicit non-clearance boundaries."
+            ),
+            status=CapabilityImplementationStatus.IMPLEMENTED,
+            authority=CapabilityAuthority.DETERMINISTIC_WITH_RAG_CROSSCHECK,
             required_inputs=CapabilityRequiredInputs(
-                optional_signals=["flutter_test_instrumentation", "modal_features"],
+                optional_signals=[
+                    "accelerometers",
+                    "angular_rate",
+                    "control_surface_deflection",
+                    "airspeed_context",
+                    "altitude_context",
+                    "frequency_features",
+                    "weight_on_wheels",
+                ],
             ),
             blocked_rules=[],
             applicability_boundaries=[
-                "Not sufficient for flutter clearance or formal aeroelastic certification."
+                "Valid only for bounded flutter-support pre-screening observations from available telemetry.",
+                "Not sufficient for flutter clearance, modal-identification certification, or formal aeroelastic substantiation.",
             ],
-            default_limitations=["Current release does not implement flutter determination logic."],
+            default_limitations=[
+                "Concern indicators are bounded heuristic screening cues and do not establish flutter onset.",
+                "Frequency summaries are screening-level and depend on sample cadence and sensor integrity.",
+                "Regime/context association is observational and not causal proof of aeroelastic instability.",
+                "Dedicated flutter/aeroelastic analysis methods are required before any envelope-expansion or clearance decision.",
+            ],
             output_contract=CapabilityOutputContract(
-                deterministic_metrics=[],
+                deterministic_metrics=[
+                    "channels_screened",
+                    "dominant_windows",
+                    "regime_context_summary",
+                    "frequency_screening_highlights",
+                    "concern_indicators",
+                    "concern_level",
+                ],
                 standards_crosscheck_allowed=True,
             ),
         ),

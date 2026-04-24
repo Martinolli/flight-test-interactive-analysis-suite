@@ -35,11 +35,13 @@ from sqlalchemy.orm import Session
 
 from app.analysis import (
     build_deterministic_buffet_vibration_section as _build_deterministic_buffet_vibration_section_impl,
+    build_deterministic_flutter_support_section as _build_deterministic_flutter_support_section_impl,
     build_deterministic_handling_qualities_section as _build_deterministic_handling_qualities_section_impl,
     build_deterministic_landing_section as _build_deterministic_landing_section_impl,
     build_deterministic_performance_section as _build_deterministic_performance_section_impl,
     build_deterministic_takeoff_section as _build_deterministic_takeoff_section_impl,
     compute_buffet_vibration_metrics as _compute_buffet_vibration_metrics_impl,
+    compute_flutter_support_metrics as _compute_flutter_support_metrics_impl,
     compute_handling_qualities_metrics as _compute_handling_qualities_metrics_impl,
     compute_landing_metrics as _compute_landing_metrics_impl,
     compute_performance_metrics as _compute_performance_metrics_impl,
@@ -1036,6 +1038,24 @@ def _build_deterministic_buffet_vibration_section(metrics: dict) -> str:
     return _build_deterministic_buffet_vibration_section_impl(metrics)
 
 
+def _compute_flutter_support_metrics(
+    db: Session,
+    flight_test_id: int,
+    dataset_version_id: Optional[int] = None,
+    request_certification_result: bool = False,
+) -> dict:
+    return _compute_flutter_support_metrics_impl(
+        db=db,
+        flight_test_id=flight_test_id,
+        dataset_version_id=dataset_version_id,
+        request_certification_result=request_certification_result,
+    )
+
+
+def _build_deterministic_flutter_support_section(metrics: dict) -> str:
+    return _build_deterministic_flutter_support_section_impl(metrics)
+
+
 def _compute_handling_qualities_metrics(
     db: Session,
     flight_test_id: int,
@@ -2011,7 +2031,7 @@ def _analysis_retrieval_focus_for_mode(mode_key: str) -> str:
         "performance": "performance flight envelope climb cruise drag thrust air-data atmosphere mach cas tas density altitude standards",
         "handling_qualities": "handling qualities controllability stability pilot workload flying qualities",
         "buffet_vibration": "buffet vibration loads screening structural response event windows frequency-domain screening instrumentation standards",
-        "flutter": "flutter aeroelastic stability modal analysis safety limitations",
+        "flutter": "flutter support pre-screening aeroelastic caution oscillatory windows dominant frequencies regime-linked anomalies safety limitations",
         "propulsion_systems": "propulsion engine performance thrust fuel system monitoring limits",
         "electrical_systems": "electrical system monitoring loads generators buses protections standards",
         "general": "flight test standards procedures engineering analysis assumptions limitations",
@@ -2045,6 +2065,13 @@ def _default_analysis_goal_for_mode(mode: AnalysisModeDefinition) -> str:
             "Produce a bounded deterministic performance assessment with: "
             "(1) trend metrics, (2) atmosphere/air-data support summary from available channels, "
             "(3) explicit assumptions and skipped calculations, (4) applicability boundaries."
+        )
+    if mode.key == "flutter":
+        return (
+            "Produce a bounded flutter-support pre-screening assessment with: "
+            "(1) screened channels and dominant windows, (2) regime/context clues, "
+            "(3) frequency highlights if available, (4) concern indicators and follow-up actions, "
+            "(5) explicit non-clearance limitations."
         )
     if mode.key == "general":
         return (
@@ -2545,6 +2572,15 @@ def ai_analysis(
         )
         deterministic_section = _build_deterministic_buffet_vibration_section(deterministic_metrics)
         run_llm = False
+    elif effective_mode.key == "flutter":
+        deterministic_metrics = _compute_flutter_support_metrics(
+            db=db,
+            flight_test_id=flight_test_id,
+            dataset_version_id=dataset_version_id,
+            request_certification_result=certification_requested,
+        )
+        deterministic_section = _build_deterministic_flutter_support_section(deterministic_metrics)
+        run_llm = True
     elif effective_mode.key == "handling_qualities":
         deterministic_metrics = _compute_handling_qualities_metrics(
             db=db,

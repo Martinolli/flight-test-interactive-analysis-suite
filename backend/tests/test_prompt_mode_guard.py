@@ -57,3 +57,13 @@ def test_infer_prompt_intent_detects_air_data_performance_keywords():
     assert "mach" in matched
     assert "cas" in matched
     assert "tas" in matched
+
+
+def test_infer_prompt_intent_detects_flutter_keywords():
+    intent, matched = infer_prompt_intent(
+        "Run flutter support review for aeroelastic instability cues and modal coupling."
+    )
+    assert intent == PromptIntent.FLUTTER
+    assert "flutter" in matched
+    assert "aeroelastic" in matched
+    assert "modal coupling" in matched

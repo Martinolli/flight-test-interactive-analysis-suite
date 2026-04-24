@@ -164,6 +164,11 @@ const QUICK_ANALYSIS_PRESETS: QuickAnalysisPreset[] = [
     text: 'Analyse structural loads and vibration data: identify any abnormal load factors, vibration frequencies, or exceedances of structural limits.',
   },
   {
+    label: 'Flutter Support Pre-screen',
+    mode: 'flutter',
+    text: 'Run a bounded flutter-support pre-screening using available oscillatory channels, regime context, and frequency cues. Highlight concern windows and required follow-up actions without claiming flutter clearance.',
+  },
+  {
     label: 'General Summary',
     mode: 'general',
     text: 'Produce a general flight test summary with executive overview, key parameter observations, anomalies, and recommendations.',
@@ -174,6 +179,7 @@ type PromptIntentKey =
   | 'takeoff'
   | 'landing'
   | 'performance'
+  | 'flutter'
   | 'buffet_vibration'
   | 'handling_qualities'
   | 'general'
@@ -185,7 +191,8 @@ const PROMPT_INTENT_KEYWORDS: Record<Exclude<PromptIntentKey, 'unknown'>, string
   takeoff: ['takeoff', 'rotation', 'ground roll', 'liftoff', 'vr'],
   landing: ['landing', 'touchdown', 'rollout', 'deceleration', 'approach speed'],
   performance: ['climb', 'rate of climb', 'climb gradient', 'altitude gain', 'performance'],
-  buffet_vibration: ['vibration', 'buffet', 'load', 'loads', 'frequency', 'flutter', 'rms'],
+  flutter: ['flutter', 'aeroelastic', 'instability', 'oscillation onset', 'modal coupling', 'flutter support'],
+  buffet_vibration: ['vibration', 'buffet', 'load', 'loads', 'frequency', 'rms'],
   handling_qualities: [
     'aileron',
     'stick',
@@ -204,6 +211,7 @@ const INTENT_TO_MODE: Record<PromptIntentKey, AnalysisModeKey | 'general'> = {
   takeoff: 'takeoff',
   landing: 'landing',
   performance: 'performance',
+  flutter: 'flutter',
   buffet_vibration: 'buffet_vibration',
   handling_qualities: 'handling_qualities',
   general: 'general',
@@ -218,6 +226,7 @@ function inferPromptIntent(prompt: string): { intent: PromptIntentKey; matchedKe
 
   const priority: Array<Exclude<PromptIntentKey, 'unknown'>> = [
     'handling_qualities',
+    'flutter',
     'buffet_vibration',
     'landing',
     'takeoff',

@@ -65,6 +65,9 @@ def test_get_analysis_modes_returns_catalog_backed_modes(client, auth_headers):
     buffet = next(item for item in payload if item["key"] == "buffet_vibration")
     assert buffet["capability_status"] == "implemented"
     assert buffet["authority"] == "deterministic_primary"
+    flutter = next(item for item in payload if item["key"] == "flutter")
+    assert flutter["capability_status"] == "implemented"
+    assert flutter["authority"] == "deterministic_with_rag_crosscheck"
     handling = next(item for item in payload if item["key"] == "handling_qualities")
     assert handling["capability_status"] == "implemented"
     assert handling["authority"] == "deterministic_with_rag_crosscheck"
@@ -390,6 +393,104 @@ def test_ai_analysis_general_mode_routes_without_takeoff_calculator(
     assert "Deterministic Takeoff Computation" not in body["analysis"]
     assert "analysis_mode=general" in body["analysis"]
     assert body["analysis_controls"]["applicability_status"] == "advisory_only"
+
+
+def test_ai_analysis_flutter_mode_runs_bounded_flutter_prescreening(
+    client, db_session, test_user, auth_headers, monkeypatch
+):
+    flight_test = _create_flight_test_with_single_datapoint(db_session, test_user["id"])
+
+    monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
+    monkeypatch.setattr(documents_router.func, "stddev", lambda col: documents_router.func.avg(col))
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_takeoff_metrics",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("takeoff calculator must not run for flutter mode")
+        ),
+    )
+    monkeypatch.setattr(
+        documents_router,
+        "_compute_flutter_support_metrics",
+        lambda **kwargs: {
+            "available": True,
+            "capability_key": "flutter_support",
+            "capability_outcome": "allow_with_limitations",
+            "capability_authority": "deterministic_with_rag_crosscheck",
+            "capability_status": "implemented",
+            "capability_applicability_boundaries": [
+                "Bounded flutter-support pre-screening only."
+            ],
+            "capability_limitations": [
+                "Not flutter clearance or formal aeroelastic substantiation."
+            ],
+            "channels_screened": 4,
+            "concern_indicator_count": 2,
+            "concern_level": "moderate",
+            "dominant_windows": [
+                {
+                    "start_timestamp": "2026-04-24T12:00:08",
+                    "end_timestamp": "2026-04-24T12:00:09",
+                    "channel_name": "AIRFRAME VIBRATION Z",
+                    "regime": "airborne_high_speed",
+                }
+            ],
+            "deterministic_assumptions": ["Bounded flutter-support screening assumptions."],
+        },
+    )
+    monkeypatch.setattr(
+        documents_router,
+        "_build_deterministic_flutter_support_section",
+        lambda metrics: (
+            "## Deterministic Calculation (Flutter-Support Pre-Screening) [DATA]\n"
+            "- Result type: Bounded flutter-support deterministic pre-screening summary.\n"
+            "- This output is not flutter clearance.\n"
+            "- Concern level: moderate."
+        ),
+    )
+    monkeypatch.setattr(
+        documents_router,
+        "_call_retrieve_hybrid_sources",
+        lambda **kwargs: ([], "", {}),
+    )
+
+    class _FakeMessage:
+        content = "Flutter-support interpretation narrative."
+
+    class _FakeChoice:
+        message = _FakeMessage()
+
+    class _FakeCompletion:
+        choices = [_FakeChoice()]
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs):
+            return _FakeCompletion()
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        chat = _FakeChat()
+
+    monkeypatch.setattr(documents_router, "get_openai_client", lambda: _FakeClient())
+
+    response = client.post(
+        f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
+        json={
+            "analysis_mode": "flutter",
+            "user_prompt": "Run flutter support pre-screening and identify concern windows.",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["analysis_mode"] == "flutter"
+    assert body["capability_key"] == "flutter_support"
+    assert "Deterministic Calculation (Flutter-Support Pre-Screening) [DATA]" in body["analysis"]
+    assert "not flutter clearance" in body["analysis"].lower()
+    assert "Deterministic Takeoff Computation" not in body["analysis"]
 
 
 def test_ai_analysis_handling_mode_runs_deterministic_control_response_path(

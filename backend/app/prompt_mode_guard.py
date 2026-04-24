@@ -26,6 +26,7 @@ class PromptIntent(str, Enum):
     TAKEOFF = "takeoff"
     LANDING = "landing"
     PERFORMANCE = "performance"
+    FLUTTER = "flutter"
     BUFFET_VIBRATION = "buffet_vibration"
     HANDLING_QUALITIES = "handling_qualities"
     GENERAL = "general"
@@ -97,8 +98,15 @@ _INTENT_KEYWORDS: Dict[PromptIntent, List[str]] = {
         "load",
         "loads",
         "frequency",
-        "flutter",
         "rms",
+    ],
+    PromptIntent.FLUTTER: [
+        "flutter",
+        "aeroelastic",
+        "oscillation onset",
+        "instability",
+        "modal coupling",
+        "flutter support",
     ],
     PromptIntent.HANDLING_QUALITIES: [
         "aileron",
@@ -126,6 +134,7 @@ _INTENT_TO_MODE: Dict[PromptIntent, str] = {
     PromptIntent.TAKEOFF: "takeoff",
     PromptIntent.LANDING: "landing",
     PromptIntent.PERFORMANCE: "performance",
+    PromptIntent.FLUTTER: "flutter",
     PromptIntent.BUFFET_VIBRATION: "buffet_vibration",
     PromptIntent.HANDLING_QUALITIES: "handling_qualities",
     PromptIntent.GENERAL: "general",
@@ -137,11 +146,13 @@ _STRICT_DETERMINISTIC_MODES = {
     "landing",
     "performance",
     "buffet_vibration",
+    "flutter",
     "handling_qualities",
 }
 
 _INTENT_PRIORITY: List[PromptIntent] = [
     PromptIntent.HANDLING_QUALITIES,
+    PromptIntent.FLUTTER,
     PromptIntent.BUFFET_VIBRATION,
     PromptIntent.LANDING,
     PromptIntent.TAKEOFF,

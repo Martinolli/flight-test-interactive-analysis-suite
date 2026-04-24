@@ -161,17 +161,23 @@
   * not flutter clearance
 * Narrative/report wording updated for screening-only positioning and clearer traceability.
 
-### P3.5 Add bounded flutter-support pre-screening
+### P3.5 Add bounded flutter-support pre-screening ✅
 
-* **Reason:** after vibration hardening and atmosphere support, introduce a limited flutter-support layer.
-* Scope:
+* **Completed:** `flutter` mode now runs a real bounded deterministic flutter-support pre-screening workflow.
+* Delivered scope:
 
-  * pre-screening
-  * safety-support indicators
-  * trend review
-  * explicit no-clearance boundary
-* Do not present this as formal flutter clearance or certification evidence.
-* Require strong applicability warning model.
+  * channel/regime/frequency-based pre-screening indicators
+  * dominant window summaries with contextual flight-condition cues
+  * concern-indicator model and follow-up recommendation output
+  * explicit non-clearance, non-certification wording in analysis/report sections
+* Safety boundary preserved:
+
+  * not flutter clearance
+  * not modal-identification certification
+  * not aeroelastic substantiation authority
+* Controls alignment:
+
+  * flutter concern indicators now influence warning severity and bounded-result interpretation.
 
 ### P3.6 Expand manual / documentation package
 
@@ -195,8 +201,7 @@
 
 ## Immediate Execution Order
 
-1. **P3.5 — Add bounded flutter-support pre-screening**
-2. **P3.6 — Expand manual / documentation package**
+1. **P3.6 — Expand manual / documentation package**
 
 ---
 
@@ -212,7 +217,8 @@
 * Prompt-to-mode guard is now enforced with explicit mismatch severity and guarded execution.
 * Handling/control-response mode is now a bounded deterministic workflow with explicit non-certification boundaries.
 * Atmosphere / air-data support is now available as a bounded deterministic kernel inside performance mode.
-* Buffet/vibration hardening is complete and now provides the bounded base required for flutter-support pre-screening.
+* Buffet/vibration hardening and flutter-support pre-screening are complete.
+* Next highest-value step is documentation/manual expansion for operational adoption and review consistency.
 * Manual/documentation expansion should continue in parallel when practical, but it becomes much more valuable after FRAT and P3.1/P3.2 stabilization.
 
 ---

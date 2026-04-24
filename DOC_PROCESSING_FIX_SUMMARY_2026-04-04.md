@@ -3005,3 +3005,73 @@ pnpm -C frontend run build
 - Buffet/vibration output is a bounded deterministic screening workflow for trend/anomaly support.
 - It is **not** formal loads substantiation.
 - It is **not** flutter clearance or formal aeroelastic determination.
+
+## P3.5 Bounded Flutter-Support Pre-Screening (2026-04-24)
+
+### Why this was added
+
+- After P3.4 buffet/vibration hardening, FTIAS needed a dedicated flutter-support pre-screening path instead of leaving `flutter` mode as blocked/generic.
+- The goal was bounded engineering support for concern discovery, not formal clearance.
+
+### What changed
+
+**Capability + mode activation**
+
+- `flutter_support` capability moved from blocked scaffold to bounded implemented support in:
+  - `backend/app/capabilities.py`
+- Authority/status now reflect bounded deterministic + optional RAG cross-check posture.
+- Applicability/limitations now explicitly state non-clearance boundaries and required follow-up methods.
+
+**Deterministic flutter-support module**
+
+- Added `compute_flutter_support_metrics(...)` and `build_deterministic_flutter_support_section(...)` in:
+  - `backend/app/analysis/deterministic.py`
+- Added exports in:
+  - `backend/app/analysis/__init__.py`
+- Implemented bounded pre-screening outputs:
+  - screened channel groups
+  - dominant channels and significant windows
+  - regime/context summaries
+  - frequency screening highlights (when available)
+  - concern indicators + concern level
+  - follow-up recommendation text
+- Reuses hardened buffet/vibration screening as deterministic foundation and adds flutter-support interpretation layers.
+
+**Routing + prompt guard alignment**
+
+- `analysis_mode=flutter` now executes the deterministic flutter-support section in:
+  - `backend/app/routers/documents.py`
+- Flutter retrieval focus/default goal prompts now use flutter-support pre-screening wording.
+- Prompt intent detection now distinguishes flutter intent from generic vibration intent in:
+  - `backend/app/prompt_mode_guard.py`
+
+**Controls integration**
+
+- Extended control evaluation for flutter mode in:
+  - `backend/app/analysis_controls.py`
+- Added flutter-specific deterministic-confidence heuristics and warning-level escalation when high concern indicators are present.
+
+**Frontend alignment**
+
+- Added `Flutter Support Pre-screen` quick preset and local intent mapping updates in:
+  - `frontend/src/pages/FlightTestDetail.tsx`
+- Flutter cues now route more honestly to flutter mode suggestions.
+
+### Tests / validation
+
+```powershell
+pytest backend/tests/test_deterministic_calculators.py backend/tests/test_analysis_mode_routing.py backend/tests/test_capability_catalog.py backend/tests/test_analysis_controls.py backend/tests/test_prompt_mode_guard.py backend/tests/test_analysis_modes.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend focused suite passed (`45 passed`).
+- Frontend production build passed.
+
+### Engineering boundary (explicit)
+
+- Flutter mode output is bounded **pre-screening/support** only.
+- It is **not** flutter clearance.
+- It is **not** modal-identification certification.
+- It is **not** formal aeroelastic substantiation or envelope-expansion approval authority.

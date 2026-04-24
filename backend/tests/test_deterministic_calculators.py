@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from app.analysis import (
     compute_buffet_vibration_metrics,
+    compute_flutter_support_metrics,
     compute_handling_qualities_metrics,
     compute_landing_metrics,
     compute_performance_metrics,
@@ -258,6 +259,103 @@ def test_buffet_vibration_calculator_exposes_regime_event_and_frequency_summarie
     assert len(result["anomaly_windows"]) >= 1
     assert "regime" in result["anomaly_windows"][0]
     assert result["frequency_screening"]["channels_attempted"] >= 1
+
+
+def test_flutter_support_calculator_returns_bounded_prescreening_output(db_session, test_user):
+    flight_test = _make_flight_test(db_session, test_user["id"], "Flutter Support Test")
+    vib = _make_parameter(db_session, "AIRFRAME VIBRATION Z", "g")
+    roll_rate = _make_parameter(db_session, "ROLL RATE", "deg/s")
+    wow = _make_parameter(db_session, "WEIGHT ON WHEELS", "")
+    gs = _make_parameter(db_session, "GROUND SPEED", "kt")
+    mach = _make_parameter(db_session, "MACH", "")
+
+    base_ts = datetime(2026, 4, 24, 12, 0, 0)
+    for i in range(120):
+        ts = base_ts + timedelta(milliseconds=100 * i)
+        gs_val = 30.0 + (1.2 * i)
+        wow_val = 1.0 if i < 35 else 0.0
+        mach_val = 0.22 + (0.0025 * i)
+        vib_val = 0.05 * math.sin(2.0 * math.pi * 1.6 * (i / 10.0))
+        roll_val = 1.8 * math.sin(2.0 * math.pi * 1.2 * (i / 10.0))
+        if i in {82, 83, 84, 85, 101, 102}:
+            vib_val += 0.75
+            roll_val += 3.5
+
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=vib.id,
+                timestamp=ts,
+                value=vib_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=roll_rate.id,
+                timestamp=ts,
+                value=roll_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=wow.id,
+                timestamp=ts,
+                value=wow_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=gs.id,
+                timestamp=ts,
+                value=gs_val,
+            )
+        )
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=mach.id,
+                timestamp=ts,
+                value=mach_val,
+            )
+        )
+    db_session.commit()
+
+    result = compute_flutter_support_metrics(db_session, flight_test.id)
+    assert result["available"] is True
+    assert result["capability_key"] == "flutter_support"
+    assert result["channels_screened"] >= 2
+    assert isinstance(result.get("dominant_windows"), list)
+    assert isinstance(result.get("concern_indicators"), list)
+    assert isinstance(result.get("frequency_screening_highlights"), list)
+    assert result["concern_level"] in {"low", "watch", "moderate", "elevated"}
+    assert "deterministic_metrics" in result
+    assert len(result["deterministic_assumptions"]) > 0
+
+
+def test_flutter_support_calculator_gracefully_handles_missing_oscillation_channels(
+    db_session, test_user
+):
+    flight_test = _make_flight_test(db_session, test_user["id"], "Flutter Missing Signals")
+    altitude = _make_parameter(db_session, "PRESSURE ALTITUDE", "ft")
+    base_ts = datetime(2026, 4, 24, 12, 30, 0)
+    for i in range(15):
+        db_session.add(
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=altitude.id,
+                timestamp=base_ts + timedelta(seconds=i),
+                value=4200 + (10 * i),
+            )
+        )
+    db_session.commit()
+
+    result = compute_flutter_support_metrics(db_session, flight_test.id)
+    assert result["available"] is False
+    assert result["capability_key"] == "flutter_support"
+    assert result["capability_reason_key"] in {"missing_required_signals", "insufficient_data_coverage"}
 
 
 def test_handling_qualities_calculator_returns_control_response_pairings(db_session, test_user):

@@ -111,6 +111,10 @@ def _evaluate_deterministic_confidence(
     buffet_channels = _safe_int(deterministic_metrics.get("channels_screened"), -1)
     buffet_events = len(deterministic_metrics.get("anomaly_windows") or [])
     buffet_samples = _safe_int(deterministic_metrics.get("samples_used"), -1)
+    flutter_channels = _safe_int(deterministic_metrics.get("channels_screened"), -1)
+    flutter_events = len(deterministic_metrics.get("dominant_windows") or [])
+    flutter_indicators = _safe_int(deterministic_metrics.get("concern_indicator_count"), 0)
+    flutter_samples = _safe_int(deterministic_metrics.get("samples_used"), -1)
     run_time_s = _safe_float(
         deterministic_metrics.get("run_time_s", deterministic_metrics.get("rollout_time_s")),
         -1.0,
@@ -135,6 +139,17 @@ def _evaluate_deterministic_confidence(
         if buffet_channels >= 2 and buffet_samples >= 60:
             return DeterministicConfidence.MEDIUM
         if buffet_channels >= 1 and (buffet_events > 0 or buffet_samples >= 20):
+            return DeterministicConfidence.LOW
+        return DeterministicConfidence.UNAVAILABLE
+
+    if mode_key == "flutter":
+        if flutter_channels >= 3 and flutter_samples >= 120:
+            return DeterministicConfidence.MEDIUM
+        if flutter_channels >= 2 and flutter_samples >= 60:
+            return DeterministicConfidence.MEDIUM
+        if flutter_channels >= 1 and (flutter_events > 0 or flutter_indicators > 0):
+            return DeterministicConfidence.LOW
+        if flutter_channels >= 1:
             return DeterministicConfidence.LOW
         return DeterministicConfidence.UNAVAILABLE
 
@@ -223,7 +238,9 @@ def _evaluate_applicability_status(
 
 def _evaluate_warning_level(
     *,
+    mode_key: str,
     capability_eval: CapabilityEvaluation,
+    deterministic_metrics: Optional[dict],
     deterministic_confidence: DeterministicConfidence,
     retrieval_coverage: RetrievalCoverage,
     applicability_status: ApplicabilityStatus,
@@ -237,6 +254,19 @@ def _evaluate_warning_level(
         return WarningLevel.HIGH
     if capability_eval.outcome == CapabilityOutcome.PARTIAL_ESTIMATE:
         return WarningLevel.CAUTION
+    if mode_key == "flutter":
+        flutter_metrics = deterministic_metrics or {}
+        concern_level = str(flutter_metrics.get("concern_level") or "").lower()
+        concern_indicators = _safe_int(flutter_metrics.get("concern_indicator_count"), 0)
+        high_indicator_count = sum(
+            1
+            for item in (flutter_metrics.get("concern_indicators") or [])
+            if str((item or {}).get("severity", "")).lower() == "high"
+        )
+        if high_indicator_count > 0 or concern_level == "elevated":
+            return WarningLevel.HIGH
+        if concern_indicators >= 2 or concern_level in {"moderate", "watch"}:
+            return WarningLevel.CAUTION
     if deterministic_confidence == DeterministicConfidence.LOW:
         return WarningLevel.CAUTION
     if retrieval_coverage in {RetrievalCoverage.NONE, RetrievalCoverage.WEAK}:
@@ -303,7 +333,9 @@ def evaluate_analysis_controls(
         capability_eval=capability_eval,
     )
     warning_level = _evaluate_warning_level(
+        mode_key=mode_key,
         capability_eval=capability_eval,
+        deterministic_metrics=deterministic_metrics,
         deterministic_confidence=deterministic_confidence,
         retrieval_coverage=retrieval_coverage,
         applicability_status=applicability_status,
