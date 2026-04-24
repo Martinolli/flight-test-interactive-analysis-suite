@@ -2008,7 +2008,7 @@ def _analysis_retrieval_focus_for_mode(mode_key: str) -> str:
     focus_map = {
         "takeoff": "takeoff distance ground roll liftoff runway acceleration weight on wheels procedures certification",
         "landing": "landing distance touchdown braking deceleration runway procedures standards",
-        "performance": "performance flight envelope climb cruise drag thrust standards",
+        "performance": "performance flight envelope climb cruise drag thrust air-data atmosphere mach cas tas density altitude standards",
         "handling_qualities": "handling qualities controllability stability pilot workload flying qualities",
         "buffet_vibration": "buffet vibration structural response instrumentation standards",
         "flutter": "flutter aeroelastic stability modal analysis safety limitations",
@@ -2032,6 +2032,12 @@ def _default_analysis_goal_for_mode(mode: AnalysisModeDefinition) -> str:
             "(1) deterministic pairing summary, (2) coupling and lag observations, "
             "(3) anomaly indicators, (4) explicit limitations and applicability boundaries, "
             "(5) recommended follow-up checks."
+        )
+    if mode.key == "performance":
+        return (
+            "Produce a bounded deterministic performance assessment with: "
+            "(1) trend metrics, (2) atmosphere/air-data support summary from available channels, "
+            "(3) explicit assumptions and skipped calculations, (4) applicability boundaries."
         )
     if mode.key == "general":
         return (

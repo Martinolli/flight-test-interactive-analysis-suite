@@ -267,22 +267,34 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
             key="performance_general",
             label="General Performance Assessment",
             description=(
-                "Deterministic bounded performance trend metrics from available flight-test channels."
+                "Deterministic bounded performance trend metrics with atmosphere/air-data support from available flight-test channels."
             ),
             status=CapabilityImplementationStatus.IMPLEMENTED,
             authority=CapabilityAuthority.DETERMINISTIC_PRIMARY,
             required_inputs=CapabilityRequiredInputs(
                 required_signals=[],
                 required_dataset_conditions=["minimum_relevant_parameters_available"],
+                optional_signals=[
+                    "pressure_altitude",
+                    "temperature",
+                    "cas",
+                    "tas",
+                    "mach",
+                    "air_data_speed",
+                    "atmosphere_air_data",
+                ],
             ),
             blocked_rules=[],
             applicability_boundaries=[
                 "Provides bounded deterministic trend metrics from available channels only.",
                 "Not a full certification performance determination without dedicated correction models.",
+                "Atmosphere/air-data outputs are engineering support summaries and are not formal pitot-static calibration evidence.",
             ],
             default_limitations=[
                 "Computed metrics depend on available altitude/vertical-speed/ground-speed channel coverage.",
-                "No atmospheric, engine-state, or runway-correction model is applied in this mode.",
+                "Atmosphere support uses bounded ISA/air-data approximations from available telemetry only.",
+                "No formal air-data calibration or full correction campaign is applied in this mode.",
+                "No engine-state or runway-correction model is applied in this mode.",
                 "Use results as engineering trend support, not standalone certification evidence.",
             ],
             output_contract=CapabilityOutputContract(
@@ -292,6 +304,7 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
                     "altitude_change_ft",
                     "speed_delta_kt",
                     "mean_longitudinal_accel_fts2",
+                    "air_data_support",
                 ],
                 standards_crosscheck_allowed=True,
             ),

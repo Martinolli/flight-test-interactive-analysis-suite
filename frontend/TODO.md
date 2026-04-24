@@ -127,7 +127,8 @@ These should be protected from regression.
 
 ### P3.3 Atmosphere / air-data support UX
 
-* Prepare future frontend support for atmosphere/air-data outputs:
+* Backend deterministic support is now available in performance analysis output.
+* Frontend hardening slice (pending) should improve dedicated readability for atmosphere/air-data fields:
 
   * corrected values
   * derived air-data summaries

@@ -47,3 +47,13 @@ def test_evaluate_prompt_mode_guard_returns_none_for_empty_prompt():
     assert guard.inferred_intent == PromptIntent.UNKNOWN.value
     assert guard.mismatch_severity == MismatchSeverity.NONE
     assert guard.guarded_execution is False
+
+
+def test_infer_prompt_intent_detects_air_data_performance_keywords():
+    intent, matched = infer_prompt_intent(
+        "Cross-check Mach, CAS, TAS and density altitude consistency for this segment."
+    )
+    assert intent == PromptIntent.PERFORMANCE
+    assert "mach" in matched
+    assert "cas" in matched
+    assert "tas" in matched

@@ -2869,3 +2869,75 @@ pnpm -C frontend run build
 
 - Handling output is a bounded deterministic control-response assessment.
 - It is **not** a formal handling-qualities certification package and does not claim Cooper-Harper/MIL compliance substantiation.
+
+## P3.3 Atmosphere / Air-Data Engineering Support (2026-04-24)
+
+### Why this was added
+
+- Performance mode needed a stronger engineering kernel for atmosphere/air-data consistency instead of trend-only summaries.
+- The objective was bounded deterministic support, not full air-data calibration/certification logic.
+
+### What changed
+
+**Backend deterministic module**
+
+- Added dedicated atmosphere/air-data helper module:
+  - `backend/app/analysis/air_data.py`
+- Implemented bounded helper functions:
+  - ISA snapshot from pressure altitude (`isa_atmosphere_from_pressure_altitude_ft`)
+  - density-altitude estimate (`density_altitude_estimate_ft`)
+  - TAS estimate from CAS + sigma (`estimate_tas_from_cas_and_sigma_knots`)
+  - Mach estimate from TAS + temperature (`estimate_mach_from_tas_knots_and_temperature_c`)
+  - reusable timeseries summary helper (`summarize_series`)
+
+**Performance deterministic integration**
+
+- Extended `compute_performance_metrics(...)` in `backend/app/analysis/deterministic.py` to detect/use air-data channels:
+  - pressure altitude / altitude
+  - OAT / SAT / TAT
+  - CAS / TAS / Mach
+- Added bounded derived outputs under `air_data_support`:
+  - channel usage + skipped-calculation list
+  - summary stats for pressure altitude, temperature channels, CAS/TAS/Mach
+  - ISA sigma/theta/delta summaries
+  - density-altitude estimate summary
+  - TAS estimate and Mach estimate summaries
+  - estimate-vs-measured consistency deltas (TAS, Mach)
+  - pressure-altitude vs altitude consistency delta
+- Added explicit temperature-source priority for Mach estimate (`SAT` -> `OAT` -> `TAT`).
+- Updated performance deterministic assumptions to explicitly state bounded non-calibration/non-certification scope.
+
+**Narrative/report rendering**
+
+- Updated `build_deterministic_performance_section(...)` to include:
+  - `Atmosphere / Air-Data Support` subsection
+  - channels used
+  - bounded derived summaries
+  - skipped-calculation list when required inputs are missing
+
+**Routing/capability alignment**
+
+- Updated capability catalog (`backend/app/capabilities.py`) for `performance_general`:
+  - description/limitations/applicability now explicitly include atmosphere/air-data bounded support and non-calibration boundary
+  - optional signals include air-data semantics
+  - output contract includes `air_data_support`
+- Updated prompt-intent performance keywords (`backend/app/prompt_mode_guard.py`) with air-data terms:
+  - `mach`, `cas`, `tas`, `air-data`, `density altitude`, `pressure altitude`, `isa`
+- Updated performance default-goal/retrieval-focus text in `backend/app/routers/documents.py`.
+
+### Validation
+
+```powershell
+pytest backend/tests/test_air_data_support.py backend/tests/test_deterministic_calculators.py backend/tests/test_analysis_mode_routing.py backend/tests/test_capability_catalog.py backend/tests/test_prompt_mode_guard.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend tests passed (`34 passed` for the focused suite).
+- Frontend production build passed.
+
+### Engineering boundary (explicit)
+
+- Atmosphere/air-data outputs are bounded engineering support summaries from available telemetry.
+- They are **not** a formal pitot-static calibration package and do not claim certification-corrected air-data determination.

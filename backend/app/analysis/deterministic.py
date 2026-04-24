@@ -20,6 +20,13 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from app.analysis.air_data import (
+    density_altitude_estimate_ft,
+    estimate_mach_from_tas_knots_and_temperature_c,
+    estimate_tas_from_cas_and_sigma_knots,
+    isa_atmosphere_from_pressure_altitude_ft,
+    summarize_series as summarize_air_data_series,
+)
 from app.capabilities import CapabilityEvaluation, evaluate_capability_request
 from app.models import DataPoint, TestParameter
 
@@ -182,6 +189,101 @@ def _score_vertical_speed(name: str, unit: Optional[str]) -> float:
     if "fpm" in u:
         score += 2
     if "m/s" in u:
+        score += 1
+    return score
+
+
+def _score_pressure_altitude(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "pressure altitude" in n:
+        score += 10
+    if re.search(r"\bpa\b", n):
+        score += 2
+    if score > 0 and "ft" in u:
+        score += 2
+    return score
+
+
+def _score_oat(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "outside air temperature" in n or re.search(r"\boat\b", n):
+        score += 8
+    if "temperature" in n and ("outside" in n or "ambient" in n):
+        score += 4
+    if score > 0 and ("c" in u or "f" in u or "k" in u):
+        score += 1
+    return score
+
+
+def _score_sat(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "static air temperature" in n:
+        score += 10
+    if re.search(r"\bsat\b", n):
+        score += 8
+    if score > 0 and ("c" in u or "f" in u or "k" in u):
+        score += 1
+    return score
+
+
+def _score_tat(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "total air temperature" in n:
+        score += 10
+    if re.search(r"\btat\b", n):
+        score += 8
+    if score > 0 and ("c" in u or "f" in u or "k" in u):
+        score += 1
+    return score
+
+
+def _score_cas(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "calibrated airspeed" in n:
+        score += 10
+    if re.search(r"\bcas\b", n):
+        score += 8
+    if "airspeed" in n and "calibrated" in n:
+        score += 5
+    if score > 0 and ("kt" in u or "knot" in u):
+        score += 1
+    return score
+
+
+def _score_tas(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "true airspeed" in n:
+        score += 10
+    if re.search(r"\btas\b", n):
+        score += 8
+    if "airspeed" in n and "true" in n:
+        score += 5
+    if score > 0 and ("kt" in u or "knot" in u):
+        score += 1
+    return score
+
+
+def _score_mach(name: str, unit: Optional[str]) -> float:
+    n = (name or "").lower()
+    u = (unit or "").lower()
+    score = 0.0
+    if "mach" in n:
+        score += 10
+    if n.strip() in {"m", "mach_number"}:
+        score += 2
+    if "mach" in u:
         score += 1
     return score
 
@@ -915,6 +1017,236 @@ def _convert_vertical_speed_to_fpm(value: float, unit: Optional[str]) -> float:
     return value
 
 
+def _convert_temperature_to_c(value: float, unit: Optional[str]) -> float:
+    u = (unit or "").strip().lower().replace("°", "")
+    if "f" in u:
+        return (value - 32.0) * (5.0 / 9.0)
+    if "k" in u and "kt" not in u:
+        return value - 273.15
+    return value
+
+
+def _convert_speed_to_knots(value: float, unit: Optional[str]) -> float:
+    u = (unit or "").strip().lower()
+    if "m/s" in u:
+        return value * 1.9438444924406
+    if "km/h" in u or "kph" in u:
+        return value * 0.53995680345572
+    if "mph" in u:
+        return value * 0.86897624190065
+    return value
+
+
+def _round_summary(summary: Optional[dict], digits: int = 3) -> Optional[dict]:
+    if not summary:
+        return None
+    rounded: Dict[str, Any] = {}
+    for key, value in summary.items():
+        if key == "samples":
+            rounded[key] = int(round(float(value)))
+            continue
+        rounded[key] = round(float(value), digits)
+    return rounded
+
+
+def _compute_air_data_support(
+    *,
+    points: List[Dict[str, Any]],
+    param_map: Dict[int, dict],
+    pressure_altitude_id: Optional[int],
+    altitude_id: Optional[int],
+    oat_id: Optional[int],
+    sat_id: Optional[int],
+    tat_id: Optional[int],
+    cas_id: Optional[int],
+    tas_id: Optional[int],
+    mach_id: Optional[int],
+) -> dict:
+    channels_used: List[str] = []
+    skipped: List[str] = []
+
+    def _channel_name(param_id: Optional[int]) -> Optional[str]:
+        if param_id is None:
+            return None
+        return str(param_map.get(param_id, {}).get("name") or "")
+
+    for pid in [pressure_altitude_id, altitude_id, oat_id, sat_id, tat_id, cas_id, tas_id, mach_id]:
+        name = _channel_name(pid)
+        if name and name not in channels_used:
+            channels_used.append(name)
+
+    pa_values_ft: List[float] = []
+    oat_values_c: List[float] = []
+    sat_values_c: List[float] = []
+    tat_values_c: List[float] = []
+    cas_values_kt: List[float] = []
+    tas_values_kt: List[float] = []
+    mach_values: List[float] = []
+    isa_sigma_values: List[float] = []
+    isa_theta_values: List[float] = []
+    isa_delta_values: List[float] = []
+    density_alt_values_ft: List[float] = []
+    tas_est_values_kt: List[float] = []
+    mach_est_values: List[float] = []
+    tas_abs_diff_values_kt: List[float] = []
+    mach_abs_diff_values: List[float] = []
+    pa_alt_abs_diff_values_ft: List[float] = []
+    mach_temp_source_counts: Dict[str, int] = {"sat": 0, "oat": 0, "tat": 0}
+
+    for point in points:
+        pa_ft = None
+        if pressure_altitude_id is not None and point.get("pressure_altitude") is not None:
+            pa_unit = param_map.get(pressure_altitude_id, {}).get("unit")
+            pa_ft = _convert_altitude_to_ft(float(point["pressure_altitude"]), pa_unit)
+            pa_values_ft.append(pa_ft)
+
+        altitude_ft = None
+        if altitude_id is not None and point.get("altitude") is not None:
+            altitude_unit = param_map.get(altitude_id, {}).get("unit")
+            altitude_ft = _convert_altitude_to_ft(float(point["altitude"]), altitude_unit)
+
+        if pa_ft is not None and altitude_ft is not None and pressure_altitude_id != altitude_id:
+            pa_alt_abs_diff_values_ft.append(abs(pa_ft - altitude_ft))
+
+        oat_c = None
+        if oat_id is not None and point.get("oat") is not None:
+            oat_unit = param_map.get(oat_id, {}).get("unit")
+            oat_c = _convert_temperature_to_c(float(point["oat"]), oat_unit)
+            oat_values_c.append(oat_c)
+
+        sat_c = None
+        if sat_id is not None and point.get("sat") is not None:
+            sat_unit = param_map.get(sat_id, {}).get("unit")
+            sat_c = _convert_temperature_to_c(float(point["sat"]), sat_unit)
+            sat_values_c.append(sat_c)
+
+        tat_c = None
+        if tat_id is not None and point.get("tat") is not None:
+            tat_unit = param_map.get(tat_id, {}).get("unit")
+            tat_c = _convert_temperature_to_c(float(point["tat"]), tat_unit)
+            tat_values_c.append(tat_c)
+
+        cas_kt = None
+        if cas_id is not None and point.get("cas") is not None:
+            cas_unit = param_map.get(cas_id, {}).get("unit")
+            cas_kt = _convert_speed_to_knots(float(point["cas"]), cas_unit)
+            cas_values_kt.append(cas_kt)
+
+        tas_kt_measured = None
+        if tas_id is not None and point.get("tas") is not None:
+            tas_unit = param_map.get(tas_id, {}).get("unit")
+            tas_kt_measured = _convert_speed_to_knots(float(point["tas"]), tas_unit)
+            tas_values_kt.append(tas_kt_measured)
+
+        mach_measured = None
+        if mach_id is not None and point.get("mach") is not None:
+            mach_measured = float(point["mach"])
+            mach_values.append(mach_measured)
+
+        isa_snapshot = isa_atmosphere_from_pressure_altitude_ft(pa_ft) if pa_ft is not None else None
+        if isa_snapshot is not None:
+            isa_sigma_values.append(float(isa_snapshot["sigma"]))
+            isa_theta_values.append(float(isa_snapshot["theta"]))
+            isa_delta_values.append(float(isa_snapshot["delta"]))
+
+        if pa_ft is not None and oat_c is not None:
+            density_alt = density_altitude_estimate_ft(pa_ft, oat_c)
+            if density_alt is not None:
+                density_alt_values_ft.append(float(density_alt))
+
+        tas_kt_for_mach = tas_kt_measured
+        if cas_kt is not None and isa_snapshot is not None:
+            tas_est = estimate_tas_from_cas_and_sigma_knots(cas_kt, float(isa_snapshot["sigma"]))
+            if tas_est is not None:
+                tas_est_values_kt.append(float(tas_est))
+                if tas_kt_measured is not None:
+                    tas_abs_diff_values_kt.append(abs(float(tas_est) - tas_kt_measured))
+                if tas_kt_for_mach is None:
+                    tas_kt_for_mach = float(tas_est)
+
+        temp_for_mach = None
+        if sat_c is not None:
+            temp_for_mach = sat_c
+            mach_temp_source_counts["sat"] += 1
+        elif oat_c is not None:
+            temp_for_mach = oat_c
+            mach_temp_source_counts["oat"] += 1
+        elif tat_c is not None:
+            temp_for_mach = tat_c
+            mach_temp_source_counts["tat"] += 1
+
+        if tas_kt_for_mach is not None and temp_for_mach is not None:
+            mach_est = estimate_mach_from_tas_knots_and_temperature_c(
+                tas_knots=float(tas_kt_for_mach),
+                temperature_c=float(temp_for_mach),
+            )
+            if mach_est is not None:
+                mach_est_values.append(float(mach_est))
+                if mach_measured is not None:
+                    mach_abs_diff_values.append(abs(float(mach_est) - mach_measured))
+
+    if not pa_values_ft:
+        skipped.append("ISA snapshot skipped: pressure-altitude channel unavailable.")
+    if not oat_values_c:
+        skipped.append("Density-altitude estimate skipped: OAT channel unavailable.")
+    if not cas_values_kt:
+        skipped.append("CAS-driven TAS estimate skipped: CAS channel unavailable.")
+    if not tas_values_kt:
+        skipped.append("Measured TAS summary unavailable: TAS channel unavailable.")
+    if not mach_values:
+        skipped.append("Measured Mach summary unavailable: Mach channel unavailable.")
+    if not (sat_values_c or oat_values_c or tat_values_c):
+        skipped.append("Mach estimate from TAS+temperature skipped: no SAT/OAT/TAT channel available.")
+
+    dominant_mach_temp_source = max(
+        mach_temp_source_counts.keys(),
+        key=lambda key: mach_temp_source_counts[key],
+    )
+    if mach_temp_source_counts[dominant_mach_temp_source] <= 0:
+        dominant_mach_temp_source = "none"
+
+    return {
+        "available": bool(
+            pa_values_ft
+            or oat_values_c
+            or sat_values_c
+            or tat_values_c
+            or cas_values_kt
+            or tas_values_kt
+            or mach_values
+        ),
+        "channels_used": channels_used,
+        "skipped_calculations": skipped,
+        "mach_temperature_source": dominant_mach_temp_source,
+        "pressure_altitude_ft": _round_summary(summarize_air_data_series(pa_values_ft), digits=2),
+        "oat_c": _round_summary(summarize_air_data_series(oat_values_c), digits=2),
+        "sat_c": _round_summary(summarize_air_data_series(sat_values_c), digits=2),
+        "tat_c": _round_summary(summarize_air_data_series(tat_values_c), digits=2),
+        "cas_kt": _round_summary(summarize_air_data_series(cas_values_kt), digits=2),
+        "tas_kt": _round_summary(summarize_air_data_series(tas_values_kt), digits=2),
+        "mach": _round_summary(summarize_air_data_series(mach_values), digits=4),
+        "isa_sigma": _round_summary(summarize_air_data_series(isa_sigma_values), digits=4),
+        "isa_theta": _round_summary(summarize_air_data_series(isa_theta_values), digits=4),
+        "isa_delta": _round_summary(summarize_air_data_series(isa_delta_values), digits=4),
+        "density_altitude_ft": _round_summary(summarize_air_data_series(density_alt_values_ft), digits=1),
+        "tas_est_from_cas_sigma_kt": _round_summary(
+            summarize_air_data_series(tas_est_values_kt), digits=2
+        ),
+        "mach_est_from_tas_temp": _round_summary(
+            summarize_air_data_series(mach_est_values), digits=4
+        ),
+        "tas_est_vs_measured_abs_diff_kt": _round_summary(
+            summarize_air_data_series(tas_abs_diff_values_kt), digits=2
+        ),
+        "mach_est_vs_measured_abs_diff": _round_summary(
+            summarize_air_data_series(mach_abs_diff_values), digits=4
+        ),
+        "pressure_vs_altitude_abs_diff_ft": _round_summary(
+            summarize_air_data_series(pa_alt_abs_diff_values_ft), digits=2
+        ),
+    }
+
+
 def compute_performance_metrics(
     db: Session,
     flight_test_id: int,
@@ -932,22 +1264,60 @@ def compute_performance_metrics(
             has_dataset=False,
         )
 
+    pressure_altitude_id = _choose_param_id(params, _score_pressure_altitude)
     altitude_id = _choose_param_id(params, _score_altitude)
+    if pressure_altitude_id is None:
+        pressure_altitude_id = altitude_id
     vertical_speed_id = _choose_param_id(params, _score_vertical_speed)
     ground_speed_id = _choose_param_id(params, _score_ground_speed)
     accel_id = _choose_param_id(params, _score_longitudinal_accel)
+    oat_id = _choose_param_id(params, _score_oat)
+    sat_id = _choose_param_id(params, _score_sat)
+    tat_id = _choose_param_id(params, _score_tat)
+    cas_id = _choose_param_id(params, _score_cas)
+    tas_id = _choose_param_id(params, _score_tas)
+    mach_id = _choose_param_id(params, _score_mach)
     param_map = {p["id"]: p for p in params}
 
-    selected_ids = [pid for pid in [altitude_id, vertical_speed_id, ground_speed_id, accel_id] if pid is not None]
+    selected_ids = sorted(
+        {
+            pid
+            for pid in [
+                pressure_altitude_id,
+                altitude_id,
+                vertical_speed_id,
+                ground_speed_id,
+                accel_id,
+                oat_id,
+                sat_id,
+                tat_id,
+                cas_id,
+                tas_id,
+                mach_id,
+            ]
+            if pid is not None
+        }
+    )
     available_signals = set()
     if altitude_id is not None:
         available_signals.add("altitude")
+    if pressure_altitude_id is not None:
+        available_signals.add("pressure_altitude")
     if vertical_speed_id is not None:
         available_signals.add("vertical_speed")
     if ground_speed_id is not None:
         available_signals.add("ground_speed")
     if accel_id is not None:
         available_signals.add("longitudinal_acceleration")
+    if any(pid is not None for pid in [oat_id, sat_id, tat_id]):
+        available_signals.add("temperature")
+    if any(pid is not None for pid in [cas_id, tas_id, mach_id]):
+        available_signals.add("air_data_speed")
+    if any(
+        pid is not None
+        for pid in [pressure_altitude_id, oat_id, sat_id, tat_id, cas_id, tas_id, mach_id]
+    ):
+        available_signals.add("atmosphere_air_data")
 
     if not selected_ids:
         return _unavailable_metrics(
@@ -981,10 +1351,19 @@ def compute_performance_metrics(
         points.append(
             {
                 "ts": ts,
+                "pressure_altitude": (
+                    values.get(pressure_altitude_id) if pressure_altitude_id is not None else None
+                ),
                 "altitude": values.get(altitude_id) if altitude_id is not None else None,
                 "vertical_speed": values.get(vertical_speed_id) if vertical_speed_id is not None else None,
                 "ground_speed": values.get(ground_speed_id) if ground_speed_id is not None else None,
                 "accel": values.get(accel_id) if accel_id is not None else None,
+                "oat": values.get(oat_id) if oat_id is not None else None,
+                "sat": values.get(sat_id) if sat_id is not None else None,
+                "tat": values.get(tat_id) if tat_id is not None else None,
+                "cas": values.get(cas_id) if cas_id is not None else None,
+                "tas": values.get(tas_id) if tas_id is not None else None,
+                "mach": values.get(mach_id) if mach_id is not None else None,
             }
         )
 
@@ -1042,6 +1421,19 @@ def compute_performance_metrics(
     accel_mean_g = (sum(accel_values) / len(accel_values)) if accel_values else None
     accel_mean_fts2 = (accel_mean_g * 32.174) if accel_mean_g is not None else None
 
+    air_data_support = _compute_air_data_support(
+        points=points,
+        param_map=param_map,
+        pressure_altitude_id=pressure_altitude_id,
+        altitude_id=altitude_id,
+        oat_id=oat_id,
+        sat_id=sat_id,
+        tat_id=tat_id,
+        cas_id=cas_id,
+        tas_id=tas_id,
+        mach_id=mach_id,
+    )
+
     evaluation = evaluate_capability_request(
         "performance_general",
         available_signals=available_signals,
@@ -1063,11 +1455,13 @@ def compute_performance_metrics(
             "min_speed_kt": round(min_speed_kt, 2) if min_speed_kt is not None else None,
             "accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
             "accel_mean_fts2": round(accel_mean_fts2, 3) if accel_mean_fts2 is not None else None,
+            "air_data_support": air_data_support,
             },
             assumptions=[
                 "Metrics are computed only from available channels in the selected dataset version.",
                 "Mean climb rate is derived from vertical-speed channel when present, otherwise altitude/time fallback.",
-                "No atmospheric, thrust, or certification correction models are applied in this bounded mode.",
+                "Atmosphere/air-data outputs use ISA and low-compressibility engineering approximations from available telemetry.",
+                "No formal pitot-static calibration, full air-data correction campaign, thrust model, or certification correction model is applied in this bounded mode.",
             ],
         ),
         evaluation,
@@ -1708,6 +2102,55 @@ def build_deterministic_performance_section(metrics: dict) -> str:
         lines.append(
             f"- Mean longitudinal acceleration: **{metrics.get('accel_mean_g')} g ({metrics.get('accel_mean_fts2')} ft/s^2)**"
         )
+
+    air_data = metrics.get("air_data_support") or {}
+    lines.extend(["", "### Atmosphere / Air-Data Support"])
+    if air_data.get("available"):
+        lines.append("- Result type: **Bounded atmosphere/air-data engineering support summary**")
+        channels_used = air_data.get("channels_used") or []
+        if channels_used:
+            lines.append("- Channels used: " + ", ".join(channels_used))
+
+        def _fmt_summary(label: str, key: str, unit: str = "") -> None:
+            summary = air_data.get(key)
+            if not summary:
+                return
+            unit_suffix = f" {unit}" if unit else ""
+            lines.append(
+                f"- {label}: mean **{summary.get('mean')}**{unit_suffix}, "
+                f"min **{summary.get('min')}**, max **{summary.get('max')}** "
+                f"(samples={summary.get('samples')})"
+            )
+
+        _fmt_summary("Pressure altitude", "pressure_altitude_ft", "ft")
+        _fmt_summary("OAT", "oat_c", "°C")
+        _fmt_summary("SAT", "sat_c", "°C")
+        _fmt_summary("TAT", "tat_c", "°C")
+        _fmt_summary("CAS", "cas_kt", "kt")
+        _fmt_summary("TAS", "tas_kt", "kt")
+        _fmt_summary("Mach (measured)", "mach", "")
+        _fmt_summary("ISA sigma", "isa_sigma", "")
+        _fmt_summary("Density altitude estimate", "density_altitude_ft", "ft")
+        _fmt_summary("TAS estimate from CAS+sigma", "tas_est_from_cas_sigma_kt", "kt")
+        _fmt_summary("Mach estimate from TAS+temperature", "mach_est_from_tas_temp", "")
+        _fmt_summary("TAS estimate vs measured |Δ|", "tas_est_vs_measured_abs_diff_kt", "kt")
+        _fmt_summary("Mach estimate vs measured |Δ|", "mach_est_vs_measured_abs_diff", "")
+        _fmt_summary("Pressure-altitude vs altitude |Δ|", "pressure_vs_altitude_abs_diff_ft", "ft")
+
+        mach_temp_source = air_data.get("mach_temperature_source")
+        if mach_temp_source and mach_temp_source != "none":
+            lines.append(
+                f"- Mach estimate temperature source priority used: **{str(mach_temp_source).upper()}**"
+            )
+    else:
+        lines.append("- Atmosphere/air-data support is unavailable for this dataset (missing relevant channels).")
+
+    skipped = air_data.get("skipped_calculations") or []
+    if skipped:
+        lines.append("")
+        lines.append("#### Skipped Calculations")
+        for item in skipped:
+            lines.append(f"- {item}")
 
     applicability = metrics.get("capability_applicability_boundaries") or []
     limitations = metrics.get("capability_limitations") or []

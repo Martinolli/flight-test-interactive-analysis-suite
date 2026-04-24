@@ -128,18 +128,22 @@
   * Capability catalog aligned with explicit applicability boundaries.
   * Deterministic summaries first, with RAG as supporting interpretation.
 
-### P3.3 Add atmosphere / air-data engineering support
+* [x] P3.3 Add atmosphere / air-data engineering support
 
-* **Reason:** this is a strong next engineering kernel and supports better normalization in later performance work.
-* Add deterministic support for:
+  * **Reason:** this is a strong engineering kernel and supports better normalization in performance workflows.
+  * Implemented bounded deterministic atmosphere/air-data support in performance mode:
 
-  * ISA / atmosphere conversions
-  * pressure / temperature / density derivations
-  * TAS / CAS / Mach support where data allows
-  * basic air-data cross-check calculations
-* This task is a strong candidate for selective PDAS/Fortran-to-Python adaptation of validated routines.
-* Keep methods bounded and traceable.
-* Do not imply full air-data calibration package unless actually implemented.
+    * ISA snapshot derivation from pressure altitude
+    * density-altitude estimate from pressure altitude + OAT
+    * TAS estimate from CAS + sigma (bounded low-compressibility approximation)
+    * Mach estimate from TAS + temperature source (SAT/OAT/TAT priority)
+    * consistency summaries for TAS/Mach estimate-vs-measured and pressure-altitude-vs-altitude
+  * Output now explicitly lists:
+
+    * channels used
+    * skipped calculations when required inputs are missing
+    * applicability boundaries and non-calibration limitations
+  * Capability catalog and prompt-intent routing keywords were aligned for air-data/performance terminology.
 
 ### P3.4 Harden buffet / vibration workflow
 
@@ -192,10 +196,9 @@
 
 ## Immediate Execution Order
 
-1. **P3.3 — Add atmosphere / air-data engineering support**
-2. **P3.4 — Harden buffet / vibration workflow**
-3. **P3.5 — Add bounded flutter-support pre-screening**
-4. **P3.6 — Expand manual / documentation package**
+1. **P3.4 — Harden buffet / vibration workflow**
+2. **P3.5 — Add bounded flutter-support pre-screening**
+3. **P3.6 — Expand manual / documentation package**
 
 ---
 
@@ -208,11 +211,9 @@
   * retrieval metadata
   * confidence/coverage/applicability controls
 * P2.5 FRAT workflow is now complete and establishes mission-risk state, scoring, hard-stops, approval/finalization, and immutable export.
-* The biggest current product gap is now routing quality:
-
-  * prompt intent can still mismatch selected mode
+* Prompt-to-mode guard is now enforced with explicit mismatch severity and guarded execution.
 * Handling/control-response mode is now a bounded deterministic workflow with explicit non-certification boundaries.
-* Atmosphere / air-data support should come before deeper vibration/flutter expansion because it strengthens engineering kernels broadly.
+* Atmosphere / air-data support is now available as a bounded deterministic kernel inside performance mode.
 * Buffet/vibration should be hardened before any flutter-support pre-screening.
 * Manual/documentation expansion should continue in parallel when practical, but it becomes much more valuable after FRAT and P3.1/P3.2 stabilization.
 
@@ -226,7 +227,7 @@
 * [x] G4 Domainization Gate (after P2.1 + first additional deterministic modules)
 * [ ] G5 Mission Decision Gate (after P2.5)
 * [x] G6 Routing Integrity Gate (after P3.1)
-* [ ] G7 Control/Handling Analysis Gate (after P3.2–P3.3)
+* [x] G7 Control/Handling Analysis Gate (after P3.2–P3.3)
 
 ---
 

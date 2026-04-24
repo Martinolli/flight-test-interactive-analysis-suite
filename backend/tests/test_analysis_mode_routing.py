@@ -269,6 +269,7 @@ def test_ai_analysis_performance_mode_runs_mode_specific_deterministic_metrics(
     assert body["capability_key"] == "performance_general"
     assert "Deterministic Calculation (Performance Trends) [DATA]" in body["analysis"]
     assert "Mean climb rate" in body["analysis"]
+    assert "Atmosphere / Air-Data Support" in body["analysis"]
     assert "Deterministic Calculation (Flight Data) [DATA]" not in body["analysis"]
 
 

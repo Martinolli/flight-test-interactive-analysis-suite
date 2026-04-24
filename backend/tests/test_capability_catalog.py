@@ -81,6 +81,7 @@ def test_performance_general_capability_is_bounded_deterministic():
     assert cap is not None
     assert cap.status == CapabilityImplementationStatus.IMPLEMENTED
     assert cap.authority == CapabilityAuthority.DETERMINISTIC_PRIMARY
+    assert "atmosphere_air_data" in cap.required_inputs.optional_signals
 
     evaluation = evaluate_capability_request(
         "performance_general",
@@ -90,7 +91,9 @@ def test_performance_general_capability_is_bounded_deterministic():
         data_coverage_ok=True,
     )
     assert evaluation.outcome == CapabilityOutcome.ALLOW_WITH_LIMITATIONS
-    assert "certification" in " ".join(evaluation.applicability_boundaries).lower()
+    combined = " ".join(evaluation.applicability_boundaries).lower()
+    assert "certification" in combined
+    assert "air-data" in combined
 
 
 def test_buffet_vibration_capability_is_deterministic_screening_only():
