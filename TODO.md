@@ -262,6 +262,37 @@ These baseline controls should be protected by regression tests.
 
 ## Deferred / Later Candidates
 
+* [ ] FRAT explanation / reporting gap for no-analysis cases
+
+  * When no analysis job is linked, FRAT currently produces a score without a structured explanation layer.
+  * This creates a decision-output gap: score-driven No-Go without clear rationale.
+
+  Proposed improvements:
+
+  * Auto-generate a minimal FRAT risk summary when no analysis is linked:
+
+    * category score breakdown
+    * dominant risk drivers
+    * explicit statement: "no technical analysis evidence linked"
+    * recommendation aligned with risk band
+
+  * Require reviewer notes when:
+
+    * score ≥ moderate
+    * AND no linked analysis job
+
+  * Optional enhancement:
+
+    * introduce bounded penalty for "no analysis" to represent uncertainty
+    * differentiate between:
+      no analysis (uncertainty)
+      weak analysis (penalized via controls)
+
+  Goal:
+
+  * Ensure every FRAT decision (especially No-Go) has a clear, traceable explanation
+  * Preserve auditability and avoid silent or ambiguous decision states
+
 * [ ] Document visibility / sharing model
 
   * private vs shared vs admin-visible standards library
