@@ -21,7 +21,9 @@ def _create_flight_test(db_session, user_id: int, name: str = "Admin Report Test
     return flight_test
 
 
-def test_admin_pdf_export_uses_persisted_analysis_job(client, db_session, admin_user, admin_headers, monkeypatch):
+def test_admin_pdf_export_uses_persisted_analysis_job(
+    client, db_session, admin_user, admin_headers, monkeypatch
+):
     flight_test = _create_flight_test(db_session, admin_user["id"])
     job = AnalysisJob(
         flight_test_id=flight_test.id,
@@ -41,7 +43,9 @@ def test_admin_pdf_export_uses_persisted_analysis_job(client, db_session, admin_
 
     captured = {}
 
-    def fake_build_pdf(*, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None):
+    def fake_build_pdf(
+        *, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None
+    ):
         captured["analysis_text"] = analysis_text
         captured["analysis_job_id"] = analysis_job.id if analysis_job else None
         captured["stats_snapshot"] = stats_snapshot
@@ -62,7 +66,9 @@ def test_admin_pdf_export_uses_persisted_analysis_job(client, db_session, admin_
     assert captured["stats_snapshot"] == []
 
 
-def test_admin_pdf_export_rejects_unknown_analysis_job(client, db_session, admin_user, admin_headers):
+def test_admin_pdf_export_rejects_unknown_analysis_job(
+    client, db_session, admin_user, admin_headers
+):
     flight_test = _create_flight_test(db_session, admin_user["id"], name="Missing Analysis Job")
 
     response = client.post(
@@ -125,7 +131,9 @@ def test_admin_pdf_export_uses_persisted_stats_snapshot_after_data_changes(
 
     captured = {}
 
-    def fake_build_pdf(*, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None):
+    def fake_build_pdf(
+        *, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None
+    ):
         captured["stats_snapshot"] = stats_snapshot
         return b"%PDF-1.4\n%mock\n"
 
@@ -255,7 +263,9 @@ def test_build_pdf_contains_professional_sections_and_provenance_block(db_sessio
 def test_build_pdf_takeoff_context_includes_result_classification_and_limitations(
     db_session, admin_user
 ):
-    flight_test = _create_flight_test(db_session, admin_user["id"], name="Takeoff Wording Hardening")
+    flight_test = _create_flight_test(
+        db_session, admin_user["id"], name="Takeoff Wording Hardening"
+    )
     job = AnalysisJob(
         flight_test_id=flight_test.id,
         created_by_id=admin_user["id"],
@@ -310,13 +320,18 @@ def test_build_pdf_takeoff_context_includes_result_classification_and_limitation
     assert b"6.3 Assumptions and Limitations" in pdf_bytes
     assert b"Wind correction not applied." in pdf_bytes
     assert b"6.5 Applicability Boundaries" in pdf_bytes
-    assert b"Not equivalent to corrected certification takeoff distance unless explicit corrections are applied." in pdf_bytes
+    assert (
+        b"Not equivalent to corrected certification takeoff distance unless explicit corrections are applied."
+        in pdf_bytes
+    )
 
 
 def test_admin_pdf_export_landing_context_uses_persisted_mode_specific_analysis_text(
     client, db_session, admin_user, admin_headers, monkeypatch
 ):
-    flight_test = _create_flight_test(db_session, admin_user["id"], name="Landing Report Compatibility")
+    flight_test = _create_flight_test(
+        db_session, admin_user["id"], name="Landing Report Compatibility"
+    )
     job = AnalysisJob(
         flight_test_id=flight_test.id,
         created_by_id=admin_user["id"],
@@ -354,7 +369,9 @@ def test_admin_pdf_export_landing_context_uses_persisted_mode_specific_analysis_
 
     captured = {}
 
-    def fake_build_pdf(*, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None):
+    def fake_build_pdf(
+        *, flight_test, stats_snapshot, analysis_text, generated_by, analysis_job=None
+    ):
         captured["analysis_text"] = analysis_text
         captured["analysis_job_id"] = analysis_job.id if analysis_job else None
         return b"%PDF-1.4\n%mock\n"

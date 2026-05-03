@@ -52,19 +52,13 @@ def _create_jwt(
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 
-def create_access_token(
-    data: dict, expires_delta: Optional[timedelta] = None
-) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
     return _create_jwt(
         data,
@@ -73,9 +67,7 @@ def create_access_token(
     )
 
 
-def create_refresh_token(
-    data: dict, expires_delta: Optional[timedelta] = None
-) -> str:
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT refresh token."""
     if expires_delta is None:
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
@@ -89,9 +81,7 @@ def create_refresh_token(
 def decode_token(token: str) -> Optional[dict]:
     """Decode and validate a JWT (access or refresh)."""
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     except JWTError:
         return None
@@ -150,7 +140,5 @@ async def get_current_superuser(
 ) -> User:
     """Get the current superuser"""
     if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=403, detail="The user doesn't have enough privileges"
-        )
+        raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
     return current_user

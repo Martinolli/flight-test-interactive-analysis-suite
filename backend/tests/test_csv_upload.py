@@ -1,14 +1,19 @@
 """Test CSV upload functionality."""
 
-from pathlib import Path
+from io import BytesIO
 
 import pytest
 from fastapi import status
 
 
-def _get_csv_path() -> Path:
-    repo_root = Path(__file__).resolve().parents[2]
-    return repo_root / "sample_data" / "Flight_Test_Data_2025_08_06.csv"
+def _build_sample_csv_file() -> BytesIO:
+    content = (
+        "timestamp,ALT,IAS,PITCH\n"
+        "2025-08-06T08:50:00,1000,120,2.5\n"
+        "2025-08-06T08:50:01,1010,121,2.6\n"
+        "2025-08-06T08:50:02,1025,123,2.7\n"
+    )
+    return BytesIO(content.encode("utf-8"))
 
 
 def _create_user(client, user_data: dict, admin_headers: dict) -> None:
@@ -51,14 +56,11 @@ def test_csv_upload_flow(client, sample_user_data, admin_headers):
     )
     flight_test_id = _create_flight_test(client, token)
 
-    csv_path = _get_csv_path()
-    assert csv_path.exists(), f"Sample CSV not found at {csv_path}"
-
-    with csv_path.open("rb") as csv_file:
+    with _build_sample_csv_file() as csv_file:
         response = client.post(
             f"/api/flight-tests/{flight_test_id}/upload-csv",
             headers={"Authorization": f"Bearer {token}"},
-            files={"file": (csv_path.name, csv_file, "text/csv")},
+            files={"file": ("flight_test_upload_fixture.csv", csv_file, "text/csv")},
         )
 
     assert response.status_code == status.HTTP_201_CREATED

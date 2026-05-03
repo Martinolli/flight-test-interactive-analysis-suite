@@ -213,9 +213,7 @@ def test_frat_analysis_job_reference_endpoint_decodes_analysis_mode(
     assert items[0]["dataset_version_id"] == dataset.id
 
 
-def test_frat_delete_flight_test_removes_assessments(
-    client, test_user, auth_headers, db_session
-):
+def test_frat_delete_flight_test_removes_assessments(client, test_user, auth_headers, db_session):
     owner = db_session.query(User).filter(User.id == test_user["id"]).first()
     assert owner is not None
 

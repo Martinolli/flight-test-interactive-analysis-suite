@@ -40,11 +40,7 @@ def _persist_ingestion_failure(
     """Persist failed ingestion state in a separate commit-safe step."""
     if not session_id:
         return
-    session = (
-        db.query(IngestionSession)
-        .filter(IngestionSession.id == session_id)
-        .first()
-    )
+    session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
     if not session:
         return
     session.status = "failed"
@@ -55,9 +51,7 @@ def _persist_ingestion_failure(
     db.add(session)
     if dataset_version_id:
         dataset_version = (
-            db.query(DatasetVersion)
-            .filter(DatasetVersion.id == dataset_version_id)
-            .first()
+            db.query(DatasetVersion).filter(DatasetVersion.id == dataset_version_id).first()
         )
         if dataset_version:
             dataset_version.status = "failed"
@@ -158,16 +152,12 @@ async def get_flight_test(
     """
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
 
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     return flight_test
 
@@ -184,15 +174,11 @@ async def list_ingestion_sessions(
     """List persisted ingestion sessions for a flight test, newest first."""
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     sessions = (
         db.query(IngestionSession)
@@ -218,15 +204,11 @@ async def list_dataset_versions(
     """List dataset versions for a flight test, newest first."""
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     versions = (
         db.query(DatasetVersion)
@@ -267,15 +249,11 @@ async def activate_dataset_version(
     """Set active dataset version for a flight test."""
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     dataset_version = (
         db.query(DatasetVersion)
@@ -345,16 +323,12 @@ async def update_flight_test(
     """
     db_flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
 
     if not db_flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     update_data = flight_test.model_dump(exclude_unset=True)
     if "test_name" in update_data:
@@ -398,16 +372,12 @@ async def delete_flight_test(
     """
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
 
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     try:
         # Break the direct FlightTest -> DatasetVersion linkage first so
@@ -432,14 +402,10 @@ async def delete_flight_test(
         db.query(FratAssessment).filter(FratAssessment.flight_test_id == test_id).delete(
             synchronize_session=False
         )
-        db.query(DatasetVersion).filter(
-            DatasetVersion.flight_test_id == test_id
-        ).delete(
+        db.query(DatasetVersion).filter(DatasetVersion.flight_test_id == test_id).delete(
             synchronize_session=False
         )
-        db.query(IngestionSession).filter(
-            IngestionSession.flight_test_id == test_id
-        ).delete(
+        db.query(IngestionSession).filter(IngestionSession.flight_test_id == test_id).delete(
             synchronize_session=False
         )
 
@@ -474,15 +440,11 @@ async def upload_flight_data_csv(
     # Verify flight test exists and belongs to the current user
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
@@ -569,8 +531,7 @@ async def upload_flight_data_csv(
             )
 
         param_units: dict[str, str] = {
-            headers[i]: (units_list[i] if i < len(units_list) else "")
-            for i in range(len(headers))
+            headers[i]: (units_list[i] if i < len(units_list) else "") for i in range(len(headers))
         }
 
         # ── Pre-load all existing parameters into a cache (1 query) ──────────
@@ -657,7 +618,7 @@ async def upload_flight_data_csv(
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"File exceeds the {MAX_ROWS:,} row limit. "
-                           "Please split the file and upload in parts.",
+                    "Please split the file and upload in parts.",
                 )
 
             csv_row_number = row_count + 2  # include header + units rows
@@ -671,9 +632,7 @@ async def upload_flight_data_csv(
                 parsed_ts = _parse_timestamp(ts_raw)
             except ValueError:
                 if len(timestamp_errors) < max_timestamp_errors:
-                    timestamp_errors.append(
-                        f"row {csv_row_number}: invalid timestamp '{ts_raw}'"
-                    )
+                    timestamp_errors.append(f"row {csv_row_number}: invalid timestamp '{ts_raw}'")
                 continue
 
             for col in data_col_names:
@@ -787,16 +746,12 @@ async def get_flight_test_data(
     """
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
 
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     effective_dataset_version_id = _resolve_dataset_version_id(
         db=db,
@@ -828,15 +783,11 @@ async def get_flight_test_parameters(
     """
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     effective_dataset_version_id = _resolve_dataset_version_id(
         db=db,
@@ -863,8 +814,9 @@ async def get_flight_test_parameters(
             DataPoint.dataset_version_id == effective_dataset_version_id
         )
     rows = (
-        stats_query
-        .group_by(TestParameter.id, TestParameter.name, TestParameter.unit, TestParameter.description)
+        stats_query.group_by(
+            TestParameter.id, TestParameter.name, TestParameter.unit, TestParameter.description
+        )
         .order_by(TestParameter.name)
         .all()
     )
@@ -903,15 +855,11 @@ async def get_flight_test_parameter_data(
 
     flight_test = (
         db.query(FlightTest)
-        .filter(
-            and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id)
-        )
+        .filter(and_(FlightTest.id == test_id, FlightTest.created_by_id == current_user.id))
         .first()
     )
     if not flight_test:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight test not found")
 
     effective_dataset_version_id = _resolve_dataset_version_id(
         db=db,
@@ -928,23 +876,15 @@ async def get_flight_test_parameter_data(
         if not param:
             continue
 
-        points_query = (
-            db.query(DataPoint)
-            .filter(
-                DataPoint.flight_test_id == test_id,
-                DataPoint.parameter_id == param.id,
-            )
+        points_query = db.query(DataPoint).filter(
+            DataPoint.flight_test_id == test_id,
+            DataPoint.parameter_id == param.id,
         )
         if effective_dataset_version_id is not None:
             points_query = points_query.filter(
                 DataPoint.dataset_version_id == effective_dataset_version_id
             )
-        points = (
-            points_query
-            .order_by(DataPoint.timestamp)
-            .limit(limit)
-            .all()
-        )
+        points = points_query.order_by(DataPoint.timestamp).limit(limit).all()
 
         if not points:
             continue
@@ -953,7 +893,7 @@ async def get_flight_test_parameter_data(
         n = len(values)
         mean = sum(values) / n
         variance = sum((v - mean) ** 2 for v in values) / n
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         # ── Min-max bucket downsampling ───────────────────────────────────────
         # Preserves peaks and valleys so the chart shows the true signal shape
@@ -978,27 +918,23 @@ async def get_flight_test_parameter_data(
                     if min_pt is not max_pt:
                         sampled.append(min_pt)
                 i = end
-            chart_data = [
-                {"timestamp": p.timestamp.isoformat(), "value": p.value}
-                for p in sampled
-            ]
+            chart_data = [{"timestamp": p.timestamp.isoformat(), "value": p.value} for p in sampled]
         else:
-            chart_data = [
-                {"timestamp": p.timestamp.isoformat(), "value": p.value}
-                for p in points
-            ]
+            chart_data = [{"timestamp": p.timestamp.isoformat(), "value": p.value} for p in points]
 
-        result.append({
-            "parameter_name": param.name,
-            "unit": param.unit,
-            "data": chart_data,
-            "statistics": {
-                "min": min(values),
-                "max": max(values),
-                "mean": mean,
-                "std_dev": std_dev,
-                "count": n,
-            },
-        })
+        result.append(
+            {
+                "parameter_name": param.name,
+                "unit": param.unit,
+                "data": chart_data,
+                "statistics": {
+                    "min": min(values),
+                    "max": max(values),
+                    "mean": mean,
+                    "std_dev": std_dev,
+                    "count": n,
+                },
+            }
+        )
 
     return result

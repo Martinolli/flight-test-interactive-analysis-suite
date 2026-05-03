@@ -5,11 +5,13 @@ SQLAlchemy ORM models
 
 try:
     from pgvector.sqlalchemy import Vector
+
     _PGVECTOR_AVAILABLE = True
 except ImportError:
     # pgvector not installed — Vector columns will use Text as a fallback
     # so the backend starts cleanly; RAG features are disabled until installed.
     from sqlalchemy import Text as Vector  # type: ignore[assignment]
+
     _PGVECTOR_AVAILABLE = False
 from sqlalchemy import (
     Boolean,
@@ -43,10 +45,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
-        return (
-            f"<User(id={self.id}, username={self.username}, "
-            f"email={self.email})>"
-        )
+        return f"<User(id={self.id}, username={self.username}, " f"email={self.email})>"
 
 
 class FlightTest(Base):
@@ -132,10 +131,7 @@ class TestParameter(Base):
     data_points = relationship("DataPoint", back_populates="parameter")
 
     def __repr__(self):
-        return (
-            f"<TestParameter(id={self.id}, name={self.name}, "
-            f"unit={self.unit})>"
-        )
+        return f"<TestParameter(id={self.id}, name={self.name}, " f"unit={self.unit})>"
 
 
 class IngestionSession(Base):
@@ -219,9 +215,7 @@ class DataPoint(Base):
         nullable=True,
         index=True,
     )
-    timestamp = Column(
-        DateTime(timezone=True), nullable=False, index=True
-    )
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     value = Column(Float, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -249,8 +243,8 @@ class Document(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String(512), nullable=False)
-    title = Column(String(512), nullable=True)          # extracted or user-supplied
-    doc_type = Column(String(100), nullable=True)       # e.g. "standard", "handbook"
+    title = Column(String(512), nullable=True)  # extracted or user-supplied
+    doc_type = Column(String(100), nullable=True)  # e.g. "standard", "handbook"
     description = Column(Text, nullable=True)
     total_pages = Column(Integer, nullable=True)
     total_chunks = Column(Integer, nullable=True)
@@ -277,10 +271,7 @@ class Document(Base):
     )
 
     def __repr__(self):
-        return (
-            f"<Document(id={self.id}, filename={self.filename}, "
-            f"status={self.status})>"
-        )
+        return f"<Document(id={self.id}, filename={self.filename}, " f"status={self.status})>"
 
 
 class DocumentChunk(Base):
@@ -292,14 +283,12 @@ class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
     id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(
-        Integer, ForeignKey("documents.id"), nullable=False, index=True
-    )
-    chunk_index = Column(Integer, nullable=False)       # order within the document
-    text = Column(Text, nullable=False)                 # raw chunk text
-    page_numbers = Column(String(255), nullable=True)   # e.g. "12-14"
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)  # order within the document
+    text = Column(Text, nullable=False)  # raw chunk text
+    page_numbers = Column(String(255), nullable=True)  # e.g. "12-14"
     section_title = Column(String(512), nullable=True)  # heading from Docling
-    embedding = Column(Vector(1536), nullable=True)     # OpenAI text-embedding-3-small
+    embedding = Column(Vector(1536), nullable=True)  # OpenAI text-embedding-3-small
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -447,9 +436,15 @@ class FratAssessment(Base):
     flight_test = relationship("FlightTest", back_populates="frat_assessments")
     dataset_version = relationship("DatasetVersion", back_populates="frat_assessments")
     created_by = relationship("User", foreign_keys=[created_by_id], backref="frat_assessments")
-    approved_by = relationship("User", foreign_keys=[approved_by_id], backref="approved_frat_assessments")
-    rejected_by = relationship("User", foreign_keys=[rejected_by_id], backref="rejected_frat_assessments")
-    finalized_by = relationship("User", foreign_keys=[finalized_by_id], backref="finalized_frat_assessments")
+    approved_by = relationship(
+        "User", foreign_keys=[approved_by_id], backref="approved_frat_assessments"
+    )
+    rejected_by = relationship(
+        "User", foreign_keys=[rejected_by_id], backref="rejected_frat_assessments"
+    )
+    finalized_by = relationship(
+        "User", foreign_keys=[finalized_by_id], backref="finalized_frat_assessments"
+    )
 
     def __repr__(self):
         return (

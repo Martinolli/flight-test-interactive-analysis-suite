@@ -11,6 +11,7 @@ from openpyxl import Workbook
 
 class TestParameterCRUD:
     """Test Parameter CRUD operations"""
+
     def test_create_parameter(self, client, auth_headers):
         """Test creating a new parameter"""
         response = client.post(
@@ -22,9 +23,9 @@ class TestParameterCRUD:
                 "system": "Navigation",
                 "category": "Position",
                 "min_value": 0.0,
-                "max_value": 50000.0
+                "max_value": 50000.0,
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -39,12 +40,8 @@ class TestParameterCRUD:
         # Create first parameter
         client.post(
             "/api/parameters/",
-            json={
-                "name": "DUPLICATE_PARAM",
-                "description": "Test Parameter",
-                "unit": "deg"
-            },
-            headers=auth_headers
+            json={"name": "DUPLICATE_PARAM", "description": "Test Parameter", "unit": "deg"},
+            headers=auth_headers,
         )
 
         # Try to create duplicate
@@ -53,9 +50,9 @@ class TestParameterCRUD:
             json={
                 "name": "DUPLICATE_PARAM",
                 "description": "Another Test Parameter",
-                "unit": "deg"
+                "unit": "deg",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -70,9 +67,9 @@ class TestParameterCRUD:
                 json={
                     "name": f"TEST_PARAM_{i}",
                     "description": f"Test Parameter {i}",
-                    "unit": "unit"
+                    "unit": "unit",
                 },
-                headers=auth_headers
+                headers=auth_headers,
             )
 
         response = client.get("/api/parameters/", headers=auth_headers)
@@ -90,21 +87,19 @@ class TestParameterCRUD:
                 json={
                     "name": f"PAGINATION_PARAM_{i}",
                     "description": f"Pagination Test {i}",
-                    "unit": "unit"
+                    "unit": "unit",
                 },
-                headers=auth_headers
+                headers=auth_headers,
             )
 
         # Test with limit
-        response = client.get("/api/parameters/?limit=5",
-                              headers=auth_headers)
+        response = client.get("/api/parameters/?limit=5", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) <= 5
 
         # Test with skip
-        response = client.get("/api/parameters/?skip=5&limit=3",
-                              headers=auth_headers)
+        response = client.get("/api/parameters/?skip=5&limit=3", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) <= 3
@@ -118,15 +113,14 @@ class TestParameterCRUD:
                 "name": "SPECIFIC_PARAM",
                 "description": "Specific Test Parameter",
                 "unit": "deg",
-                "system": "Flight Control"
+                "system": "Flight Control",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
         param_id = create_response.json()["id"]
 
         # Retrieve it
-        response = client.get(f"/api/parameters/{param_id}",
-                              headers=auth_headers)
+        response = client.get(f"/api/parameters/{param_id}", headers=auth_headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -144,12 +138,8 @@ class TestParameterCRUD:
         # Create a parameter
         create_response = client.post(
             "/api/parameters/",
-            json={
-                "name": "UPDATE_PARAM",
-                "description": "Original Description",
-                "unit": "deg"
-            },
-            headers=auth_headers
+            json={"name": "UPDATE_PARAM", "description": "Original Description", "unit": "deg"},
+            headers=auth_headers,
         )
         param_id = create_response.json()["id"]
 
@@ -162,9 +152,9 @@ class TestParameterCRUD:
                 "unit": "rad",
                 "system": "Updated System",
                 "min_value": 0.0,
-                "max_value": 360.0
+                "max_value": 360.0,
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -179,23 +169,17 @@ class TestParameterCRUD:
         # Create a parameter
         create_response = client.post(
             "/api/parameters/",
-            json={
-                "name": "DELETE_PARAM",
-                "description": "To Be Deleted",
-                "unit": "unit"
-            },
-            headers=auth_headers
+            json={"name": "DELETE_PARAM", "description": "To Be Deleted", "unit": "unit"},
+            headers=auth_headers,
         )
         param_id = create_response.json()["id"]
 
         # Delete it
-        response = client.delete(f"/api/parameters/{param_id}",
-                                 headers=auth_headers)
+        response = client.delete(f"/api/parameters/{param_id}", headers=auth_headers)
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify it's gone
-        get_response = client.get(f"/api/parameters/{param_id}",
-                                  headers=auth_headers)
+        get_response = client.get(f"/api/parameters/{param_id}", headers=auth_headers)
         assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_search_parameters_by_system(self, client, auth_headers):
@@ -210,21 +194,19 @@ class TestParameterCRUD:
                         "name": f"{system.upper()}_{j}",
                         "description": f"{system} Parameter {j}",
                         "unit": "unit",
-                        "system": system
+                        "system": system,
                     },
-                    headers=auth_headers
+                    headers=auth_headers,
                 )
 
         # Search for Navigation parameters
-        response = client.get("/api/parameters/?system=Navigation",
-                              headers=auth_headers)
+        response = client.get("/api/parameters/?system=Navigation", headers=auth_headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert all(p["system"] == "Navigation" for p in data)
 
-    def test_search_parameters_by_category(self, client,
-                                           auth_headers):
+    def test_search_parameters_by_category(self, client, auth_headers):
         """Test searching parameters by category"""
         # Create parameters with different categories
         categories = ["Position", "Attitude", "Performance"]
@@ -236,14 +218,13 @@ class TestParameterCRUD:
                         "name": f"{category.upper()}_{j}",
                         "description": f"{category} Parameter {j}",
                         "unit": "unit",
-                        "category": category
+                        "category": category,
                     },
-                    headers=auth_headers
+                    headers=auth_headers,
                 )
 
         # Search for Position parameters
-        response = client.get("/api/parameters/?category=Position",
-                              headers=auth_headers)
+        response = client.get("/api/parameters/?category=Position", headers=auth_headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -261,16 +242,12 @@ class TestExcelUpload:
         ws.title = "Parameters"
 
         # Add headers
-        ws.append(["Name", "Description", "Unit", "System", "Category",
-                   "Min Value", "Max Value"])
+        ws.append(["Name", "Description", "Unit", "System", "Category", "Min Value", "Max Value"])
 
         # Add data
-        ws.append(["ALT_MSL", "Altitude MSL", "ft", "Navigation",
-                   "Position", 0, 50000])
-        ws.append(["IAS", "Indicated Airspeed", "kt", "Navigation",
-                   "Performance", 0, 500])
-        ws.append(["PITCH", "Pitch Angle", "deg", "Flight Control",
-                   "Attitude", -90, 90])
+        ws.append(["ALT_MSL", "Altitude MSL", "ft", "Navigation", "Position", 0, 50000])
+        ws.append(["IAS", "Indicated Airspeed", "kt", "Navigation", "Performance", 0, 500])
+        ws.append(["PITCH", "Pitch Angle", "deg", "Flight Control", "Attitude", -90, 90])
 
         # Save to BytesIO
         excel_file = io.BytesIO()
@@ -278,16 +255,9 @@ class TestExcelUpload:
         excel_file.seek(0)
 
         # Upload
-        mime_type = (
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        )
+        mime_type = "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
         files = {"file": ("parameters.xlsx", excel_file, mime_type)}
-        response = client.post(
-            "/api/parameters/upload-excel",
-            files=files,
-            headers=auth_headers
-        )
+        response = client.post("/api/parameters/upload-excel", files=files, headers=auth_headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -299,38 +269,24 @@ class TestExcelUpload:
         # Create a parameter first
         client.post(
             "/api/parameters/",
-            json={
-                "name": "EXISTING_PARAM",
-                "description": "Existing Parameter",
-                "unit": "unit"
-            },
-            headers=auth_headers
+            json={"name": "EXISTING_PARAM", "description": "Existing Parameter", "unit": "unit"},
+            headers=auth_headers,
         )
 
         # Create Excel with duplicate
         wb = Workbook()
         ws = wb.active
-        ws.append(["Name", "Description", "Unit", "System",
-                   "Category", "Min Value", "Max Value"])
-        ws.append(["EXISTING_PARAM", "Duplicate Parameter",
-                   "unit", "System", "Category", 0, 100])
-        ws.append(["NEW_PARAM", "New Parameter",
-                   "unit", "System", "Category", 0, 100])
+        ws.append(["Name", "Description", "Unit", "System", "Category", "Min Value", "Max Value"])
+        ws.append(["EXISTING_PARAM", "Duplicate Parameter", "unit", "System", "Category", 0, 100])
+        ws.append(["NEW_PARAM", "New Parameter", "unit", "System", "Category", 0, 100])
 
         excel_file = io.BytesIO()
         wb.save(excel_file)
         excel_file.seek(0)
 
-        mime_type = (
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        )
+        mime_type = "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
         files = {"file": ("parameters.xlsx", excel_file, mime_type)}
-        response = client.post(
-            "/api/parameters/upload-excel",
-            files=files,
-            headers=auth_headers
-        )
+        response = client.post("/api/parameters/upload-excel", files=files, headers=auth_headers)
 
         # Should handle duplicates gracefully
         assert response.status_code == status.HTTP_200_OK
@@ -342,13 +298,8 @@ class TestExcelUpload:
         # Create a text file
         text_file = io.BytesIO(b"Not an Excel file")
 
-        files = {"file": ("test.txt", text_file,
-                          "text/plain")}
-        response = client.post(
-            "/api/parameters/upload-excel",
-            files=files,
-            headers=auth_headers
-        )
+        files = {"file": ("test.txt", text_file, "text/plain")}
+        response = client.post("/api/parameters/upload-excel", files=files, headers=auth_headers)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Excel" in response.json()["detail"]
@@ -363,20 +314,12 @@ class TestExcelUpload:
         wb.save(excel_file)
         excel_file.seek(0)
 
-        mime_type = (
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        )
+        mime_type = "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
         files = {"file": ("empty.xlsx", excel_file, mime_type)}
-        response = client.post(
-            "/api/parameters/upload-excel",
-            files=files,
-            headers=auth_headers
-        )
+        response = client.post("/api/parameters/upload-excel", files=files, headers=auth_headers)
 
         # Should handle empty file gracefully
-        assert response.status_code in [status.HTTP_200_OK,
-                                        status.HTTP_400_BAD_REQUEST]
+        assert response.status_code in [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST]
 
     def test_excel_upload_missing_required_columns(self, client, auth_headers):
         """Test Excel upload with missing required columns"""
@@ -389,16 +332,9 @@ class TestExcelUpload:
         wb.save(excel_file)
         excel_file.seek(0)
 
-        mime_type = (
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        )
+        mime_type = "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
         files = {"file": ("invalid.xlsx", excel_file, mime_type)}
-        response = client.post(
-            "/api/parameters/upload-excel",
-            files=files,
-            headers=auth_headers
-        )
+        response = client.post("/api/parameters/upload-excel", files=files, headers=auth_headers)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "required" in response.json()["detail"].lower()
@@ -414,15 +350,13 @@ class TestBulkOperations:
                 "name": f"BULK_PARAM_{i}",
                 "description": f"Bulk Parameter {i}",
                 "unit": "unit",
-                "system": "Test System"
+                "system": "Test System",
             }
             for i in range(10)
         ]
 
         response = client.post(
-            "/api/parameters/bulk",
-            json={"parameters": parameters},
-            headers=auth_headers
+            "/api/parameters/bulk", json={"parameters": parameters}, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -436,29 +370,19 @@ class TestBulkOperations:
         for i in range(5):
             response = client.post(
                 "/api/parameters/",
-                json={
-                    "name": f"BULK_UPDATE_{i}",
-                    "description": f"Original {i}",
-                    "unit": "unit"
-                },
-                headers=auth_headers
+                json={"name": f"BULK_UPDATE_{i}", "description": f"Original {i}", "unit": "unit"},
+                headers=auth_headers,
             )
             param_ids.append(response.json()["id"])
 
         # Bulk update
         updates = [
-            {
-                "id": param_id,
-                "description": f"Updated {i}",
-                "system": "Updated System"
-            }
+            {"id": param_id, "description": f"Updated {i}", "system": "Updated System"}
             for i, param_id in enumerate(param_ids)
         ]
 
         response = client.put(
-            "/api/parameters/bulk",
-            json={"parameters": updates},
-            headers=auth_headers
+            "/api/parameters/bulk", json={"parameters": updates}, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -472,12 +396,8 @@ class TestBulkOperations:
         for i in range(5):
             response = client.post(
                 "/api/parameters/",
-                json={
-                    "name": f"BULK_DELETE_{i}",
-                    "description": f"To Delete {i}",
-                    "unit": "unit"
-                },
-                headers=auth_headers
+                json={"name": f"BULK_DELETE_{i}", "description": f"To Delete {i}", "unit": "unit"},
+                headers=auth_headers,
             )
             param_ids.append(response.json()["id"])
 
@@ -493,8 +413,7 @@ class TestBulkOperations:
 
         # Verify all are deleted
         for param_id in param_ids:
-            get_response = client.get(f"/api/parameters/{param_id}",
-                                      headers=auth_headers)
+            get_response = client.get(f"/api/parameters/{param_id}", headers=auth_headers)
             assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -505,18 +424,13 @@ class TestParameterValidation:
         """Test creating parameter with invalid name"""
         response = client.post(
             "/api/parameters/",
-            json={
-                "name": "",  # Empty name
-                "description": "Test",
-                "unit": "unit"
-            },
-            headers=auth_headers
+            json={"name": "", "description": "Test", "unit": "unit"},  # Empty name
+            headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_create_parameter_missing_required_fields(self,
-                                                      client, auth_headers):
+    def test_create_parameter_missing_required_fields(self, client, auth_headers):
         """Test creating parameter without required fields"""
         response = client.post(
             "/api/parameters/",
@@ -524,7 +438,7 @@ class TestParameterValidation:
                 "description": "Test"
                 # Missing name and unit
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -538,9 +452,9 @@ class TestParameterValidation:
                 "description": "Invalid Range",
                 "unit": "unit",
                 "min_value": 100.0,
-                "max_value": 50.0  # Max less than min
+                "max_value": 50.0,  # Max less than min
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         # Should either reject or swap values
@@ -559,11 +473,7 @@ class TestAuthentication:
         """Test that creating parameter requires authentication"""
         response = client.post(
             "/api/parameters/",
-            json={
-                "name": "UNAUTH_PARAM",
-                "description": "Unauthorized",
-                "unit": "unit"
-            }
+            json={"name": "UNAUTH_PARAM", "description": "Unauthorized", "unit": "unit"},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -582,10 +492,7 @@ class TestAuthentication:
         wb.save(excel_file)
         excel_file.seek(0)
 
-        mime_type = (
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        )
+        mime_type = "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
         files = {"file": ("test.xlsx", excel_file, mime_type)}
         response = client.post("/api/parameters/upload-excel", files=files)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

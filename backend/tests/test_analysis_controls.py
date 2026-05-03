@@ -133,7 +133,9 @@ def test_flutter_controls_escalate_warning_when_concern_indicators_are_high():
             "samples_used": 180,
             "concern_level": "elevated",
             "concern_indicator_count": 2,
-            "concern_indicators": [{"severity": "high", "key": "high_speed_regime_event_concentration"}],
+            "concern_indicators": [
+                {"severity": "high", "key": "high_speed_regime_event_concentration"}
+            ],
             "dominant_windows": [{"channel_name": "AIRFRAME VIBRATION"}],
         },
         retrieved_sources=[],

@@ -187,11 +187,11 @@ def _dataset_provenance_dict(analysis_job: Optional[AnalysisJob]) -> Dict[str, s
         "dataset_label": _sanitize_pdf_text(dataset.label or "—"),
         "dataset_number": str(dataset.version_number),
         "dataset_status": _sanitize_pdf_text(dataset.status or "—"),
-        "dataset_row_count": _format_int(dataset.row_count) if dataset.row_count is not None else "—",
+        "dataset_row_count": (
+            _format_int(dataset.row_count) if dataset.row_count is not None else "—"
+        ),
         "dataset_data_points": (
-            _format_int(dataset.data_points_count)
-            if dataset.data_points_count is not None
-            else "—"
+            _format_int(dataset.data_points_count) if dataset.data_points_count is not None else "—"
         ),
         "source_session_id": (
             str(dataset.source_session_id) if dataset.source_session_id is not None else "—"
@@ -222,9 +222,7 @@ def _analysis_summary_dict(
         }
 
     created_at = (
-        analysis_job.created_at.strftime("%Y-%m-%d %H:%M UTC")
-        if analysis_job.created_at
-        else "—"
+        analysis_job.created_at.strftime("%Y-%m-%d %H:%M UTC") if analysis_job.created_at else "—"
     )
     model_line = _sanitize_pdf_text(analysis_job.model_name or "—")
     if analysis_job.model_version:
@@ -243,9 +241,7 @@ def _analysis_summary_dict(
             str(controls.get("deterministic_confidence", "—"))
         ),
         "retrieval_coverage": _sanitize_pdf_text(str(controls.get("retrieval_coverage", "—"))),
-        "applicability_status": _sanitize_pdf_text(
-            str(controls.get("applicability_status", "—"))
-        ),
+        "applicability_status": _sanitize_pdf_text(str(controls.get("applicability_status", "—"))),
         "warning_level": _sanitize_pdf_text(str(controls.get("warning_level", "—"))),
         "downgrade_reason": _sanitize_pdf_text(str(downgrade_reason)),
         "output_sha256": analysis_job.output_sha256 or "—",
@@ -285,7 +281,9 @@ def _is_takeoff_groundroll_context(
     analysis_text: str,
     analysis_job: Optional[AnalysisJob],
 ) -> bool:
-    haystack = f"{analysis_text or ''}\n{(analysis_job.prompt_text if analysis_job else '')}".lower()
+    haystack = (
+        f"{analysis_text or ''}\n{(analysis_job.prompt_text if analysis_job else '')}".lower()
+    )
     has_takeoff = "takeoff" in haystack
     has_groundroll = ("ground roll" in haystack) or ("liftoff" in haystack) or ("wow" in haystack)
     return has_takeoff and has_groundroll
@@ -295,11 +293,16 @@ def _section_key_for_heading(heading_text: str) -> str:
     title = heading_text.strip().lower()
     if not title:
         return "general"
-    if any(token in title for token in ["deterministic", "computed metrics", "wow-based", "equations"]):
+    if any(
+        token in title for token in ["deterministic", "computed metrics", "wow-based", "equations"]
+    ):
         return "deterministic"
     if any(token in title for token in ["standards cross-check", "standards", "compliance"]):
         return "standards"
-    if any(token in title for token in ["assumption", "limitations", "risk", "constraint", "uncertainty"]):
+    if any(
+        token in title
+        for token in ["assumption", "limitations", "risk", "constraint", "uncertainty"]
+    ):
         return "assumptions"
     if any(token in title for token in ["recommendation", "mitigation", "next step", "actions"]):
         return "recommendations"
@@ -372,6 +375,7 @@ def _default_takeoff_applicability() -> List[str]:
 # Pydantic schemas (admin-specific)
 # ---------------------------------------------------------------------------
 
+
 class AdminUserOut(BaseModel):
     id: int
     username: str
@@ -388,6 +392,7 @@ class AdminUserOut(BaseModel):
 
 class AdminUserUpdate(BaseModel):
     """Fields an admin can change on any user account."""
+
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
@@ -397,6 +402,7 @@ class AdminUserUpdate(BaseModel):
 
 class AdminUserCreate(BaseModel):
     """Fields required to create a new user account."""
+
     username: str
     email: EmailStr
     password: str
@@ -407,6 +413,7 @@ class AdminUserCreate(BaseModel):
 # ---------------------------------------------------------------------------
 # POST /api/admin/users  — create a new user
 # ---------------------------------------------------------------------------
+
 
 @router.post("/users", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
 def create_user(
@@ -443,6 +450,7 @@ def create_user(
 # GET /api/admin/users  — list all users
 # ---------------------------------------------------------------------------
 
+
 @router.get("/users", response_model=List[AdminUserOut])
 def list_users(
     db: Session = Depends(get_db),
@@ -456,6 +464,7 @@ def list_users(
 # ---------------------------------------------------------------------------
 # PATCH /api/admin/users/{user_id}  — update role / password / status
 # ---------------------------------------------------------------------------
+
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)
 def update_user(
@@ -502,6 +511,7 @@ def update_user(
 # DELETE /api/admin/users/{user_id}  — delete a user
 # ---------------------------------------------------------------------------
 
+
 @router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
 def delete_user(
     user_id: int,
@@ -525,6 +535,7 @@ def delete_user(
 # ---------------------------------------------------------------------------
 # GET /api/admin/flight-tests/{flight_test_id}/report.pdf
 # ---------------------------------------------------------------------------
+
 
 @router.get("/flight-tests/{flight_test_id}/report.pdf")
 def export_ai_analysis_pdf(
@@ -574,6 +585,7 @@ def export_ai_analysis_pdf(
 # POST /api/admin/flight-tests/{flight_test_id}/report.pdf
 # (accepts analysis text in request body — avoids URL length limits)
 # ---------------------------------------------------------------------------
+
 
 class PDFReportRequest(BaseModel):
     analysis_job_id: int
@@ -626,6 +638,7 @@ def export_ai_analysis_pdf_post(
 # ---------------------------------------------------------------------------
 # PDF builder (reportlab)
 # ---------------------------------------------------------------------------
+
 
 def _build_pdf(
     flight_test: FlightTest,
@@ -784,9 +797,7 @@ def _build_pdf(
     generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     normalized_stats = _normalise_stats_snapshot(stats_snapshot)
     retrieved_sources_snapshot = (
-        _load_retrieved_sources_snapshot(analysis_job)
-        if analysis_job is not None
-        else []
+        _load_retrieved_sources_snapshot(analysis_job) if analysis_job is not None else []
     )
     dataset_summary = _dataset_provenance_dict(analysis_job)
     analysis_summary = _analysis_summary_dict(
@@ -826,14 +837,19 @@ def _build_pdf(
     )
 
     metadata_rows = [
-        [Paragraph("Flight Test ID", meta_label_style), Paragraph(str(flight_test.id), meta_value_style)],
+        [
+            Paragraph("Flight Test ID", meta_label_style),
+            Paragraph(str(flight_test.id), meta_value_style),
+        ],
         [
             Paragraph("Flight Test Name", meta_label_style),
             Paragraph(_sanitize_pdf_text(flight_test.test_name), meta_value_style),
         ],
         [
             Paragraph("Aircraft Type", meta_label_style),
-            Paragraph(_sanitize_pdf_text(flight_test.aircraft_type or "Not specified"), meta_value_style),
+            Paragraph(
+                _sanitize_pdf_text(flight_test.aircraft_type or "Not specified"), meta_value_style
+            ),
         ],
         [Paragraph("Test Date", meta_label_style), Paragraph(test_date_str, meta_value_style)],
         [
@@ -851,64 +867,133 @@ def _build_pdf(
         )
 
     metadata_table = Table(metadata_rows, colWidths=[4.0 * cm, 13.0 * cm])
-    metadata_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
-        ("PADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    metadata_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(metadata_table)
     story.append(Spacer(1, 0.2 * cm))
 
     # ---- 2) Dataset provenance summary ----
     story.append(Paragraph("2. Dataset Provenance Summary", section_title_style))
     dataset_rows = [
-        [Paragraph("Dataset Version ID", meta_label_style), Paragraph(dataset_summary["dataset_version_id"], meta_value_style)],
-        [Paragraph("Dataset Label", meta_label_style), Paragraph(dataset_summary["dataset_label"], meta_value_style)],
-        [Paragraph("Version Number", meta_label_style), Paragraph(dataset_summary["dataset_number"], meta_value_style)],
-        [Paragraph("Status", meta_label_style), Paragraph(dataset_summary["dataset_status"], meta_value_style)],
-        [Paragraph("Rows", meta_label_style), Paragraph(dataset_summary["dataset_row_count"], meta_value_style)],
-        [Paragraph("Data Points", meta_label_style), Paragraph(dataset_summary["dataset_data_points"], meta_value_style)],
-        [Paragraph("Source Session ID", meta_label_style), Paragraph(dataset_summary["source_session_id"], meta_value_style)],
+        [
+            Paragraph("Dataset Version ID", meta_label_style),
+            Paragraph(dataset_summary["dataset_version_id"], meta_value_style),
+        ],
+        [
+            Paragraph("Dataset Label", meta_label_style),
+            Paragraph(dataset_summary["dataset_label"], meta_value_style),
+        ],
+        [
+            Paragraph("Version Number", meta_label_style),
+            Paragraph(dataset_summary["dataset_number"], meta_value_style),
+        ],
+        [
+            Paragraph("Status", meta_label_style),
+            Paragraph(dataset_summary["dataset_status"], meta_value_style),
+        ],
+        [
+            Paragraph("Rows", meta_label_style),
+            Paragraph(dataset_summary["dataset_row_count"], meta_value_style),
+        ],
+        [
+            Paragraph("Data Points", meta_label_style),
+            Paragraph(dataset_summary["dataset_data_points"], meta_value_style),
+        ],
+        [
+            Paragraph("Source Session ID", meta_label_style),
+            Paragraph(dataset_summary["source_session_id"], meta_value_style),
+        ],
     ]
     dataset_table = Table(dataset_rows, colWidths=[4.0 * cm, 13.0 * cm])
-    dataset_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
-        ("PADDING", (0, 0), (-1, -1), 6),
-    ]))
+    dataset_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(dataset_table)
     story.append(Spacer(1, 0.2 * cm))
 
     # ---- 3) Analysis summary ----
     story.append(Paragraph("3. Analysis Summary", section_title_style))
     analysis_rows = [
-        [Paragraph("Analysis Job ID", meta_label_style), Paragraph(analysis_summary["analysis_job_id"], meta_value_style)],
-        [Paragraph("Analysis Created At", meta_label_style), Paragraph(analysis_summary["analysis_created_at"], meta_value_style)],
-        [Paragraph("Model", meta_label_style), Paragraph(analysis_summary["model"], meta_value_style)],
-        [Paragraph("Parameters Analysed", meta_label_style), Paragraph(analysis_summary["parameters_analysed"], meta_value_style)],
-        [Paragraph("Retrieved Sources", meta_label_style), Paragraph(analysis_summary["retrieved_sources"], meta_value_style)],
-        [Paragraph("Result Strength", meta_label_style), Paragraph(analysis_summary["result_strength"], meta_value_style)],
-        [Paragraph("Deterministic Confidence", meta_label_style), Paragraph(analysis_summary["deterministic_confidence"], meta_value_style)],
-        [Paragraph("Retrieval Coverage", meta_label_style), Paragraph(analysis_summary["retrieval_coverage"], meta_value_style)],
-        [Paragraph("Applicability Status", meta_label_style), Paragraph(analysis_summary["applicability_status"], meta_value_style)],
-        [Paragraph("Warning Level", meta_label_style), Paragraph(analysis_summary["warning_level"], meta_value_style)],
-        [Paragraph("Blocking/Downgrade Reason", meta_label_style), Paragraph(analysis_summary["downgrade_reason"], body_style)],
-        [Paragraph("Output Hash (SHA-256)", meta_label_style), Paragraph(_sanitize_pdf_text(analysis_summary["output_sha256"]), body_style)],
+        [
+            Paragraph("Analysis Job ID", meta_label_style),
+            Paragraph(analysis_summary["analysis_job_id"], meta_value_style),
+        ],
+        [
+            Paragraph("Analysis Created At", meta_label_style),
+            Paragraph(analysis_summary["analysis_created_at"], meta_value_style),
+        ],
+        [
+            Paragraph("Model", meta_label_style),
+            Paragraph(analysis_summary["model"], meta_value_style),
+        ],
+        [
+            Paragraph("Parameters Analysed", meta_label_style),
+            Paragraph(analysis_summary["parameters_analysed"], meta_value_style),
+        ],
+        [
+            Paragraph("Retrieved Sources", meta_label_style),
+            Paragraph(analysis_summary["retrieved_sources"], meta_value_style),
+        ],
+        [
+            Paragraph("Result Strength", meta_label_style),
+            Paragraph(analysis_summary["result_strength"], meta_value_style),
+        ],
+        [
+            Paragraph("Deterministic Confidence", meta_label_style),
+            Paragraph(analysis_summary["deterministic_confidence"], meta_value_style),
+        ],
+        [
+            Paragraph("Retrieval Coverage", meta_label_style),
+            Paragraph(analysis_summary["retrieval_coverage"], meta_value_style),
+        ],
+        [
+            Paragraph("Applicability Status", meta_label_style),
+            Paragraph(analysis_summary["applicability_status"], meta_value_style),
+        ],
+        [
+            Paragraph("Warning Level", meta_label_style),
+            Paragraph(analysis_summary["warning_level"], meta_value_style),
+        ],
+        [
+            Paragraph("Blocking/Downgrade Reason", meta_label_style),
+            Paragraph(analysis_summary["downgrade_reason"], body_style),
+        ],
+        [
+            Paragraph("Output Hash (SHA-256)", meta_label_style),
+            Paragraph(_sanitize_pdf_text(analysis_summary["output_sha256"]), body_style),
+        ],
     ]
     analysis_table = Table(analysis_rows, colWidths=[4.0 * cm, 13.0 * cm])
-    analysis_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
-        ("PADDING", (0, 0), (-1, -1), 6),
-    ]))
+    analysis_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f9fc")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1d2733")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(analysis_table)
     if analysis_summary["warning_level"] in {"caution", "high"}:
         story.append(
@@ -986,7 +1071,9 @@ def _build_pdf(
         wrapped_data = []
         for i, row in enumerate(table_data):
             if i == 0:
-                wrapped_data.append([Paragraph(_sanitize_pdf_text(str(c)), para_style_hdr) for c in row])
+                wrapped_data.append(
+                    [Paragraph(_sanitize_pdf_text(str(c)), para_style_hdr) for c in row]
+                )
             else:
                 wrapped_data.append(
                     [
@@ -1002,21 +1089,30 @@ def _build_pdf(
 
         col_widths = [5.5 * cm, 1.7 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 2.0 * cm, 1.8 * cm]
         stats_table = Table(wrapped_data, colWidths=col_widths, repeatRows=1)
-        stats_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 8.5),
-            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 1), (-1, -1), 8),
-            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-            ("ALIGN", (0, 1), (0, -1), "LEFT"),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f9fc")]),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
-            ("PADDING", (0, 0), (-1, -1), 5),
-        ]))
+        stats_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8.5),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 1), (-1, -1), 8),
+                    ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                    ("ALIGN", (0, 1), (0, -1), "LEFT"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#f7f9fc")],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(stats_table)
     else:
         story.append(Paragraph("No parameter data available for this analysis job.", body_style))
@@ -1177,23 +1273,34 @@ def _build_pdf(
         wrapped_source_rows = []
         for idx, row in enumerate(source_rows):
             style = source_hdr_style if idx == 0 else source_cell_style
-            wrapped_source_rows.append([Paragraph(_sanitize_pdf_text(str(cell)), style) for cell in row])
+            wrapped_source_rows.append(
+                [Paragraph(_sanitize_pdf_text(str(cell)), style) for cell in row]
+            )
 
         source_table = Table(
             wrapped_source_rows,
             colWidths=[1.8 * cm, 8.3 * cm, 4.9 * cm, 2.0 * cm],
             repeatRows=1,
         )
-        source_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#27496d")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),
-            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f9fc")]),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
-            ("PADDING", (0, 0), (-1, -1), 4),
-        ]))
+        source_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#27496d")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                    ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#f7f9fc")],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d9e2ec")),
+                    ("PADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
         story.append(source_table)
     else:
         story.append(
@@ -1237,7 +1344,9 @@ def _build_callout_table(text: str, kind: str, styles):
         "recommendation": (colors.HexColor("#ecfdf3"), colors.HexColor("#166534")),
         "finding": (colors.HexColor("#eff6ff"), colors.HexColor("#1d4ed8")),
     }
-    bg_color, border_color = palette.get(kind, (colors.HexColor("#f8fafc"), colors.HexColor("#64748b")))
+    bg_color, border_color = palette.get(
+        kind, (colors.HexColor("#f8fafc"), colors.HexColor("#64748b"))
+    )
     text_style = ParagraphStyle(
         f"CalloutText{kind.title()}",
         parent=styles["Normal"],
@@ -1247,14 +1356,18 @@ def _build_callout_table(text: str, kind: str, styles):
         fontName="Helvetica",
     )
     table = Table([[Paragraph(_sanitize_pdf_text(text), text_style)]], colWidths=[17.0 * cm])
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), bg_color),
-        ("BOX", (0, 0), (-1, -1), 0.8, border_color),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), bg_color),
+                ("BOX", (0, 0), (-1, -1), 0.8, border_color),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     return table
 
 
@@ -1313,9 +1426,15 @@ def _build_stats_figures(stats_rows: List[Dict[str, Any]]) -> List[tuple]:
     top_profile = [row for row in by_samples if row.get("avg_val") is not None][:6]
     if top_profile:
         labels = [_truncate_text(str(row.get("name") or "—"), 18) for row in top_profile]
-        min_vals = [row.get("min_val") if row.get("min_val") is not None else 0.0 for row in top_profile]
-        mean_vals = [row.get("avg_val") if row.get("avg_val") is not None else 0.0 for row in top_profile]
-        max_vals = [row.get("max_val") if row.get("max_val") is not None else 0.0 for row in top_profile]
+        min_vals = [
+            row.get("min_val") if row.get("min_val") is not None else 0.0 for row in top_profile
+        ]
+        mean_vals = [
+            row.get("avg_val") if row.get("avg_val") is not None else 0.0 for row in top_profile
+        ]
+        max_vals = [
+            row.get("max_val") if row.get("max_val") is not None else 0.0 for row in top_profile
+        ]
 
         min_value = min(min(min_vals), min(mean_vals), min(max_vals))
         max_value = max(max(min_vals), max(mean_vals), max(max_vals))
@@ -1505,25 +1624,30 @@ def _build_markdown_table(rows: list, styles) -> object | None:
         table_data.append([Paragraph(_sanitize_pdf_text(str(c)), style) for c in padded])
 
     tbl = Table(table_data, colWidths=[col_w] * n_cols, repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c8d6e5")),
-        ("PADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, 0), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
-    ]))
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#c8d6e5")),
+                ("PADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, 0), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+            ]
+        )
+    )
     return tbl
 
 
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _user_to_out(user: User) -> AdminUserOut:
     return AdminUserOut(

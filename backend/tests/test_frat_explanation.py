@@ -36,7 +36,9 @@ def _create_dataset(db_session, flight_test: FlightTest, user_id: int) -> Datase
     return dataset
 
 
-def _create_analysis_job(db_session, flight_test: FlightTest, user_id: int, dataset_id: int | None = None) -> AnalysisJob:
+def _create_analysis_job(
+    db_session, flight_test: FlightTest, user_id: int, dataset_id: int | None = None
+) -> AnalysisJob:
     controls = {
         "deterministic_confidence": "low",
         "retrieval_coverage": "weak",
@@ -155,6 +157,7 @@ def test_rejected_no_go_unacceptable_scored_assessment_can_export(
 ):
     flight_test = _create_flight_test(db_session, test_user["id"], "FRAT No Go Export")
     captured = {}
+
     def fake_build_pdf(*, report_snapshot, generated_by):
         captured["report_snapshot"] = report_snapshot
         return b"%PDF-1.4\n%mock\n"
@@ -193,7 +196,10 @@ def test_rejected_no_go_unacceptable_scored_assessment_can_export(
     explanation = captured["report_snapshot"]["decision_explanation"]
     assert explanation["lifecycle_state"] == "rejected"
     assert "score_band" in explanation["decision"]["driver_types"]
-    assert any("Mitigate and rescore" in item for item in explanation["decision"]["recommended_next_actions"])
+    assert any(
+        "Mitigate and rescore" in item
+        for item in explanation["decision"]["recommended_next_actions"]
+    )
 
 
 def test_hard_stop_assessment_can_export_and_includes_reasons(
@@ -201,6 +207,7 @@ def test_hard_stop_assessment_can_export_and_includes_reasons(
 ):
     flight_test = _create_flight_test(db_session, test_user["id"], "FRAT Hard Stop Export")
     captured = {}
+
     def fake_build_pdf(*, report_snapshot, generated_by):
         captured["report_snapshot"] = report_snapshot
         return b"%PDF-1.4\n%mock\n"
@@ -224,11 +231,16 @@ def test_hard_stop_assessment_can_export_and_includes_reasons(
     )
     scored = _score(client, auth_headers, assessment_id)
     assert scored["decision_explanation"]["hard_stops"]["triggered"] is True
-    assert "Crew readiness indicates unfit status." in scored["decision_explanation"]["hard_stops"]["reasons"]
+    assert (
+        "Crew readiness indicates unfit status."
+        in scored["decision_explanation"]["hard_stops"]["reasons"]
+    )
 
     exported = client.get(f"/api/frat/assessments/{assessment_id}/report.pdf", headers=auth_headers)
     assert exported.status_code == status.HTTP_200_OK, exported.text
-    assert "crew_unfit" in captured["report_snapshot"]["decision_explanation"]["hard_stops"]["flags"]
+    assert (
+        "crew_unfit" in captured["report_snapshot"]["decision_explanation"]["hard_stops"]["flags"]
+    )
 
 
 def test_no_linked_analysis_explanation_and_unscored_draft_export_block(
@@ -251,14 +263,19 @@ def test_no_linked_analysis_explanation_and_unscored_draft_export_block(
         },
     )
 
-    draft_export = client.get(f"/api/frat/assessments/{assessment_id}/report.pdf", headers=auth_headers)
+    draft_export = client.get(
+        f"/api/frat/assessments/{assessment_id}/report.pdf", headers=auth_headers
+    )
     assert draft_export.status_code == status.HTTP_400_BAD_REQUEST
     assert "must be scored before export" in draft_export.json()["detail"]
 
     scored = _score(client, auth_headers, assessment_id)
     explanation = scored["decision_explanation"]
     assert explanation["linked_analysis"]["available"] is False
-    assert "No linked analysis job is available" in explanation["linked_analysis"]["no_linked_analysis_statement"]
+    assert (
+        "No linked analysis job is available"
+        in explanation["linked_analysis"]["no_linked_analysis_statement"]
+    )
     assert explanation["linked_analysis"]["warning"] == (
         "Review required: score is moderate or higher and no linked analysis evidence is attached."
     )
@@ -275,6 +292,7 @@ def test_linked_analysis_penalty_appears_in_score_composition_and_explanation(
     dataset = _create_dataset(db_session, flight_test, test_user["id"])
     job = _create_analysis_job(db_session, flight_test, test_user["id"], dataset.id)
     captured = {}
+
     def fake_build_pdf(*, report_snapshot, generated_by):
         captured["report_snapshot"] = report_snapshot
         return b"%PDF-1.4\n%mock\n"
@@ -301,11 +319,19 @@ def test_linked_analysis_penalty_appears_in_score_composition_and_explanation(
     scored = _score(client, auth_headers, assessment_id)
     explanation = scored["decision_explanation"]
     assert scored["score_snapshot"]["analysis_indicator_score"] > 0
-    assert explanation["score_composition"]["analysis_indicator_score"] == scored["score_snapshot"]["analysis_indicator_score"]
+    assert (
+        explanation["score_composition"]["analysis_indicator_score"]
+        == scored["score_snapshot"]["analysis_indicator_score"]
+    )
     assert explanation["linked_analysis"]["available"] is True
     assert explanation["linked_analysis"]["controls_summary"][0]["analysis_job_id"] == job.id
     assert explanation["dataset_version"]["label"] == "v1 scored evidence"
 
     exported = client.get(f"/api/frat/assessments/{assessment_id}/report.pdf", headers=auth_headers)
     assert exported.status_code == status.HTTP_200_OK, exported.text
-    assert captured["report_snapshot"]["decision_explanation"]["linked_analysis"]["controls_summary"][0]["analysis_job_id"] == job.id
+    assert (
+        captured["report_snapshot"]["decision_explanation"]["linked_analysis"]["controls_summary"][
+            0
+        ]["analysis_job_id"]
+        == job.id
+    )

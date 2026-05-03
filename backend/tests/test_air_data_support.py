@@ -52,7 +52,9 @@ def test_air_data_helpers_return_bounded_engineering_values():
 
 
 def test_performance_calculator_includes_air_data_support_with_channels(db_session, test_user):
-    flight_test = _make_flight_test(db_session, test_user["id"], "Performance Air-Data Support Test")
+    flight_test = _make_flight_test(
+        db_session, test_user["id"], "Performance Air-Data Support Test"
+    )
     pa = _make_parameter(db_session, "PRESSURE ALTITUDE", "ft")
     oat = _make_parameter(db_session, "OAT", "C")
     cas = _make_parameter(db_session, "CAS", "kt")
@@ -71,22 +73,46 @@ def test_performance_calculator_includes_air_data_support_with_channels(db_sessi
     for i in range(len(pa_values)):
         ts = base_ts + timedelta(seconds=5 * i)
         db_session.add(
-            DataPoint(flight_test_id=flight_test.id, parameter_id=pa.id, timestamp=ts, value=pa_values[i])
+            DataPoint(
+                flight_test_id=flight_test.id, parameter_id=pa.id, timestamp=ts, value=pa_values[i]
+            )
         )
         db_session.add(
-            DataPoint(flight_test_id=flight_test.id, parameter_id=oat.id, timestamp=ts, value=oat_values[i])
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=oat.id,
+                timestamp=ts,
+                value=oat_values[i],
+            )
         )
         db_session.add(
-            DataPoint(flight_test_id=flight_test.id, parameter_id=cas.id, timestamp=ts, value=cas_values[i])
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=cas.id,
+                timestamp=ts,
+                value=cas_values[i],
+            )
         )
         db_session.add(
-            DataPoint(flight_test_id=flight_test.id, parameter_id=tas.id, timestamp=ts, value=tas_values[i])
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=tas.id,
+                timestamp=ts,
+                value=tas_values[i],
+            )
         )
         db_session.add(
-            DataPoint(flight_test_id=flight_test.id, parameter_id=mach.id, timestamp=ts, value=mach_values[i])
+            DataPoint(
+                flight_test_id=flight_test.id,
+                parameter_id=mach.id,
+                timestamp=ts,
+                value=mach_values[i],
+            )
         )
         db_session.add(
-            DataPoint(flight_test_id=flight_test.id, parameter_id=gs.id, timestamp=ts, value=gs_values[i])
+            DataPoint(
+                flight_test_id=flight_test.id, parameter_id=gs.id, timestamp=ts, value=gs_values[i]
+            )
         )
     db_session.commit()
 
@@ -105,8 +131,12 @@ def test_performance_calculator_includes_air_data_support_with_channels(db_sessi
     assert len(result.get("deterministic_assumptions") or []) > 0
 
 
-def test_performance_air_data_support_degrades_gracefully_when_channels_missing(db_session, test_user):
-    flight_test = _make_flight_test(db_session, test_user["id"], "Performance Air-Data Degradation Test")
+def test_performance_air_data_support_degrades_gracefully_when_channels_missing(
+    db_session, test_user
+):
+    flight_test = _make_flight_test(
+        db_session, test_user["id"], "Performance Air-Data Degradation Test"
+    )
     gs = _make_parameter(db_session, "GROUND SPEED", "kt")
 
     base_ts = datetime(2026, 4, 24, 9, 0, 0)

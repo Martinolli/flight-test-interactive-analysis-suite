@@ -33,10 +33,10 @@ def db_session():
     """Create a fresh database session for each test"""
     # Create tables
     Base.metadata.create_all(bind=test_engine)
-    
+
     # Create session
     session = TestingSessionLocal()
-    
+
     try:
         yield session
     finally:
@@ -48,18 +48,18 @@ def db_session():
 @pytest.fixture(scope="function")
 def client(db_session):
     """Create a test client with database session override"""
-    
+
     def override_get_db():
         try:
             yield db_session
         finally:
             pass
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     with TestClient(app) as test_client:
         yield test_client
-    
+
     app.dependency_overrides.clear()
 
 
@@ -70,7 +70,7 @@ def sample_user_data():
         "email": "test@example.com",
         "username": "testuser",
         "full_name": "Test User",
-        "password": "securepassword123"
+        "password": "securepassword123",
     }
 
 

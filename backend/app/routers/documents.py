@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 try:
     from openai import OpenAI as _OpenAI
+
     _OPENAI_AVAILABLE = True
 except ImportError:
     _OpenAI = None  # type: ignore[assignment,misc]
@@ -26,6 +27,7 @@ except ImportError:
 
 try:
     from docling.document_converter import DocumentConverter as _DocumentConverter
+
     _DOCLING_AVAILABLE = True
 except ImportError:
     _DocumentConverter = None  # type: ignore[assignment,misc]
@@ -119,9 +121,7 @@ QUERY_VECTOR_CANDIDATES = max(
 QUERY_LEXICAL_CANDIDATES = max(
     QUERY_TOP_K_DEFAULT, min(80, int(os.getenv("QUERY_LEXICAL_CANDIDATES", "20")))
 )
-QUERY_CONTEXT_LIMIT = max(
-    QUERY_TOP_K_DEFAULT, min(20, int(os.getenv("QUERY_CONTEXT_LIMIT", "12")))
-)
+QUERY_CONTEXT_LIMIT = max(QUERY_TOP_K_DEFAULT, min(20, int(os.getenv("QUERY_CONTEXT_LIMIT", "12"))))
 QUERY_MIN_UNIQUE_DOCUMENTS = max(
     1, min(QUERY_CONTEXT_LIMIT, int(os.getenv("QUERY_MIN_UNIQUE_DOCUMENTS", "3")))
 )
@@ -175,7 +175,7 @@ def get_openai_client():
             raise HTTPException(
                 status_code=503,
                 detail="OPENAI_API_KEY is not configured. "
-                       "Add it to your .env file to enable AI features.",
+                "Add it to your .env file to enable AI features.",
             )
         _openai_client = _OpenAI(api_key=api_key)
     return _openai_client
@@ -184,6 +184,7 @@ def get_openai_client():
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
+
 
 class DocumentOut(BaseModel):
     id: int
@@ -313,6 +314,7 @@ class AnalysisModeOut(BaseModel):
 # Helper: embed a single text string
 # ---------------------------------------------------------------------------
 
+
 def embed_text(text_content: str) -> List[float]:
     """Return a 1536-dim embedding vector for the given text."""
     client = get_openai_client()
@@ -415,9 +417,7 @@ def _build_query_source_legend(sources: List[dict]) -> str:
             metadata_bits.append(f"revision={source.get('document_revision')}")
         domain_tags = source.get("domain_tags") or []
         if domain_tags:
-            metadata_bits.append(
-                "domains=" + ",".join(str(tag) for tag in domain_tags[:3])
-            )
+            metadata_bits.append("domains=" + ",".join(str(tag) for tag in domain_tags[:3]))
         if metadata_bits:
             label += f" [{'; '.join(metadata_bits)}]"
         lines.append(f"- {source_id}: {label}")
@@ -578,18 +578,14 @@ def _extract_markdown_section_items(
         return []
 
     items: List[str] = []
-    for raw_line in lines[heading_index + 1:]:
+    for raw_line in lines[heading_index + 1 :]:
         line = raw_line.strip()
         if not line:
             if items:
                 break
             continue
         normalized = line.lower().lstrip("#").strip()
-        if (
-            line.startswith("#")
-            or re.match(r"^\d+[).:-]\s+\w+", line)
-            or normalized.endswith(":")
-        ):
+        if line.startswith("#") or re.match(r"^\d+[).:-]\s+\w+", line) or normalized.endswith(":"):
             # stop at the next section-like heading after collecting something
             if items:
                 break
@@ -647,9 +643,7 @@ def _default_recommended_next_queries(
             "Provide the exact input values available and request a step-by-step deterministic calculation."
         )
     if has_coverage_warning:
-        base.append(
-            "Cite the exact sections/pages that justify each high-severity risk statement."
-        )
+        base.append("Cite the exact sections/pages that justify each high-severity risk statement.")
     if not base:
         base.append(
             "Request a document-by-document comparison table with citations for each conclusion."
@@ -791,15 +785,19 @@ def _retrieve_hybrid_sources(
         lexical_rows = []
 
     if not vector_rows and not lexical_rows:
-        return [], "", {
-            "analysis_mode": (analysis_mode or "general"),
-            "capability_key": capability_key,
-            "mode_filter_enabled": False,
-            "mode_filter_matched_chunks": 0,
-            "mode_filter_fallback_used": False,
-            "metadata_coverage_ratio": 0.0,
-            "authority_weighting_enabled": True,
-        }
+        return (
+            [],
+            "",
+            {
+                "analysis_mode": (analysis_mode or "general"),
+                "capability_key": capability_key,
+                "mode_filter_enabled": False,
+                "mode_filter_matched_chunks": 0,
+                "mode_filter_fallback_used": False,
+                "metadata_coverage_ratio": 0.0,
+                "authority_weighting_enabled": True,
+            },
+        )
 
     # Reciprocal rank fusion
     rrf_k = 60
@@ -1078,6 +1076,7 @@ def _build_deterministic_handling_qualities_section(metrics: dict) -> str:
 # Helper: parse and chunk a PDF with Docling
 # ---------------------------------------------------------------------------
 
+
 def _split_long_text(text_content: str, max_chars: int) -> List[str]:
     """Split oversized chunks into smaller pieces to avoid tokenizer slow paths."""
     if max_chars <= 0 or len(text_content) <= max_chars:
@@ -1151,23 +1150,15 @@ def parse_and_chunk_pdf(
         auto_fast_for_large = _env_flag("DOCLING_AUTO_FAST_FOR_LARGE_FILES", True)
         table_structure_enabled = _env_flag("DOCLING_TABLE_STRUCTURE", True)
 
-        file_size_mb = (
-            (file_size_bytes / (1024 * 1024))
-            if file_size_bytes is not None
-            else None
-        )
-        is_large_file = (
-            file_size_mb is not None and file_size_mb >= DOCLING_FAST_THRESHOLD_MB
-        )
+        file_size_mb = (file_size_bytes / (1024 * 1024)) if file_size_bytes is not None else None
+        is_large_file = file_size_mb is not None and file_size_mb >= DOCLING_FAST_THRESHOLD_MB
         use_fast_mode = force_fast_mode or (auto_fast_for_large and is_large_file)
 
         # Table extraction is accurate but expensive. In fast mode we disable it.
         use_table_structure = table_structure_enabled and not use_fast_mode
         pipeline_options.do_table_structure = use_table_structure
         if use_table_structure:
-            pipeline_options.table_structure_options = TableStructureOptions(
-                do_cell_matching=True
-            )
+            pipeline_options.table_structure_options = TableStructureOptions(do_cell_matching=True)
 
         # Enrichments: disable all — not needed for text-based RAG
         pipeline_options.do_picture_classification = False
@@ -1198,9 +1189,7 @@ def parse_and_chunk_pdf(
         )
 
         converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-            }
+            format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
         )
 
         result = converter.convert(pdf_path)
@@ -1264,6 +1253,7 @@ def parse_and_chunk_pdf(
 # ---------------------------------------------------------------------------
 # Background processing
 # ---------------------------------------------------------------------------
+
 
 def _process_document_upload(doc_id: int, pdf_path: str):
     """
@@ -1437,6 +1427,7 @@ def _process_document_upload(doc_id: int, pdf_path: str):
 # POST /api/documents/upload
 # ---------------------------------------------------------------------------
 
+
 @router.post("/upload", response_model=DocumentOut)
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -1518,6 +1509,7 @@ async def upload_document(
 # GET /api/documents
 # ---------------------------------------------------------------------------
 
+
 @router.get("/", response_model=List[DocumentOut])
 def list_documents(
     db: Session = Depends(get_db),
@@ -1536,6 +1528,7 @@ def list_documents(
 # ---------------------------------------------------------------------------
 # DELETE /api/documents/{doc_id}
 # ---------------------------------------------------------------------------
+
 
 @router.delete("/{doc_id}")
 def delete_document(
@@ -1559,6 +1552,7 @@ def delete_document(
 # ---------------------------------------------------------------------------
 # POST /api/documents/query  — semantic search + LLM answer
 # ---------------------------------------------------------------------------
+
 
 @router.post("/query", response_model=QueryResponse)
 def query_documents(
@@ -1633,10 +1627,16 @@ def query_documents(
                 analysis_mode=selected_mode.key,
                 capability_key=selected_mode.capability_key,
                 mode_filter_enabled=bool(retrieval_debug.get("mode_filter_enabled", False)),
-                mode_filter_matched_chunks=int(retrieval_debug.get("mode_filter_matched_chunks", 0)),
-                mode_filter_fallback_used=bool(retrieval_debug.get("mode_filter_fallback_used", False)),
+                mode_filter_matched_chunks=int(
+                    retrieval_debug.get("mode_filter_matched_chunks", 0)
+                ),
+                mode_filter_fallback_used=bool(
+                    retrieval_debug.get("mode_filter_fallback_used", False)
+                ),
                 metadata_coverage_ratio=float(retrieval_debug.get("metadata_coverage_ratio", 0.0)),
-                authority_weighting_enabled=bool(retrieval_debug.get("authority_weighting_enabled", True)),
+                authority_weighting_enabled=bool(
+                    retrieval_debug.get("authority_weighting_enabled", True)
+                ),
             ),
         )
 
@@ -1739,7 +1739,9 @@ def query_documents(
 
     if unknown_source_ids:
         answer = _sanitize_invalid_inline_citations(answer, allowed_source_ids)
-        warnings.append("Removed invalid source citation IDs that were not present in retrieved evidence.")
+        warnings.append(
+            "Removed invalid source citation IDs that were not present in retrieved evidence."
+        )
         inline_source_ids = _extract_inline_source_ids(answer)
 
     if QUERY_STRICT_CITATIONS and sources and not inline_source_ids:
@@ -1829,7 +1831,9 @@ def query_documents(
             mode_filter_matched_chunks=int(retrieval_debug.get("mode_filter_matched_chunks", 0)),
             mode_filter_fallback_used=bool(retrieval_debug.get("mode_filter_fallback_used", False)),
             metadata_coverage_ratio=float(retrieval_debug.get("metadata_coverage_ratio", 0.0)),
-            authority_weighting_enabled=bool(retrieval_debug.get("authority_weighting_enabled", True)),
+            authority_weighting_enabled=bool(
+                retrieval_debug.get("authority_weighting_enabled", True)
+            ),
         ),
     )
 
@@ -1837,6 +1841,7 @@ def query_documents(
 # ---------------------------------------------------------------------------
 # GET /api/documents/analysis-modes
 # ---------------------------------------------------------------------------
+
 
 @router.get("/analysis-modes", response_model=List[AnalysisModeOut])
 def get_analysis_modes(
@@ -1862,6 +1867,7 @@ def get_analysis_modes(
 # ---------------------------------------------------------------------------
 # Analysis job helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_accessible_flight_test(
     *,
@@ -1913,7 +1919,9 @@ def _build_mode_routing_section(
     requested_mode_key: Optional[str] = None,
 ) -> str:
     requested_mode = get_analysis_mode_definition(requested_mode_key or "")
-    requested_mode_label = requested_mode.label if requested_mode else (requested_mode_key or mode.label)
+    requested_mode_label = (
+        requested_mode.label if requested_mode else (requested_mode_key or mode.label)
+    )
     lines = [
         "## Analysis Mode Routing",
         f"- Requested mode: **{requested_mode_key or mode.key}** ({requested_mode_label})",
@@ -1928,8 +1936,7 @@ def _build_mode_routing_section(
     lines.append(f"- Routing note: {capability_eval.user_message}")
     if capability_eval.missing_required_signals:
         lines.append(
-            "- Missing required signals: "
-            + ", ".join(capability_eval.missing_required_signals)
+            "- Missing required signals: " + ", ".join(capability_eval.missing_required_signals)
         )
     if capability_eval.applicability_boundaries:
         lines.append("")
@@ -1960,13 +1967,17 @@ def _build_non_takeoff_deterministic_section(
     if capability_eval.reason_key:
         lines.append(f"- Reason key: **{capability_eval.reason_key}**")
     if capability_eval.outcome == CapabilityOutcome.STANDARDS_ONLY_GUIDANCE:
-        lines.append("- Behavior: standards/context guidance only (no authoritative deterministic metric).")
+        lines.append(
+            "- Behavior: standards/context guidance only (no authoritative deterministic metric)."
+        )
     elif capability_eval.outcome == CapabilityOutcome.BLOCKED:
         lines.append("- Behavior: analysis is capability-gated; deterministic result is blocked.")
     elif capability_eval.outcome == CapabilityOutcome.PARTIAL_ESTIMATE:
         lines.append("- Behavior: partial estimate only with explicit limitations.")
     else:
-        lines.append("- Behavior: mode can provide narrative guidance with explicit applicability boundaries.")
+        lines.append(
+            "- Behavior: mode can provide narrative guidance with explicit applicability boundaries."
+        )
     return "\n".join(lines)
 
 
@@ -1982,9 +1993,7 @@ def _build_analysis_controls_section(controls: AnalysisControlSnapshot) -> str:
         f"- Narrative citations: **{controls.cited_sources_count}**",
     ]
     if controls.blocking_or_downgrade_reason:
-        lines.append(
-            f"- Blocking/downgrade reason: **{controls.blocking_or_downgrade_reason}**"
-        )
+        lines.append(f"- Blocking/downgrade reason: **{controls.blocking_or_downgrade_reason}**")
     if controls.warning_messages:
         lines.append("")
         lines.append("### Control Warnings")
@@ -2104,7 +2113,11 @@ def _capability_eval_from_deterministic_metrics(
         label=mode.label,
         status=resolved_status,
         authority=resolved_authority,
-        outcome=CapabilityOutcome(outcome) if outcome in {item.value for item in CapabilityOutcome} else CapabilityOutcome.ALLOW_WITH_LIMITATIONS,
+        outcome=(
+            CapabilityOutcome(outcome)
+            if outcome in {item.value for item in CapabilityOutcome}
+            else CapabilityOutcome.ALLOW_WITH_LIMITATIONS
+        ),
         reason_key=metrics.get("capability_reason_key"),
         user_message=str(
             metrics.get("capability_user_message")
@@ -2384,6 +2397,7 @@ def get_ai_analysis_job(
 # POST /api/documents/flight-tests/{flight_test_id}/ai-analysis
 # ---------------------------------------------------------------------------
 
+
 class AIAnalysisRequest(BaseModel):
     user_prompt: str | None = None
     dataset_version_id: Optional[int] = None
@@ -2439,9 +2453,7 @@ def ai_analysis(
         .filter(DataPoint.flight_test_id == flight_test_id)
     )
     if dataset_version_id is not None:
-        stats_query = stats_query.filter(
-            DataPoint.dataset_version_id == dataset_version_id
-        )
+        stats_query = stats_query.filter(DataPoint.dataset_version_id == dataset_version_id)
     stats_rows = stats_query.group_by(TestParameter.name, TestParameter.unit).all()
 
     if not stats_rows:
@@ -2588,7 +2600,9 @@ def ai_analysis(
             dataset_version_id=dataset_version_id,
             request_certification_result=certification_requested,
         )
-        deterministic_section = _build_deterministic_handling_qualities_section(deterministic_metrics)
+        deterministic_section = _build_deterministic_handling_qualities_section(
+            deterministic_metrics
+        )
         run_llm = True
     else:
         deterministic_section = _build_non_takeoff_deterministic_section(
@@ -2751,7 +2765,9 @@ def ai_analysis(
                     if repaired_text:
                         llm_analysis_text = repaired_text
                 except Exception as repair_exc:
-                    logger.warning("Citation density repair skipped due to LLM error: %s", repair_exc)
+                    logger.warning(
+                        "Citation density repair skipped due to LLM error: %s", repair_exc
+                    )
 
         inline_source_ids = _extract_inline_source_ids(llm_analysis_text)
         if inline_source_ids and sources:
@@ -2788,9 +2804,7 @@ def ai_analysis(
                     + (f", p.{s.get('page_numbers')}" if s.get("page_numbers") else "")
                     + (f" — {s.get('section_title')}" if s.get("section_title") else "")
                 )
-                refs_lines.append(
-                    f"- [{s['source_id']}] {ref_label}"
-                )
+                refs_lines.append(f"- [{s['source_id']}] {ref_label}")
             final_analysis = f"{final_analysis}\n" + "\n".join(refs_lines)
         else:
             final_analysis = (
@@ -2831,9 +2845,7 @@ def ai_analysis(
         persisted_prompt_text = _encode_prompt_with_mode(analysis_goal, effective_mode.key)
 
     retrieved_source_ids = [
-        str(source.get("source_id"))
-        for source in sources
-        if source.get("source_id")
+        str(source.get("source_id")) for source in sources if source.get("source_id")
     ]
     retrieved_sources_snapshot = _serialize_retrieval_snapshot(sources)
     parameter_stats_snapshot = _serialize_parameter_stats_snapshot(stats_rows)
@@ -2869,6 +2881,7 @@ def ai_analysis(
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _doc_to_out(doc: Document) -> DocumentOut:
     domain_tags = _safe_json_load(getattr(doc, "domain_tags_json", "[]"), [])

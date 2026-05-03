@@ -108,15 +108,13 @@ class TestFlightTestCRUD:
             )
 
         # Test with limit
-        response = client.get("/api/flight-tests/?limit=3",
-                              headers=auth_headers)
+        response = client.get("/api/flight-tests/?limit=3", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) <= 3
 
         # Test with skip
-        response = client.get("/api/flight-tests/?skip=2&limit=2",
-                              headers=auth_headers)
+        response = client.get("/api/flight-tests/?skip=2&limit=2", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) <= 2
@@ -137,8 +135,7 @@ class TestFlightTestCRUD:
         test_id = create_response.json()["id"]
 
         # Retrieve it
-        response = client.get(f"/api/flight-tests/{test_id}",
-                              headers=auth_headers)
+        response = client.get(f"/api/flight-tests/{test_id}", headers=auth_headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -151,8 +148,7 @@ class TestFlightTestCRUD:
         response = client.get("/api/flight-tests/99999", headers=auth_headers)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_get_other_user_flight_test(self, client,
-                                        auth_headers, db_session):
+    def test_get_other_user_flight_test(self, client, auth_headers, db_session):
         """Test that users cannot access other users' flight tests"""
 
         # Create another user
@@ -168,16 +164,14 @@ class TestFlightTestCRUD:
 
         # Create flight test for other user
         other_test = FlightTest(
-            test_name="Other User Test", aircraft_type="F-18",
-            created_by_id=other_user.id
+            test_name="Other User Test", aircraft_type="F-18", created_by_id=other_user.id
         )
         db_session.add(other_test)
         db_session.commit()
         db_session.refresh(other_test)
 
         # Try to access with current user's token
-        response = client.get(f"/api/flight-tests/{other_test.id}",
-                              headers=auth_headers)
+        response = client.get(f"/api/flight-tests/{other_test.id}", headers=auth_headers)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_flight_test(self, client, auth_headers):
@@ -185,8 +179,7 @@ class TestFlightTestCRUD:
         # Create a flight test
         create_response = client.post(
             "/api/flight-tests/",
-            json={"test_name": "Update Test", "aircraft_type": "F-16",
-                  "test_date": "2025-08-15"},
+            json={"test_name": "Update Test", "aircraft_type": "F-16", "test_date": "2025-08-15"},
             headers=auth_headers,
         )
         test_id = create_response.json()["id"]
@@ -214,39 +207,33 @@ class TestFlightTestCRUD:
         # Create a flight test
         create_response = client.post(
             "/api/flight-tests/",
-            json={"test_name": "Delete Test", "aircraft_type": "F-16",
-                  "test_date": "2025-08-15"},
+            json={"test_name": "Delete Test", "aircraft_type": "F-16", "test_date": "2025-08-15"},
             headers=auth_headers,
         )
         test_id = create_response.json()["id"]
 
         # Delete it
-        response = client.delete(f"/api/flight-tests/{test_id}",
-                                 headers=auth_headers)
+        response = client.delete(f"/api/flight-tests/{test_id}", headers=auth_headers)
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify it's gone
-        get_response = client.get(f"/api/flight-tests/{test_id}",
-                                  headers=auth_headers)
+        get_response = client.get(f"/api/flight-tests/{test_id}", headers=auth_headers)
         assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_delete_flight_test_cascades_data(self, client, test_user,
-                                              auth_headers, db_session):
+    def test_delete_flight_test_cascades_data(self, client, test_user, auth_headers, db_session):
         """Test that deleting a flight test
         also deletes associated data points"""
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="Cascade Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Cascade Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
         db_session.refresh(flight_test)
 
         # Create parameter
-        parameter = TestParameter(name="TEST_PARAM",
-                                  description="Test Parameter", unit="deg")
+        parameter = TestParameter(name="TEST_PARAM", description="Test Parameter", unit="deg")
         db_session.add(parameter)
         db_session.commit()
         db_session.refresh(parameter)
@@ -269,8 +256,7 @@ class TestFlightTestCRUD:
         assert len(data_points) == 5
 
         # Delete flight test
-        response = client.delete(f"/api/flight-tests/{flight_test.id}",
-                                 headers=auth_headers)
+        response = client.delete(f"/api/flight-tests/{flight_test.id}", headers=auth_headers)
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify data points are deleted
@@ -410,9 +396,7 @@ class TestFlightTestCRUD:
         assert dataset_v2.source_session_id == session_v2.id
 
         assert (
-            db_session.query(DataPoint)
-            .filter(DataPoint.flight_test_id == flight_test.id)
-            .count()
+            db_session.query(DataPoint).filter(DataPoint.flight_test_id == flight_test.id).count()
             == 2
         )
         assert (
@@ -440,16 +424,9 @@ class TestFlightTestCRUD:
         )
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
+        assert db_session.query(FlightTest).filter(FlightTest.id == flight_test.id).first() is None
         assert (
-            db_session.query(FlightTest)
-            .filter(FlightTest.id == flight_test.id)
-            .first()
-            is None
-        )
-        assert (
-            db_session.query(DataPoint)
-            .filter(DataPoint.flight_test_id == flight_test.id)
-            .count()
+            db_session.query(DataPoint).filter(DataPoint.flight_test_id == flight_test.id).count()
             == 0
         )
         assert (
@@ -475,13 +452,11 @@ class TestFlightTestCRUD:
 class TestCSVUpload:
     """Test CSV upload functionality"""
 
-    def test_csv_upload_simple(self, client, test_user,
-                               auth_headers, db_session):
+    def test_csv_upload_simple(self, client, test_user, auth_headers, db_session):
         """Test uploading a simple CSV file"""
         # Create flight test
         flight_test = FlightTest(
-            test_name="CSV Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="CSV Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -495,11 +470,9 @@ s,ft,kt,deg
 0.2,5100.0,252.0,5.4"""
 
         # Upload CSV
-        files = {"file": ("test.csv",
-                          io.BytesIO(csv_content.encode()), "text/csv")}
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -508,13 +481,11 @@ s,ft,kt,deg
         assert data["rows_processed"] == 3
         assert data["data_points_created"] == 9  # 3 rows × 3 parameters
 
-    def test_csv_upload_two_header_format(self, client,
-                                          test_user, auth_headers, db_session):
+    def test_csv_upload_two_header_format(self, client, test_user, auth_headers, db_session):
         """Test uploading CSV with two-header format (names + units)"""
         # Create flight test
         flight_test = FlightTest(
-            test_name="Two Header CSV Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Two Header CSV Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -527,11 +498,9 @@ EU,deg,deg,deg/s
 0:00:00:01.000,0.6,0.9,0.04"""
 
         # Upload CSV
-        files = {"file": ("test.csv",
-                          io.BytesIO(csv_content.encode()), "text/csv")}
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -542,21 +511,17 @@ EU,deg,deg,deg/s
         # Verify parameters were created with units
 
         roll_param = (
-            db_session.query(TestParameter)
-            .filter(TestParameter.name == "ROLL_ANGLE")
-            .first()
+            db_session.query(TestParameter).filter(TestParameter.name == "ROLL_ANGLE").first()
         )
         assert roll_param is not None
         assert roll_param.unit == "deg"
 
-    def test_csv_upload_invalid_file_type(self, client,
-                                          test_user, auth_headers, db_session):
+    def test_csv_upload_invalid_file_type(self, client, test_user, auth_headers, db_session):
         """Test uploading a non-CSV file"""
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="Invalid File Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Invalid File Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -565,21 +530,18 @@ EU,deg,deg,deg/s
         # Try to upload a text file
         files = {"file": ("test.txt", io.BytesIO(b"not a csv"), "text/plain")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "CSV" in response.json()["detail"]
 
-    def test_csv_upload_empty_file(self, client,
-                                   test_user, auth_headers, db_session):
+    def test_csv_upload_empty_file(self, client, test_user, auth_headers, db_session):
         """Test uploading an empty CSV file"""
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="Empty CSV Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Empty CSV Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -587,23 +549,19 @@ EU,deg,deg,deg/s
 
         # Upload empty CSV
         csv_content = ""
-        files = {"file": ("test.csv",
-                          io.BytesIO(csv_content.encode()), "text/csv")}
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_csv_upload_missing_timestamp(self, client,
-                                          test_user, auth_headers, db_session):
+    def test_csv_upload_missing_timestamp(self, client, test_user, auth_headers, db_session):
         """Test uploading CSV without timestamp column"""
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="No Timestamp CSV Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="No Timestamp CSV Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -614,22 +572,20 @@ EU,deg,deg,deg/s
 5000.0,250.0,5.2
 5050.0,251.0,5.3"""
 
-        files = {"file": ("test.csv",
-                          io.BytesIO(csv_content.encode()), "text/csv")}
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "timestamp" in response.json()["detail"].lower()
 
-    def test_csv_upload_invalid_timestamp_format(self, client,
-                                                 test_user, auth_headers, db_session):
+    def test_csv_upload_invalid_timestamp_format(self, client, test_user, auth_headers, db_session):
         """Invalid timestamp values should fail with row-level detail."""
         flight_test = FlightTest(
-            test_name="Invalid Timestamp CSV Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Invalid Timestamp CSV Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -642,8 +598,7 @@ abc,5000.0,250.0
 
         files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -651,12 +606,12 @@ abc,5000.0,250.0
         assert "timestamp validation failed" in detail
         assert "row 3" in detail
 
-    def test_csv_upload_missing_timestamp_value(self, client,
-                                                test_user, auth_headers, db_session):
+    def test_csv_upload_missing_timestamp_value(self, client, test_user, auth_headers, db_session):
         """Blank timestamp cells should fail with row-level detail."""
         flight_test = FlightTest(
-            test_name="Blank Timestamp CSV Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Blank Timestamp CSV Test",
+            aircraft_type="F-16",
+            created_by_id=test_user["id"],
         )
         db_session.add(flight_test)
         db_session.commit()
@@ -669,8 +624,7 @@ s,ft,kt
 
         files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            f"/api/flight-tests/{flight_test.id}/upload-csv",
-            files=files, headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -683,11 +637,9 @@ s,ft,kt
         csv_content = """timestamp,ALT
 0.0,5000.0"""
 
-        files = {"file": ("test.csv",
-                          io.BytesIO(csv_content.encode()), "text/csv")}
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post(
-            "/api/flight-tests/99999/upload-csv",
-            files=files, headers=auth_headers
+            "/api/flight-tests/99999/upload-csv", files=files, headers=auth_headers
         )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -819,9 +771,7 @@ s,ft
         assert v2_id != v1_id
 
         all_points = (
-            db_session.query(DataPoint)
-            .filter(DataPoint.flight_test_id == flight_test.id)
-            .all()
+            db_session.query(DataPoint).filter(DataPoint.flight_test_id == flight_test.id).all()
         )
         assert len(all_points) == 2  # no overwrite; both versions are retained
         assert {p.dataset_version_id for p in all_points} == {v1_id, v2_id}
@@ -1042,22 +992,19 @@ bad-time,5000.0
 class TestDataRetrieval:
     """Test data point retrieval"""
 
-    def test_get_data_points(self, client, test_user,
-                             auth_headers, db_session):
+    def test_get_data_points(self, client, test_user, auth_headers, db_session):
         """Test retrieving data points for a flight test"""
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="Data Retrieval Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Data Retrieval Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
         db_session.refresh(flight_test)
 
         # Create parameter
-        parameter = TestParameter(name="ALT",
-                                  description="Altitude", unit="ft")
+        parameter = TestParameter(name="ALT", description="Altitude", unit="ft")
         db_session.add(parameter)
         db_session.commit()
         db_session.refresh(parameter)
@@ -1074,8 +1021,7 @@ class TestDataRetrieval:
         db_session.commit()
 
         # Retrieve data points
-        response = client.get(f"/api/flight-tests/{flight_test.id}/data",
-                              headers=auth_headers)
+        response = client.get(f"/api/flight-tests/{flight_test.id}/data", headers=auth_headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -1083,24 +1029,20 @@ class TestDataRetrieval:
         assert all("timestamp" in dp for dp in data)
         assert all("value" in dp for dp in data)
 
-    def test_get_data_points_with_pagination(self, client,
-                                             test_user, auth_headers,
-                                             db_session):
+    def test_get_data_points_with_pagination(self, client, test_user, auth_headers, db_session):
         """Test data point retrieval with pagination"""
         from app.models import DataPoint, FlightTest, TestParameter
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="Pagination Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Pagination Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
         db_session.refresh(flight_test)
 
         # Create parameter
-        parameter = TestParameter(name="ALT",
-                                  description="Altitude", unit="ft")
+        parameter = TestParameter(name="ALT", description="Altitude", unit="ft")
         db_session.add(parameter)
         db_session.commit()
         db_session.refresh(parameter)
@@ -1118,8 +1060,7 @@ class TestDataRetrieval:
 
         # Test with limit
         response = client.get(
-            f"/api/flight-tests/{flight_test.id}/data?limit=10",
-            headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/data?limit=10", headers=auth_headers
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -1127,33 +1068,27 @@ class TestDataRetrieval:
 
         # Test with skip and limit
         response = client.get(
-            f"/api/flight-tests/{flight_test.id}/data?skip=10&limit=5",
-            headers=auth_headers
+            f"/api/flight-tests/{flight_test.id}/data?skip=10&limit=5", headers=auth_headers
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 5
 
-    def test_get_data_points_parameter_filter(self, client,
-                                              test_user, auth_headers,
-                                              db_session):
+    def test_get_data_points_parameter_filter(self, client, test_user, auth_headers, db_session):
         """Test filtering data points by parameter"""
         from app.models import DataPoint, FlightTest, TestParameter
 
         # Create flight test
         flight_test = FlightTest(
-            test_name="Filter Test", aircraft_type="F-16",
-            created_by_id=test_user["id"]
+            test_name="Filter Test", aircraft_type="F-16", created_by_id=test_user["id"]
         )
         db_session.add(flight_test)
         db_session.commit()
         db_session.refresh(flight_test)
 
         # Create two parameters
-        alt_param = TestParameter(name="ALT",
-                                  description="Altitude", unit="ft")
-        ias_param = TestParameter(name="IAS",
-                                  description="Airspeed", unit="kt")
+        alt_param = TestParameter(name="ALT", description="Altitude", unit="ft")
+        ias_param = TestParameter(name="IAS", description="Airspeed", unit="kt")
         db_session.add(alt_param)
         db_session.add(ias_param)
         db_session.commit()
@@ -1198,8 +1133,7 @@ class TestAuthentication:
     def test_create_flight_test_without_auth(self, client):
         """Test that creating flight test requires authentication"""
         response = client.post(
-            "/api/flight-tests/",
-            json={"test_name": "Unauthorized Test", "aircraft_type": "F-16"}
+            "/api/flight-tests/", json={"test_name": "Unauthorized Test", "aircraft_type": "F-16"}
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -1212,8 +1146,7 @@ class TestAuthentication:
         """Test that CSV upload requires authentication"""
         csv_content = """timestamp,ALT
 0.0,5000.0"""
-        files = {"file": ("test.csv",
-                          io.BytesIO(csv_content.encode()), "text/csv")}
+        files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
         response = client.post("/api/flight-tests/1/upload-csv", files=files)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 

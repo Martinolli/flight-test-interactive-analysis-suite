@@ -256,11 +256,16 @@ def _decision_driver_types(
     drivers: List[str] = []
     if hard_stops or bool(score_snapshot.get("hard_stop_triggered")):
         drivers.append("hard_stop")
-    if str(score_snapshot.get("recommendation") or "") != "go" or str(score_snapshot.get("risk_band") or "") != "low":
+    if (
+        str(score_snapshot.get("recommendation") or "") != "go"
+        or str(score_snapshot.get("risk_band") or "") != "low"
+    ):
         drivers.append("score_band")
     if int(score_snapshot.get("analysis_indicator_score") or 0) > 0:
         drivers.append("linked_analysis_penalty")
-    if not has_linked_analysis and _risk_band_requires_review(str(score_snapshot.get("risk_band") or "")):
+    if not has_linked_analysis and _risk_band_requires_review(
+        str(score_snapshot.get("risk_band") or "")
+    ):
         drivers.append("missing_analysis_evidence")
     return drivers
 
@@ -285,7 +290,9 @@ def _build_decision_explanation(
     score_snapshot: dict,
     hard_stop_snapshot: List[dict],
 ) -> Dict[str, Any]:
-    analysis_reference_ids = _clean_digits(_safe_json_load(assessment.analysis_reference_ids_json, []))
+    analysis_reference_ids = _clean_digits(
+        _safe_json_load(assessment.analysis_reference_ids_json, [])
+    )
     analysis_jobs = (
         _load_analysis_jobs_for_assessment(
             db=db,
@@ -295,11 +302,17 @@ def _build_decision_explanation(
         if db is not None
         else []
     )
-    has_linked_analysis = len(analysis_jobs) > 0 if db is not None else len(analysis_reference_ids) > 0
+    has_linked_analysis = (
+        len(analysis_jobs) > 0 if db is not None else len(analysis_reference_ids) > 0
+    )
 
     dataset_version_label = None
     if db is not None and assessment.dataset_version_id is not None:
-        dataset = db.query(DatasetVersion).filter(DatasetVersion.id == assessment.dataset_version_id).first()
+        dataset = (
+            db.query(DatasetVersion)
+            .filter(DatasetVersion.id == assessment.dataset_version_id)
+            .first()
+        )
         if dataset:
             dataset_version_label = dataset.label
 
@@ -352,15 +365,20 @@ def _build_decision_explanation(
             "recommendation": recommendation or None,
         },
         "hard_stops": {
-            "triggered": bool(score_snapshot.get("hard_stop_triggered")) or bool(hard_stop_snapshot),
+            "triggered": bool(score_snapshot.get("hard_stop_triggered"))
+            or bool(hard_stop_snapshot),
             "flags": [str(item.get("code") or "hard_stop") for item in hard_stop_snapshot],
-            "reasons": [str(item.get("message") or "") for item in hard_stop_snapshot if item.get("message")],
+            "reasons": [
+                str(item.get("message") or "") for item in hard_stop_snapshot if item.get("message")
+            ],
             "items": hard_stop_snapshot,
         },
         "linked_analysis": {
             "available": has_linked_analysis,
             "controls_summary": _analysis_controls_summary(analysis_jobs),
-            "no_linked_analysis_statement": None if has_linked_analysis else NO_LINKED_ANALYSIS_STATEMENT,
+            "no_linked_analysis_statement": (
+                None if has_linked_analysis else NO_LINKED_ANALYSIS_STATEMENT
+            ),
             "warning": no_linked_analysis_warning,
         },
         "dominant_risk_drivers": _dominant_risk_drivers(
@@ -393,7 +411,9 @@ def _build_decision_explanation(
     }
 
 
-def _serialize_assessment(assessment: FratAssessment, db: Optional[Session] = None) -> FratAssessmentOut:
+def _serialize_assessment(
+    assessment: FratAssessment, db: Optional[Session] = None
+) -> FratAssessmentOut:
     analysis_reference_ids = _safe_json_load(assessment.analysis_reference_ids_json, [])
     input_snapshot = _safe_json_load(assessment.input_snapshot_json, {})
     if not isinstance(input_snapshot, dict):
@@ -471,7 +491,9 @@ def _get_accessible_assessment(
     assessment_id: int,
     current_user: User,
 ) -> FratAssessment:
-    query = db.query(FratAssessment).join(FlightTest, FlightTest.id == FratAssessment.flight_test_id)
+    query = db.query(FratAssessment).join(
+        FlightTest, FlightTest.id == FratAssessment.flight_test_id
+    )
     query = query.filter(FratAssessment.id == assessment_id)
     if not current_user.is_superuser:
         query = query.filter(FlightTest.created_by_id == current_user.id)
@@ -506,7 +528,9 @@ def _validate_dataset_version_link(
         .first()
     )
     if not version:
-        raise HTTPException(status_code=404, detail="Dataset version not found for this flight test")
+        raise HTTPException(
+            status_code=404, detail="Dataset version not found for this flight test"
+        )
     return version.id
 
 
@@ -610,10 +634,14 @@ def _build_report_snapshot(
             "approved_by_id": assessment.approved_by_id,
             "rejected_by_id": assessment.rejected_by_id,
             "finalized_by_id": assessment.finalized_by_id,
-            "finalized_at": assessment.finalized_at.isoformat() if assessment.finalized_at else None,
+            "finalized_at": (
+                assessment.finalized_at.isoformat() if assessment.finalized_at else None
+            ),
             "generated_at": datetime.utcnow().isoformat(),
         },
-        "analysis_reference_ids": _clean_digits(_safe_json_load(assessment.analysis_reference_ids_json, [])),
+        "analysis_reference_ids": _clean_digits(
+            _safe_json_load(assessment.analysis_reference_ids_json, [])
+        ),
         "input_snapshot": _safe_json_load(assessment.input_snapshot_json, {}),
         "score_snapshot": score,
         "hard_stop_snapshot": clean_hard_stops,
@@ -703,7 +731,12 @@ def _build_frat_pdf(
         for item in why_not_acceptable:
             story.append(Paragraph(f"- {escape(str(item))}", styles["Normal"]))
     else:
-        story.append(Paragraph("- Assessment is acceptable under the recorded FRAT decision state.", styles["Normal"]))
+        story.append(
+            Paragraph(
+                "- Assessment is acceptable under the recorded FRAT decision state.",
+                styles["Normal"],
+            )
+        )
     actions = decision.get("recommended_next_actions") or []
     if actions:
         story.append(Paragraph("Recommended Next Action", styles["Heading3"]))
@@ -738,7 +771,12 @@ def _build_frat_pdf(
         story.append(Paragraph("Category Breakdown", styles["Heading2"]))
         score_rows = [["Category", "Base Score"]]
         for item in category_breakdown:
-            score_rows.append([escape(str(item.get("label") or item.get("key") or "Category")), str(item.get("base_score") or 0)])
+            score_rows.append(
+                [
+                    escape(str(item.get("label") or item.get("key") or "Category")),
+                    str(item.get("base_score") or 0),
+                ]
+            )
         score_table = Table(score_rows, colWidths=[10 * cm, 5.7 * cm])
         score_table.setStyle(
             TableStyle(
@@ -784,7 +822,9 @@ def _build_frat_pdf(
                     str(item.get("applicability_status") or "—"),
                 ]
             )
-        controls_table = Table(controls_rows, colWidths=[2 * cm, 3 * cm, 3.4 * cm, 3 * cm, 4.3 * cm])
+        controls_table = Table(
+            controls_rows, colWidths=[2 * cm, 3 * cm, 3.4 * cm, 3 * cm, 4.3 * cm]
+        )
         controls_table.setStyle(
             TableStyle(
                 [
@@ -796,7 +836,17 @@ def _build_frat_pdf(
         )
         story.append(controls_table)
     else:
-        story.append(Paragraph(escape(str(linked_analysis.get("no_linked_analysis_statement") or NO_LINKED_ANALYSIS_STATEMENT)), styles["Normal"]))
+        story.append(
+            Paragraph(
+                escape(
+                    str(
+                        linked_analysis.get("no_linked_analysis_statement")
+                        or NO_LINKED_ANALYSIS_STATEMENT
+                    )
+                ),
+                styles["Normal"],
+            )
+        )
     if linked_analysis.get("warning"):
         story.append(Paragraph(escape(str(linked_analysis.get("warning"))), styles["Normal"]))
     story.append(Spacer(1, 0.2 * cm))
@@ -813,14 +863,32 @@ def _build_frat_pdf(
                 )
             )
     else:
-        story.append(Paragraph("- No dominant risk drivers identified in the scored snapshot.", styles["Normal"]))
+        story.append(
+            Paragraph(
+                "- No dominant risk drivers identified in the scored snapshot.", styles["Normal"]
+            )
+        )
     story.append(Spacer(1, 0.2 * cm))
 
     notes = explanation.get("notes") or {}
     story.append(Paragraph("Reviewer / Transition Notes", styles["Heading2"]))
-    story.append(Paragraph(f"Review notes: {escape(str(notes.get('review_notes') or '—'))}", styles["Normal"]))
-    story.append(Paragraph(f"Override/rationale notes: {escape(str(notes.get('override_rationale_notes') or '—'))}", styles["Normal"]))
-    story.append(Paragraph(f"Transition notes: {escape(str(notes.get('transition_notes') or '—'))}", styles["Normal"]))
+    story.append(
+        Paragraph(
+            f"Review notes: {escape(str(notes.get('review_notes') or '—'))}", styles["Normal"]
+        )
+    )
+    story.append(
+        Paragraph(
+            f"Override/rationale notes: {escape(str(notes.get('override_rationale_notes') or '—'))}",
+            styles["Normal"],
+        )
+    )
+    story.append(
+        Paragraph(
+            f"Transition notes: {escape(str(notes.get('transition_notes') or '—'))}",
+            styles["Normal"],
+        )
+    )
     story.append(Spacer(1, 0.2 * cm))
 
     story.append(Paragraph("Engineering Notice", styles["Heading2"]))
@@ -833,7 +901,9 @@ def _build_frat_pdf(
             styles["Normal"],
         )
     )
-    story.append(Paragraph(escape(str(explanation.get("provenance_statement") or "")), styles["Normal"]))
+    story.append(
+        Paragraph(escape(str(explanation.get("provenance_statement") or "")), styles["Normal"])
+    )
 
     doc.build(story)
     pdf_bytes = buffer.getvalue()
@@ -913,11 +983,7 @@ def list_flight_test_analysis_jobs(
     query = db.query(AnalysisJob).filter(AnalysisJob.flight_test_id == flight_test_id)
     if not current_user.is_superuser:
         query = query.filter(AnalysisJob.created_by_id == current_user.id)
-    rows = (
-        query.order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc())
-        .limit(50)
-        .all()
-    )
+    rows = query.order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc()).limit(50).all()
     response_items: List[FratAnalysisJobReferenceOut] = []
     for row in rows:
         mode_key = _decode_prompt_mode(row.prompt_text or "")
@@ -1012,7 +1078,10 @@ def score_frat_assessment(
     )
     _assert_assessment_mutable(assessment)
     if assessment.status == FRAT_STATUS_APPROVED:
-        raise HTTPException(status_code=400, detail="Approved assessments must be rejected or finalized before rescoring.")
+        raise HTTPException(
+            status_code=400,
+            detail="Approved assessments must be rejected or finalized before rescoring.",
+        )
     _score_and_persist(
         db=db,
         assessment=assessment,
@@ -1039,9 +1108,13 @@ def approve_frat_assessment(
     if not isinstance(score, dict) or not score:
         raise HTTPException(status_code=400, detail="Assessment must be scored before approval.")
     if bool(score.get("hard_stop_triggered")):
-        raise HTTPException(status_code=400, detail="Assessment has hard-stops and cannot be approved.")
+        raise HTTPException(
+            status_code=400, detail="Assessment has hard-stops and cannot be approved."
+        )
     if str(score.get("recommendation")) != "go":
-        raise HTTPException(status_code=400, detail="Only go-recommended assessments can be approved.")
+        raise HTTPException(
+            status_code=400, detail="Only go-recommended assessments can be approved."
+        )
 
     assessment.status = FRAT_STATUS_APPROVED
     assessment.approved_by_id = current_user.id
@@ -1098,13 +1171,21 @@ def finalize_frat_assessment(
     score = _safe_json_load(assessment.score_snapshot_json, {})
     hard_stops = _safe_json_load(assessment.hard_stop_snapshot_json, [])
     if not isinstance(score, dict) or not score:
-        raise HTTPException(status_code=400, detail="Assessment must be scored before finalization.")
+        raise HTTPException(
+            status_code=400, detail="Assessment must be scored before finalization."
+        )
     if bool(score.get("hard_stop_triggered")):
-        raise HTTPException(status_code=400, detail="Assessment has hard-stops and cannot be finalized.")
+        raise HTTPException(
+            status_code=400, detail="Assessment has hard-stops and cannot be finalized."
+        )
     if str(score.get("recommendation")) != "go":
-        raise HTTPException(status_code=400, detail="Only go-recommended assessments can be finalized.")
+        raise HTTPException(
+            status_code=400, detail="Only go-recommended assessments can be finalized."
+        )
     if assessment.approved_by_id is None:
-        raise HTTPException(status_code=400, detail="Assessment must be approved before finalization.")
+        raise HTTPException(
+            status_code=400, detail="Assessment must be approved before finalization."
+        )
 
     now = datetime.utcnow()
     assessment.status = FRAT_STATUS_FINALIZED
@@ -1137,7 +1218,11 @@ def finalize_frat_assessment(
             db=db,
             assessment=assessment,
             score_snapshot=score,
-            hard_stop_snapshot=[item for item in hard_stops if isinstance(item, dict)] if isinstance(hard_stops, list) else [],
+            hard_stop_snapshot=(
+                [item for item in hard_stops if isinstance(item, dict)]
+                if isinstance(hard_stops, list)
+                else []
+            ),
         ),
     }
     assessment.finalized_snapshot_json = json.dumps(finalized_snapshot)
@@ -1168,7 +1253,5 @@ def export_frat_assessment_pdf(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

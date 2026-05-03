@@ -2,6 +2,7 @@
 Comprehensive test suite for Authentication API
 Tests login, logout, token refresh, and security features
 """
+
 from datetime import datetime, timedelta
 import pytest
 from fastapi import status
@@ -17,11 +18,7 @@ class TestLogin:
     def test_login_success(self, client, test_user):
         """Test successful login"""
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": test_user["username"],
-                "password": "testpass123"
-            }
+            "/api/auth/login", json={"username": test_user["username"], "password": "testpass123"}
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -32,19 +29,14 @@ class TestLogin:
 
         # Verify token is valid JWT
         token = data["access_token"]
-        payload = jwt.decode(token, settings.SECRET_KEY,
-                             algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         assert "sub" in payload
         assert "exp" in payload
 
     def test_login_invalid_username(self, client):
         """Test login with invalid username"""
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": "nonexistent",
-                "password": "password123"
-            }
+            "/api/auth/login", json={"username": "nonexistent", "password": "password123"}
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -53,11 +45,7 @@ class TestLogin:
     def test_login_invalid_password(self, client, test_user):
         """Test login with invalid password"""
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": test_user["username"],
-                "password": "wrongpassword"
-            }
+            "/api/auth/login", json={"username": test_user["username"], "password": "wrongpassword"}
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -65,28 +53,19 @@ class TestLogin:
 
     def test_login_missing_username(self, client):
         """Test login without username"""
-        response = client.post(
-            "/api/auth/login",
-            json={"password": "password123"}
-        )
+        response = client.post("/api/auth/login", json={"password": "password123"})
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_login_missing_password(self, client, test_user):
         """Test login without password"""
-        response = client.post(
-            "/api/auth/login",
-            json={"username": test_user["username"]}
-        )
+        response = client.post("/api/auth/login", json={"username": test_user["username"]})
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_login_empty_credentials(self, client):
         """Test login with empty credentials"""
-        response = client.post(
-            "/api/auth/login",
-            json={"username": "", "password": ""}
-        )
+        response = client.post("/api/auth/login", json={"username": "", "password": ""})
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -99,17 +78,13 @@ class TestLogin:
             username="inactiveuser",
             hashed_password=get_password_hash("password123"),
             full_name="Inactive User",
-            is_active=False
+            is_active=False,
         )
         db_session.add(inactive_user)
         db_session.commit()
 
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": "inactiveuser",
-                "password": "password123"
-            }
+            "/api/auth/login", json={"username": "inactiveuser", "password": "password123"}
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -123,19 +98,12 @@ class TestTokenRefresh:
         """Test successful token refresh"""
         # Login to get refresh token
         login_response = client.post(
-            "/api/auth/login",
-            json={
-                "username": test_user["username"],
-                "password": "testpass123"
-            }
+            "/api/auth/login", json={"username": test_user["username"], "password": "testpass123"}
         )
         refresh_token = login_response.json()["refresh_token"]
 
         # Refresh token
-        response = client.post(
-            "/api/auth/refresh",
-            json={"refresh_token": refresh_token}
-        )
+        response = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -149,10 +117,7 @@ class TestTokenRefresh:
 
     def test_refresh_invalid_token(self, client):
         """Test refresh with invalid token"""
-        response = client.post(
-            "/api/auth/refresh",
-            json={"refresh_token": "invalid_token"}
-        )
+        response = client.post("/api/auth/refresh", json={"refresh_token": "invalid_token"})
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -161,13 +126,9 @@ class TestTokenRefresh:
         # Create an expired token
         expire = datetime.utcnow() - timedelta(minutes=1)
         token_data = {"sub": str(test_user["id"]), "exp": expire}
-        expired_token = jwt.encode(token_data, settings.SECRET_KEY,
-                                   algorithm=settings.ALGORITHM)
+        expired_token = jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-        response = client.post(
-            "/api/auth/refresh",
-            json={"refresh_token": expired_token}
-        )
+        response = client.post("/api/auth/refresh", json={"refresh_token": expired_token})
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -207,8 +168,7 @@ class TestLogout:
 
         # Note: Logout is typically client-side (token deletion)
         # Server may return success even though token is still valid
-        assert response.status_code in [status.HTTP_200_OK,
-                                        status.HTTP_204_NO_CONTENT]
+        assert response.status_code in [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT]
 
     def test_logout_without_auth(self, client):
         """Test logout without authentication"""
@@ -217,7 +177,7 @@ class TestLogout:
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_204_NO_CONTENT,
-            status.HTTP_401_UNAUTHORIZED
+            status.HTTP_401_UNAUTHORIZED,
         ]
 
 
@@ -227,32 +187,22 @@ class TestTokenSecurity:
     def test_token_contains_user_id(self, client, test_user):
         """Test that token contains user ID"""
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": test_user["username"],
-                "password": "testpass123"
-            }
+            "/api/auth/login", json={"username": test_user["username"], "password": "testpass123"}
         )
 
         token = response.json()["access_token"]
-        payload = jwt.decode(token, settings.SECRET_KEY,
-                             algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
         assert payload["sub"] == str(test_user["id"])
 
     def test_token_has_expiration(self, client, test_user):
         """Test that token has expiration time"""
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": test_user["username"],
-                "password": "testpass123"
-            }
+            "/api/auth/login", json={"username": test_user["username"], "password": "testpass123"}
         )
 
         token = response.json()["access_token"]
-        payload = jwt.decode(token, settings.SECRET_KEY,
-                             algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
         assert "exp" in payload
         # `exp` is an absolute unix timestamp (UTC); use UTC conversion.
@@ -264,10 +214,8 @@ class TestTokenSecurity:
     def test_token_signature_verification(self, client, test_user):
         """Test that token signature is verified"""
         # Create a token with wrong signature
-        token_data = {"sub": str(test_user["id"]),
-                      "exp": datetime.utcnow() + timedelta(minutes=30)}
-        fake_token = jwt.encode(token_data, "wrong_secret",
-                                algorithm=settings.ALGORITHM)
+        token_data = {"sub": str(test_user["id"]), "exp": datetime.utcnow() + timedelta(minutes=30)}
+        fake_token = jwt.encode(token_data, "wrong_secret", algorithm=settings.ALGORITHM)
 
         headers = {"Authorization": f"Bearer {fake_token}"}
         response = client.get("/api/auth/me", headers=headers)
@@ -277,13 +225,11 @@ class TestTokenSecurity:
     def test_token_algorithm_verification(self, client, test_user):
         """Test that token algorithm is verified"""
         # Create a token with different algorithm (if possible)
-        token_data = {"sub": str(test_user["id"]),
-                      "exp": datetime.utcnow() + timedelta(minutes=30)}
+        token_data = {"sub": str(test_user["id"]), "exp": datetime.utcnow() + timedelta(minutes=30)}
 
         try:
             # Try to create token with HS512 instead of HS256
-            fake_token = jwt.encode(token_data,
-                                    settings.SECRET_KEY, algorithm="HS512")
+            fake_token = jwt.encode(token_data, settings.SECRET_KEY, algorithm="HS512")
             headers = {"Authorization": f"Bearer {fake_token}"}
             response = client.get("/api/auth/me", headers=headers)
             assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -309,11 +255,7 @@ class TestTokenSecurity:
     def test_missing_bearer_prefix(self, client, test_user):
         """Test that Bearer prefix is required"""
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": test_user["username"],
-                "password": "testpass123"
-            }
+            "/api/auth/login", json={"username": test_user["username"], "password": "testpass123"}
         )
         token = response.json()["access_token"]
 
@@ -352,11 +294,7 @@ class TestPasswordSecurity:
         # Wrong password should not verify
         assert verify_password("wrongpassword", hashed) is False
 
-    def test_password_not_returned_in_response(self,
-                                               client,
-                                               test_user,
-                                               auth_headers
-                                               ):
+    def test_password_not_returned_in_response(self, client, test_user, auth_headers):
         """Test that password is never returned in API responses"""
         # Get current user
         response = client.get("/api/auth/me", headers=auth_headers)
@@ -367,9 +305,7 @@ class TestPasswordSecurity:
         assert "hashed_password" not in data
 
         # /api/users/{id} is admin-only; regular users should be denied.
-        response = client.get(f"/api/users/{test_user['id']}",
-                              headers=auth_headers
-                              )
+        response = client.get(f"/api/users/{test_user['id']}", headers=auth_headers)
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -382,20 +318,12 @@ class TestRateLimiting:
         # Make multiple failed login attempts
         for _ in range(10):
             response = client.post(
-                "/api/auth/login",
-                json={
-                    "username": "testuser",
-                    "password": "wrongpassword"
-                }
+                "/api/auth/login", json={"username": "testuser", "password": "wrongpassword"}
             )
 
         # After many attempts, should be rate limited
         response = client.post(
-            "/api/auth/login",
-            json={
-                "username": "testuser",
-                "password": "wrongpassword"
-            }
+            "/api/auth/login", json={"username": "testuser", "password": "wrongpassword"}
         )
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS

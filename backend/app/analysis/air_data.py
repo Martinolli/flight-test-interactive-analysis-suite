@@ -22,7 +22,9 @@ KNOT_TO_MPS = 0.514444
 MPS_TO_KNOT = 1.0 / KNOT_TO_MPS
 
 
-def isa_atmosphere_from_pressure_altitude_ft(pressure_altitude_ft: float) -> Optional[Dict[str, float]]:
+def isa_atmosphere_from_pressure_altitude_ft(
+    pressure_altitude_ft: float,
+) -> Optional[Dict[str, float]]:
     """
     ISA snapshot from pressure altitude using troposphere model.
     Returns bounded outputs up to ~36,089 ft (11 km).

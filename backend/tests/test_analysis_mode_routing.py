@@ -161,9 +161,7 @@ def test_ai_analysis_defaults_to_takeoff_mode_and_persists_mode_tag(
     assert body["retrieved_sources_snapshot"][0]["source_id"] == "S1"
 
     persisted_job = (
-        db_session.query(AnalysisJob)
-        .filter(AnalysisJob.id == body["analysis_job_id"])
-        .first()
+        db_session.query(AnalysisJob).filter(AnalysisJob.id == body["analysis_job_id"]).first()
     )
     assert persisted_job is not None
     assert persisted_job.prompt_text.startswith("[analysis_mode:takeoff]")
@@ -258,12 +256,17 @@ def test_ai_analysis_performance_mode_runs_mode_specific_deterministic_metrics(
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("takeoff calculator must not run")
+        ),
     )
 
     response = client.post(
         f"/api/documents/flight-tests/{flight_test.id}/ai-analysis",
-        json={"analysis_mode": "performance", "user_prompt": "Provide deterministic performance trends"},
+        json={
+            "analysis_mode": "performance",
+            "user_prompt": "Provide deterministic performance trends",
+        },
         headers=auth_headers,
     )
     assert response.status_code == status.HTTP_200_OK
@@ -310,7 +313,9 @@ def test_ai_analysis_buffet_mode_returns_screening_metrics(
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("takeoff calculator must not run")
+        ),
     )
 
     response = client.post(
@@ -378,7 +383,9 @@ def test_ai_analysis_general_mode_routes_without_takeoff_calculator(
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("takeoff calculator must not run")
+        ),
     )
 
     response = client.post(
@@ -418,9 +425,7 @@ def test_ai_analysis_flutter_mode_runs_bounded_flutter_prescreening(
             "capability_outcome": "allow_with_limitations",
             "capability_authority": "deterministic_with_rag_crosscheck",
             "capability_status": "implemented",
-            "capability_applicability_boundaries": [
-                "Bounded flutter-support pre-screening only."
-            ],
+            "capability_applicability_boundaries": ["Bounded flutter-support pre-screening only."],
             "capability_limitations": [
                 "Not flutter clearance or formal aeroelastic substantiation."
             ],
@@ -516,12 +521,8 @@ def test_ai_analysis_handling_mode_runs_deterministic_control_response_path(
             "capability_outcome": "allow_with_limitations",
             "capability_authority": "deterministic_with_rag_crosscheck",
             "capability_status": "implemented",
-            "capability_applicability_boundaries": [
-                "Bounded control-response trend summary only."
-            ],
-            "capability_limitations": [
-                "Not a formal certification handling-qualities rating."
-            ],
+            "capability_applicability_boundaries": ["Bounded control-response trend summary only."],
+            "capability_limitations": ["Not a formal certification handling-qualities rating."],
             "pairings_analyzed": 2,
             "pairing_results": [
                 {
@@ -721,7 +722,9 @@ def test_ai_analysis_prompt_guard_soft_mismatch_keeps_general_mode(
     monkeypatch.setattr(
         documents_router,
         "_compute_takeoff_metrics",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("takeoff calculator must not run")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("takeoff calculator must not run")
+        ),
     )
 
     response = client.post(

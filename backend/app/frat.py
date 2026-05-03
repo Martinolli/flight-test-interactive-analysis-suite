@@ -34,10 +34,7 @@ CATEGORY_KEYS = [
 
 def default_frat_inputs() -> Dict[str, Any]:
     return {
-        "categories": {
-            key: {"score": 0, "notes": ""}
-            for key in CATEGORY_KEYS
-        },
+        "categories": {key: {"score": 0, "notes": ""} for key in CATEGORY_KEYS},
         "manual_adjustment": 0,
         "critical_flags": {
             "critical_system_unavailable": False,
@@ -130,7 +127,13 @@ def _analysis_penalty_from_controls(control: dict) -> int:
         deterministic_confidence,
         3,
     )
-    return warning_penalty + strength_penalty + applicability_penalty + retrieval_penalty + confidence_penalty
+    return (
+        warning_penalty
+        + strength_penalty
+        + applicability_penalty
+        + retrieval_penalty
+        + confidence_penalty
+    )
 
 
 def _build_hard_stops(
@@ -182,7 +185,10 @@ def _build_hard_stops(
         )
 
     for control in controls:
-        if str(control.get("result_strength")) == "blocked" or str(control.get("applicability_status")) == "not_applicable":
+        if (
+            str(control.get("result_strength")) == "blocked"
+            or str(control.get("applicability_status")) == "not_applicable"
+        ):
             stops.append(
                 {
                     "code": "analysis_not_applicable",

@@ -90,10 +90,7 @@ def test_update_user(client, sample_user_data, admin_headers):
     user_id = create_response.json()["id"]
 
     # Update user
-    update_data = {
-        "full_name": "Updated Name",
-        "email": sample_user_data["email"]
-    }
+    update_data = {"full_name": "Updated Name", "email": sample_user_data["email"]}
     response = client.put(f"/api/users/{user_id}", json=update_data, headers=admin_headers)
 
     assert response.status_code == status.HTTP_200_OK
@@ -151,7 +148,7 @@ def test_invalid_email_format(client, admin_headers):
         "email": "not-an-email",
         "username": "testuser",
         "full_name": "Test User",
-        "password": "password123"
+        "password": "password123",
     }
     response = client.post("/api/users/", json=invalid_data, headers=admin_headers)
 

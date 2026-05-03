@@ -20,8 +20,7 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=schemas.Token)
-async def login(login_data: schemas.LoginRequest,
-                db: Session = Depends(get_db)):
+async def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db)):
     """
     Login endpoint - authenticate user and return JWT token
     """
@@ -38,9 +37,7 @@ async def login(login_data: schemas.LoginRequest,
     )
 
     # Verify user exists and password is correct
-    if not user or not auth.verify_password(
-        login_data.password, user.hashed_password
-    ):
+    if not user or not auth.verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -49,14 +46,10 @@ async def login(login_data: schemas.LoginRequest,
 
     # Check if user is active
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
     # Create access token
-    access_token_expires = timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
@@ -92,6 +85,7 @@ async def get_current_user_info(
 
 class ProfileUpdate(BaseModel):
     """Schema for updating the current user's own profile."""
+
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
 
@@ -111,9 +105,7 @@ async def update_current_user(
     if update.email is not None:
         # Check that the new email is not already taken by another account
         existing = (
-            db.query(User)
-            .filter(User.email == update.email, User.id != current_user.id)
-            .first()
+            db.query(User).filter(User.email == update.email, User.id != current_user.id).first()
         )
         if existing:
             raise HTTPException(
@@ -162,9 +154,7 @@ async def refresh_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token_expires = timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={"sub": str(user.id)}, expires_delta=access_token_expires
     )

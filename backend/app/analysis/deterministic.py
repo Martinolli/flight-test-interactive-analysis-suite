@@ -54,7 +54,9 @@ class DeterministicCalculatorResult:
         return payload
 
 
-def _apply_capability_evaluation_to_metrics(metrics: dict, evaluation: CapabilityEvaluation) -> dict:
+def _apply_capability_evaluation_to_metrics(
+    metrics: dict, evaluation: CapabilityEvaluation
+) -> dict:
     enriched = dict(metrics)
     enriched["capability_key"] = evaluation.capability_key
     enriched["capability_authority"] = evaluation.authority.value
@@ -68,7 +70,9 @@ def _apply_capability_evaluation_to_metrics(metrics: dict, evaluation: Capabilit
     return enriched
 
 
-def _result_with_capability(result: DeterministicCalculatorResult, evaluation: CapabilityEvaluation) -> dict:
+def _result_with_capability(
+    result: DeterministicCalculatorResult, evaluation: CapabilityEvaluation
+) -> dict:
     return _apply_capability_evaluation_to_metrics(result.to_dict(), evaluation)
 
 
@@ -106,12 +110,9 @@ def _load_timeseries_rows(
     dataset_version_id: Optional[int],
     parameter_ids: Iterable[int],
 ):
-    rows_query = (
-        db.query(DataPoint.timestamp, DataPoint.parameter_id, DataPoint.value)
-        .filter(
-            DataPoint.flight_test_id == flight_test_id,
-            DataPoint.parameter_id.in_(list(parameter_ids)),
-        )
+    rows_query = db.query(DataPoint.timestamp, DataPoint.parameter_id, DataPoint.value).filter(
+        DataPoint.flight_test_id == flight_test_id,
+        DataPoint.parameter_id.in_(list(parameter_ids)),
     )
     if dataset_version_id is not None:
         rows_query = rows_query.filter(DataPoint.dataset_version_id == dataset_version_id)
@@ -480,7 +481,9 @@ def _pearson_corr(xs: List[float], ys: List[float]) -> Optional[float]:
     return cov / denom
 
 
-def _best_sample_lag(xs: List[float], ys: List[float], max_lag: int = 3) -> Tuple[Optional[int], Optional[float]]:
+def _best_sample_lag(
+    xs: List[float], ys: List[float], max_lag: int = 3
+) -> Tuple[Optional[int], Optional[float]]:
     best_lag: Optional[int] = None
     best_corr: Optional[float] = None
     for lag in range(-max_lag, max_lag + 1):
@@ -703,7 +706,9 @@ def compute_takeoff_metrics(
             break
     if start_idx is None:
         candidates = [
-            i for i in range(0, liftoff_idx + 1) if points[i]["wow"] is None or points[i]["wow"] >= 0.5
+            i
+            for i in range(0, liftoff_idx + 1)
+            if points[i]["wow"] is None or points[i]["wow"] >= 0.5
         ]
         start_idx = candidates[0] if candidates else 0
 
@@ -753,7 +758,9 @@ def compute_takeoff_metrics(
     if duration_s > 0:
         mean_accel_fts2 = (_knot_to_fts(liftoff_pt["gs_kt"] - start_pt["gs_kt"])) / duration_s
 
-    accel_samples = [pt["accel"] for pt in points[start_idx : liftoff_idx + 1] if pt["accel"] is not None]
+    accel_samples = [
+        pt["accel"] for pt in points[start_idx : liftoff_idx + 1] if pt["accel"] is not None
+    ]
     accel_mean_g = (sum(accel_samples) / len(accel_samples)) if accel_samples else None
     accel_sensor_fts2 = (accel_mean_g * 32.174) if accel_mean_g is not None else None
 
@@ -771,22 +778,30 @@ def compute_takeoff_metrics(
         DeterministicCalculatorResult(
             available=True,
             metrics={
-            "available": True,
-            "distance_ft": round(distance_ft, 1),
-            "distance_m": round(distance_ft * 0.3048, 1),
-            "wow_channels_used": len(wow_ids),
-            "wow_ground_threshold": 0.5,
-            "start_timestamp": start_pt["ts"].isoformat(),
-            "liftoff_timestamp": liftoff_pt["ts"].isoformat(),
-            "start_wow_mean": round(start_pt["wow"], 3) if start_pt["wow"] is not None else None,
-            "liftoff_wow_mean": round(liftoff_pt["wow"], 3) if liftoff_pt["wow"] is not None else None,
-            "start_speed_kt": round(start_pt["gs_kt"], 2),
-            "liftoff_speed_kt": round(liftoff_pt["gs_kt"], 2),
-            "run_time_s": round(duration_s, 2),
-            "mean_accel_fts2": round(mean_accel_fts2, 3) if mean_accel_fts2 is not None else None,
-            "sensor_accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
-            "sensor_accel_mean_fts2": round(accel_sensor_fts2, 3) if accel_sensor_fts2 is not None else None,
-            "sample_intervals_used": valid_intervals,
+                "available": True,
+                "distance_ft": round(distance_ft, 1),
+                "distance_m": round(distance_ft * 0.3048, 1),
+                "wow_channels_used": len(wow_ids),
+                "wow_ground_threshold": 0.5,
+                "start_timestamp": start_pt["ts"].isoformat(),
+                "liftoff_timestamp": liftoff_pt["ts"].isoformat(),
+                "start_wow_mean": (
+                    round(start_pt["wow"], 3) if start_pt["wow"] is not None else None
+                ),
+                "liftoff_wow_mean": (
+                    round(liftoff_pt["wow"], 3) if liftoff_pt["wow"] is not None else None
+                ),
+                "start_speed_kt": round(start_pt["gs_kt"], 2),
+                "liftoff_speed_kt": round(liftoff_pt["gs_kt"], 2),
+                "run_time_s": round(duration_s, 2),
+                "mean_accel_fts2": (
+                    round(mean_accel_fts2, 3) if mean_accel_fts2 is not None else None
+                ),
+                "sensor_accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
+                "sensor_accel_mean_fts2": (
+                    round(accel_sensor_fts2, 3) if accel_sensor_fts2 is not None else None
+                ),
+                "sample_intervals_used": valid_intervals,
             },
             assumptions=[
                 "WOW mean threshold 0.5 is used to separate on-ground vs airborne states.",
@@ -917,7 +932,9 @@ def compute_landing_metrics(
             break
     if rollout_end_idx is None:
         ground_candidates = [
-            idx for idx in range(touchdown_idx + 1, len(points)) if _is_ground(points[idx]["gs_kt"], points[idx]["wow"])
+            idx
+            for idx in range(touchdown_idx + 1, len(points))
+            if _is_ground(points[idx]["gs_kt"], points[idx]["wow"])
         ]
         rollout_end_idx = ground_candidates[-1] if ground_candidates else (len(points) - 1)
 
@@ -979,18 +996,20 @@ def compute_landing_metrics(
         DeterministicCalculatorResult(
             available=True,
             metrics={
-            "available": True,
-            "distance_ft": round(distance_ft, 1),
-            "distance_m": round(distance_ft * 0.3048, 1),
-            "touchdown_timestamp": touchdown_pt["ts"].isoformat(),
-            "rollout_end_timestamp": end_pt["ts"].isoformat(),
-            "touchdown_speed_kt": round(touchdown_pt["gs_kt"], 2),
-            "rollout_end_speed_kt": round(end_pt["gs_kt"], 2),
-            "rollout_time_s": round(rollout_time_s, 2),
-            "mean_decel_fts2": round(mean_decel_fts2, 3) if mean_decel_fts2 is not None else None,
-            "sample_intervals_used": valid_intervals,
-            "wow_channels_used": len(wow_ids),
-            "wow_ground_threshold": 0.5,
+                "available": True,
+                "distance_ft": round(distance_ft, 1),
+                "distance_m": round(distance_ft * 0.3048, 1),
+                "touchdown_timestamp": touchdown_pt["ts"].isoformat(),
+                "rollout_end_timestamp": end_pt["ts"].isoformat(),
+                "touchdown_speed_kt": round(touchdown_pt["gs_kt"], 2),
+                "rollout_end_speed_kt": round(end_pt["gs_kt"], 2),
+                "rollout_time_s": round(rollout_time_s, 2),
+                "mean_decel_fts2": (
+                    round(mean_decel_fts2, 3) if mean_decel_fts2 is not None else None
+                ),
+                "sample_intervals_used": valid_intervals,
+                "wow_channels_used": len(wow_ids),
+                "wow_ground_threshold": 0.5,
             },
             assumptions=[
                 "Touchdown is detected from WOW airborne-to-ground transition with speed sanity threshold.",
@@ -1145,7 +1164,9 @@ def _compute_air_data_support(
             mach_measured = float(point["mach"])
             mach_values.append(mach_measured)
 
-        isa_snapshot = isa_atmosphere_from_pressure_altitude_ft(pa_ft) if pa_ft is not None else None
+        isa_snapshot = (
+            isa_atmosphere_from_pressure_altitude_ft(pa_ft) if pa_ft is not None else None
+        )
         if isa_snapshot is not None:
             isa_sigma_values.append(float(isa_snapshot["sigma"]))
             isa_theta_values.append(float(isa_snapshot["theta"]))
@@ -1198,7 +1219,9 @@ def _compute_air_data_support(
     if not mach_values:
         skipped.append("Measured Mach summary unavailable: Mach channel unavailable.")
     if not (sat_values_c or oat_values_c or tat_values_c):
-        skipped.append("Mach estimate from TAS+temperature skipped: no SAT/OAT/TAT channel available.")
+        skipped.append(
+            "Mach estimate from TAS+temperature skipped: no SAT/OAT/TAT channel available."
+        )
 
     dominant_mach_temp_source = max(
         mach_temp_source_counts.keys(),
@@ -1230,7 +1253,9 @@ def _compute_air_data_support(
         "isa_sigma": _round_summary(summarize_air_data_series(isa_sigma_values), digits=4),
         "isa_theta": _round_summary(summarize_air_data_series(isa_theta_values), digits=4),
         "isa_delta": _round_summary(summarize_air_data_series(isa_delta_values), digits=4),
-        "density_altitude_ft": _round_summary(summarize_air_data_series(density_alt_values_ft), digits=1),
+        "density_altitude_ft": _round_summary(
+            summarize_air_data_series(density_alt_values_ft), digits=1
+        ),
         "tas_est_from_cas_sigma_kt": _round_summary(
             summarize_air_data_series(tas_est_values_kt), digits=2
         ),
@@ -1357,8 +1382,12 @@ def compute_performance_metrics(
                     values.get(pressure_altitude_id) if pressure_altitude_id is not None else None
                 ),
                 "altitude": values.get(altitude_id) if altitude_id is not None else None,
-                "vertical_speed": values.get(vertical_speed_id) if vertical_speed_id is not None else None,
-                "ground_speed": values.get(ground_speed_id) if ground_speed_id is not None else None,
+                "vertical_speed": (
+                    values.get(vertical_speed_id) if vertical_speed_id is not None else None
+                ),
+                "ground_speed": (
+                    values.get(ground_speed_id) if ground_speed_id is not None else None
+                ),
                 "accel": values.get(accel_id) if accel_id is not None else None,
                 "oat": values.get(oat_id) if oat_id is not None else None,
                 "sat": values.get(sat_id) if sat_id is not None else None,
@@ -1397,16 +1426,18 @@ def compute_performance_metrics(
         altitude_values = [pt["altitude"] for pt in points if pt["altitude"] is not None]
         if len(altitude_values) >= 2:
             altitude_unit = param_map.get(altitude_id, {}).get("unit")
-            altitude_change_ft = _convert_altitude_to_ft(altitude_values[-1], altitude_unit) - _convert_altitude_to_ft(
-                altitude_values[0], altitude_unit
-            )
+            altitude_change_ft = _convert_altitude_to_ft(
+                altitude_values[-1], altitude_unit
+            ) - _convert_altitude_to_ft(altitude_values[0], altitude_unit)
 
     mean_climb_rate_fpm = None
     if vertical_speed_id is not None:
         vs_values = [pt["vertical_speed"] for pt in points if pt["vertical_speed"] is not None]
         if vs_values:
             vs_unit = param_map.get(vertical_speed_id, {}).get("unit")
-            mean_climb_rate_fpm = sum(_convert_vertical_speed_to_fpm(v, vs_unit) for v in vs_values) / len(vs_values)
+            mean_climb_rate_fpm = sum(
+                _convert_vertical_speed_to_fpm(v, vs_unit) for v in vs_values
+            ) / len(vs_values)
     elif altitude_change_ft is not None and duration_s > 0:
         mean_climb_rate_fpm = (altitude_change_ft / duration_s) * 60.0
 
@@ -1447,17 +1478,23 @@ def compute_performance_metrics(
         DeterministicCalculatorResult(
             available=True,
             metrics={
-            "available": True,
-            "analysis_window_s": round(duration_s, 2),
-            "samples_used": len(points),
-            "altitude_change_ft": round(altitude_change_ft, 2) if altitude_change_ft is not None else None,
-            "mean_climb_rate_fpm": round(mean_climb_rate_fpm, 2) if mean_climb_rate_fpm is not None else None,
-            "speed_delta_kt": round(speed_delta_kt, 2) if speed_delta_kt is not None else None,
-            "max_speed_kt": round(max_speed_kt, 2) if max_speed_kt is not None else None,
-            "min_speed_kt": round(min_speed_kt, 2) if min_speed_kt is not None else None,
-            "accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
-            "accel_mean_fts2": round(accel_mean_fts2, 3) if accel_mean_fts2 is not None else None,
-            "air_data_support": air_data_support,
+                "available": True,
+                "analysis_window_s": round(duration_s, 2),
+                "samples_used": len(points),
+                "altitude_change_ft": (
+                    round(altitude_change_ft, 2) if altitude_change_ft is not None else None
+                ),
+                "mean_climb_rate_fpm": (
+                    round(mean_climb_rate_fpm, 2) if mean_climb_rate_fpm is not None else None
+                ),
+                "speed_delta_kt": round(speed_delta_kt, 2) if speed_delta_kt is not None else None,
+                "max_speed_kt": round(max_speed_kt, 2) if max_speed_kt is not None else None,
+                "min_speed_kt": round(min_speed_kt, 2) if min_speed_kt is not None else None,
+                "accel_mean_g": round(accel_mean_g, 4) if accel_mean_g is not None else None,
+                "accel_mean_fts2": (
+                    round(accel_mean_fts2, 3) if accel_mean_fts2 is not None else None
+                ),
+                "air_data_support": air_data_support,
             },
             assumptions=[
                 "Metrics are computed only from available channels in the selected dataset version.",
@@ -1477,7 +1514,10 @@ def _classify_buffet_channel_group(name: str, unit: Optional[str]) -> str:
         return "structural_vibration"
     if "accel" in n or u in {"g", "m/s2", "m/s^2"}:
         return "accelerations"
-    if any(token in n for token in ["roll rate", "pitch rate", "yaw rate"]) or u in {"deg/s", "rad/s"}:
+    if any(token in n for token in ["roll rate", "pitch rate", "yaw rate"]) or u in {
+        "deg/s",
+        "rad/s",
+    }:
         return "angular_rates"
     if any(token in n for token in ["speed", "mach", "dynamic pressure", "qbar", "tas", "cas"]):
         return "airspeed_response"
@@ -1670,7 +1710,9 @@ def _build_channel_anomaly_windows(
     return out
 
 
-def _speed_band(speed_kt: Optional[float], low_cut: Optional[float], high_cut: Optional[float]) -> str:
+def _speed_band(
+    speed_kt: Optional[float], low_cut: Optional[float], high_cut: Optional[float]
+) -> str:
     if speed_kt is None or low_cut is None or high_cut is None:
         return "unspecified"
     if speed_kt <= low_cut:
@@ -1756,8 +1798,12 @@ def compute_buffet_vibration_metrics(
         rms = math.sqrt(sum(v * v for v in values) / len(values))
         abs_values = [abs(v) for v in values]
         p95_abs = _percentile(abs_values, 0.95)
-        threshold = max((3.0 * std_val) if std_val > 0 else 0.0, (0.6 * p95_abs) if p95_abs is not None else 0.0)
-        exceedance_count = sum(1 for v in values if threshold > 0 and abs(v - mean_val) >= threshold)
+        threshold = max(
+            (3.0 * std_val) if std_val > 0 else 0.0, (0.6 * p95_abs) if p95_abs is not None else 0.0
+        )
+        exceedance_count = sum(
+            1 for v in values if threshold > 0 and abs(v - mean_val) >= threshold
+        )
         group = _classify_buffet_channel_group(p["name"], p.get("unit"))
         dominance_score = (
             (max(abs_values) * 0.45)
@@ -1864,7 +1910,11 @@ def compute_buffet_vibration_metrics(
         phase = "unknown_phase"
         if wow_mean is not None:
             phase = "ground" if _is_ground(float(speed or 0.0), wow_mean) else "airborne"
-        speed_band = _speed_band(float(speed), speed_low_cut, speed_high_cut) if speed is not None else "unspecified"
+        speed_band = (
+            _speed_band(float(speed), speed_low_cut, speed_high_cut)
+            if speed is not None
+            else "unspecified"
+        )
         regime_key = f"{phase}_{speed_band}" if speed_band != "unspecified" else phase
         regime_by_timestamp[ts] = regime_key
         regime_by_iso_timestamp[ts.isoformat()] = regime_key
@@ -1908,8 +1958,12 @@ def compute_buffet_vibration_metrics(
         dominant_channel_name = None
         dominant_peak_abs = None
         if peak_map:
-            dominant_channel_name, dominant_peak_abs = max(peak_map.items(), key=lambda item: item[1])
-        speed_summary = summarize_air_data_series(data["speed_values"]) if data["speed_values"] else None
+            dominant_channel_name, dominant_peak_abs = max(
+                peak_map.items(), key=lambda item: item[1]
+            )
+        speed_summary = (
+            summarize_air_data_series(data["speed_values"]) if data["speed_values"] else None
+        )
         wow_summary = summarize_air_data_series(data["wow_values"]) if data["wow_values"] else None
         regime_segmentation_summary.append(
             {
@@ -1917,9 +1971,9 @@ def compute_buffet_vibration_metrics(
                 "samples": int(data["samples"]),
                 "events_detected": int(event_counts_by_regime.get(regime_key, 0)),
                 "dominant_channel": dominant_channel_name,
-                "dominant_peak_abs": round(float(dominant_peak_abs), 4)
-                if dominant_peak_abs is not None
-                else None,
+                "dominant_peak_abs": (
+                    round(float(dominant_peak_abs), 4) if dominant_peak_abs is not None else None
+                ),
                 "mean_speed_kt": round(float(speed_summary["mean"]), 3) if speed_summary else None,
                 "mean_wow": round(float(wow_summary["mean"]), 3) if wow_summary else None,
             }
@@ -1972,23 +2026,25 @@ def compute_buffet_vibration_metrics(
         DeterministicCalculatorResult(
             available=True,
             metrics={
-            "available": True,
-            "channels_screened": len(channel_summaries),
-            "dominant_channel": dominant["name"],
-            "dominant_peak_abs": dominant["peak_abs"],
-            "dominant_unit": dominant["unit"],
-            "channels_with_exceedances": sum(1 for c in channel_summaries if c["exceedance_count"] > 0),
-            "samples_used": sum(int(c.get("samples", 0)) for c in channel_summaries),
-            "channel_summaries": channel_summaries[:6],
-            "grouped_channel_summaries": grouped_channel_summaries,
-            "dominant_channels_ranked": dominant_channels_ranked,
-            "regime_segmentation_summary": regime_segmentation_summary,
-            "anomaly_windows": anomaly_windows,
-            "frequency_screening": frequency_screening,
-            "regime_logic": (
-                "Phase uses WOW threshold (>=0.5 ground / <0.5 airborne) when available; "
-                "speed bands use dataset terciles when ground speed is available."
-            ),
+                "available": True,
+                "channels_screened": len(channel_summaries),
+                "dominant_channel": dominant["name"],
+                "dominant_peak_abs": dominant["peak_abs"],
+                "dominant_unit": dominant["unit"],
+                "channels_with_exceedances": sum(
+                    1 for c in channel_summaries if c["exceedance_count"] > 0
+                ),
+                "samples_used": sum(int(c.get("samples", 0)) for c in channel_summaries),
+                "channel_summaries": channel_summaries[:6],
+                "grouped_channel_summaries": grouped_channel_summaries,
+                "dominant_channels_ranked": dominant_channels_ranked,
+                "regime_segmentation_summary": regime_segmentation_summary,
+                "anomaly_windows": anomaly_windows,
+                "frequency_screening": frequency_screening,
+                "regime_logic": (
+                    "Phase uses WOW threshold (>=0.5 ground / <0.5 airborne) when available; "
+                    "speed bands use dataset terciles when ground speed is available."
+                ),
             },
             assumptions=[
                 "This mode performs descriptive screening (RMS/peaks/spread/exceedance) on available vibration-like channels.",
@@ -2273,7 +2329,9 @@ def compute_flutter_support_metrics(
                 "screening_basis": "flutter_support_pre_screening",
                 "source_screening_mode": "buffet_vibration_hardened",
                 "channels_screened": int(buffet.get("channels_screened") or 0),
-                "channels_screened_names": [item.get("name") for item in channel_summaries if item.get("name")],
+                "channels_screened_names": [
+                    item.get("name") for item in channel_summaries if item.get("name")
+                ],
                 "channel_groups_screened": sorted(
                     {str(item.get("group")) for item in channel_summaries if item.get("group")}
                 ),
@@ -2336,11 +2394,7 @@ def compute_handling_qualities_metrics(
         "heading": _choose_param_id(params, _score_heading),
     }
 
-    selected_ids = {
-        pid
-        for pid in [*controls.values(), *responses.values()]
-        if pid is not None
-    }
+    selected_ids = {pid for pid in [*controls.values(), *responses.values()] if pid is not None}
     available_signals = set()
     if any(controls.values()):
         available_signals.add("control_input")
@@ -2492,9 +2546,7 @@ def compute_handling_qualities_metrics(
                 if abs(value - response_stats["mean"]) >= (3.0 * response_stats["std"])
             )
         if response_outlier_count > 0:
-            anomaly_flags.append(
-                f"response_outliers={response_outlier_count}"
-            )
+            anomaly_flags.append(f"response_outliers={response_outlier_count}")
         abrupt_control_steps = _count_abrupt_steps(control_samples)
         abrupt_response_steps = _count_abrupt_steps(response_samples)
         if abrupt_control_steps > 0:
@@ -2545,11 +2597,7 @@ def compute_handling_qualities_metrics(
     )
     strongest_pairing = pairing_results[0]
     aggregated_anomalies = sorted(
-        {
-            flag
-            for pairing in pairing_results
-            for flag in (pairing.get("anomaly_flags") or [])
-        }
+        {flag for pairing in pairing_results for flag in (pairing.get("anomaly_flags") or [])}
     )
 
     evaluation = evaluate_capability_request(
@@ -2566,15 +2614,21 @@ def compute_handling_qualities_metrics(
                 "available": True,
                 "pairings_analyzed": len(pairing_results),
                 "pairing_results": pairing_results[:8],
-                "control_channels_used": [item["name"] for item in control_channel_summaries if item.get("name")],
-                "response_channels_used": [item["name"] for item in response_channel_summaries if item.get("name")],
+                "control_channels_used": [
+                    item["name"] for item in control_channel_summaries if item.get("name")
+                ],
+                "response_channels_used": [
+                    item["name"] for item in response_channel_summaries if item.get("name")
+                ],
                 "control_channel_summaries": control_channel_summaries[:8],
                 "response_channel_summaries": response_channel_summaries[:8],
                 "strongest_pairing": strongest_pairing.get("pairing_key"),
                 "strongest_abs_correlation": round(
                     abs(strongest_pairing.get("pearson_correlation") or 0.0), 4
                 ),
-                "total_pairing_samples": sum(int(item.get("samples", 0)) for item in pairing_results),
+                "total_pairing_samples": sum(
+                    int(item.get("samples", 0)) for item in pairing_results
+                ),
                 "anomaly_flags": aggregated_anomalies[:10],
             },
             assumptions=[
@@ -2625,7 +2679,10 @@ def build_deterministic_takeoff_section(metrics: dict) -> str:
     capability_reason_key = metrics.get("capability_reason_key")
 
     if not metrics.get("available"):
-        return _build_unavailable_section("## Deterministic Calculation (Flight Data) [DATA]", metrics) + "\n"
+        return (
+            _build_unavailable_section("## Deterministic Calculation (Flight Data) [DATA]", metrics)
+            + "\n"
+        )
 
     lines = [
         "## Deterministic Calculation (Flight Data) [DATA]",
@@ -2716,7 +2773,9 @@ def build_deterministic_takeoff_section(metrics: dict) -> str:
     if accel_for_eq is not None:
         lines.append(f"- a = ({vf_fts:.3f} - {vi_fts:.3f}) / {t_s:.2f} = {accel_for_eq:.3f} ft/s^2")
     if distance_kinematic is not None:
-        lines.append(f"- Kinematic distance check: d ≈ {distance_kinematic:.1f} ft (integrated result: {distance_integrated:.1f} ft)")
+        lines.append(
+            f"- Kinematic distance check: d ≈ {distance_kinematic:.1f} ft (integrated result: {distance_integrated:.1f} ft)"
+        )
     lines.extend(
         [
             "",
@@ -2748,7 +2807,9 @@ def build_deterministic_takeoff_section(metrics: dict) -> str:
 
 def build_deterministic_landing_section(metrics: dict) -> str:
     if not metrics.get("available"):
-        return _build_unavailable_section("## Deterministic Calculation (Landing Data) [DATA]", metrics)
+        return _build_unavailable_section(
+            "## Deterministic Calculation (Landing Data) [DATA]", metrics
+        )
 
     lines = [
         "## Deterministic Calculation (Landing Data) [DATA]",
@@ -2792,7 +2853,9 @@ def build_deterministic_landing_section(metrics: dict) -> str:
 
 def build_deterministic_performance_section(metrics: dict) -> str:
     if not metrics.get("available"):
-        return _build_unavailable_section("## Deterministic Calculation (Performance Trends) [DATA]", metrics)
+        return _build_unavailable_section(
+            "## Deterministic Calculation (Performance Trends) [DATA]", metrics
+        )
 
     lines = [
         "## Deterministic Calculation (Performance Trends) [DATA]",
@@ -2861,7 +2924,9 @@ def build_deterministic_performance_section(metrics: dict) -> str:
                 f"- Mach estimate temperature source priority used: **{str(mach_temp_source).upper()}**"
             )
     else:
-        lines.append("- Atmosphere/air-data support is unavailable for this dataset (missing relevant channels).")
+        lines.append(
+            "- Atmosphere/air-data support is unavailable for this dataset (missing relevant channels)."
+        )
 
     skipped = air_data.get("skipped_calculations") or []
     if skipped:
@@ -3045,8 +3110,7 @@ def build_deterministic_flutter_support_section(metrics: dict) -> str:
         "",
         "### Screening Coverage",
         f"- Channels screened: **{metrics.get('channels_screened')}**",
-        "- Channel groups: "
-        + (", ".join(metrics.get("channel_groups_screened") or []) or "n/a"),
+        "- Channel groups: " + (", ".join(metrics.get("channel_groups_screened") or []) or "n/a"),
         f"- Samples used: **{metrics.get('samples_used', 'n/a')}**",
         f"- Concern level: **{concern_level}**",
         "",
@@ -3117,7 +3181,9 @@ def build_deterministic_flutter_support_section(metrics: dict) -> str:
                 )
             )
     else:
-        lines.append("- No strong flutter-support concern indicators were triggered by bounded screening rules.")
+        lines.append(
+            "- No strong flutter-support concern indicators were triggered by bounded screening rules."
+        )
 
     if metrics.get("follow_up_recommendation"):
         lines.extend(["", "### Follow-Up Recommendation"])
@@ -3163,8 +3229,7 @@ def build_deterministic_handling_qualities_section(metrics: dict) -> str:
         f"- Strongest absolute correlation: **{metrics.get('strongest_abs_correlation', 'n/a')}**",
         "",
         "### Channels Used",
-        "- Control channels: "
-        + (", ".join(metrics.get("control_channels_used") or []) or "none"),
+        "- Control channels: " + (", ".join(metrics.get("control_channels_used") or []) or "none"),
         "- Response channels: "
         + (", ".join(metrics.get("response_channels_used") or []) or "none"),
         "",

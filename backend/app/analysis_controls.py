@@ -195,9 +195,10 @@ def _evaluate_retrieval_coverage(
     elif metadata_coverage_ratio >= 0.35:
         score += 0.5
 
-    if bool(debug.get("mode_filter_enabled")) and _safe_int(
-        debug.get("mode_filter_matched_chunks"), 0
-    ) > 0:
+    if (
+        bool(debug.get("mode_filter_enabled"))
+        and _safe_int(debug.get("mode_filter_matched_chunks"), 0) > 0
+    ):
         score += 0.5
 
     if bool(debug.get("mode_filter_fallback_used")):
@@ -389,11 +390,15 @@ def evaluate_analysis_controls(
         result_strength=result_strength,
         blocking_or_downgrade_reason=reason,
         warning_messages=warning_messages,
-        deterministic_available=bool(deterministic_metrics and deterministic_metrics.get("available")),
+        deterministic_available=bool(
+            deterministic_metrics and deterministic_metrics.get("available")
+        ),
         retrieved_sources_count=retrieved_count,
         cited_sources_count=cited_count,
         mode_filter_fallback_used=bool(debug.get("mode_filter_fallback_used", False)),
-        metadata_coverage_ratio=max(0.0, min(1.0, _safe_float(debug.get("metadata_coverage_ratio"), 0.0))),
+        metadata_coverage_ratio=max(
+            0.0, min(1.0, _safe_float(debug.get("metadata_coverage_ratio"), 0.0))
+        ),
     )
 
 

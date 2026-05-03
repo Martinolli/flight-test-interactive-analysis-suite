@@ -80,9 +80,7 @@ async def get_parameter(
 ):
     parameter = db.query(TestParameter).filter(TestParameter.id == parameter_id).first()
     if not parameter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found")
     return parameter
 
 
@@ -95,9 +93,7 @@ async def update_parameter(
 ):
     db_parameter = db.query(TestParameter).filter(TestParameter.id == parameter_id).first()
     if not db_parameter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found")
 
     update_data = parameter.model_dump(exclude_unset=True)
     _validate_min_max(
@@ -134,9 +130,7 @@ async def delete_parameter(
 ):
     parameter = db.query(TestParameter).filter(TestParameter.id == parameter_id).first()
     if not parameter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found")
 
     db.delete(parameter)
     db.commit()
@@ -237,9 +231,7 @@ async def upload_parameters_excel(
         sheet = workbook.active
 
         header_cells = [cell.value for cell in sheet[1]]
-        headers = [
-            (str(h).strip().lower() if h is not None else "") for h in header_cells
-        ]
+        headers = [(str(h).strip().lower() if h is not None else "") for h in header_cells]
 
         def header_index(name: str) -> Optional[int]:
             name = name.strip().lower()
@@ -275,13 +267,19 @@ async def upload_parameters_excel(
             name = str(row[name_idx]).strip()
             unit = str(row[unit_idx]).strip() if row[unit_idx] is not None else ""
             description = (
-                str(row[desc_idx]).strip() if desc_idx is not None and row[desc_idx] is not None else None
+                str(row[desc_idx]).strip()
+                if desc_idx is not None and row[desc_idx] is not None
+                else None
             )
             system = (
-                str(row[system_idx]).strip() if system_idx is not None and row[system_idx] is not None else None
+                str(row[system_idx]).strip()
+                if system_idx is not None and row[system_idx] is not None
+                else None
             )
             category = (
-                str(row[category_idx]).strip() if category_idx is not None and row[category_idx] is not None else None
+                str(row[category_idx]).strip()
+                if category_idx is not None and row[category_idx] is not None
+                else None
             )
             min_value = row[min_idx] if min_idx is not None else None
             max_value = row[max_idx] if max_idx is not None else None
@@ -295,7 +293,9 @@ async def upload_parameters_excel(
 
             existing = db.query(TestParameter).filter(TestParameter.name == name).first()
             if existing:
-                existing.description = description if description is not None else existing.description
+                existing.description = (
+                    description if description is not None else existing.description
+                )
                 existing.unit = unit if unit is not None else existing.unit
                 existing.system = system if system is not None else existing.system
                 existing.category = category if category is not None else existing.category

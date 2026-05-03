@@ -18,7 +18,9 @@ from app.models import (
 from app.routers import documents as documents_router
 
 
-def _create_user(db_session, email: str, username: str, password: str, *, is_superuser: bool = False) -> User:
+def _create_user(
+    db_session, email: str, username: str, password: str, *, is_superuser: bool = False
+) -> User:
     user = User(
         email=email,
         username=username,
@@ -149,7 +151,9 @@ def test_query_documents_passes_current_user_scope(client, test_user, auth_heade
     assert isinstance(body.get("recommended_next_queries"), list)
 
 
-def test_query_documents_empty_retrieval_returns_structured_response(client, auth_headers, monkeypatch):
+def test_query_documents_empty_retrieval_returns_structured_response(
+    client, auth_headers, monkeypatch
+):
     """Empty retrieval should still return full structured response contract."""
     captured = {}
 
@@ -164,15 +168,19 @@ def test_query_documents_empty_retrieval_returns_structured_response(client, aut
     ):
         captured["analysis_mode"] = analysis_mode
         captured["capability_key"] = capability_key
-        return [], "", {
-            "analysis_mode": analysis_mode or "general",
-            "capability_key": capability_key,
-            "mode_filter_enabled": bool(analysis_mode and analysis_mode != "general"),
-            "mode_filter_matched_chunks": 0,
-            "mode_filter_fallback_used": True,
-            "metadata_coverage_ratio": 0.0,
-            "authority_weighting_enabled": True,
-        }
+        return (
+            [],
+            "",
+            {
+                "analysis_mode": analysis_mode or "general",
+                "capability_key": capability_key,
+                "mode_filter_enabled": bool(analysis_mode and analysis_mode != "general"),
+                "mode_filter_matched_chunks": 0,
+                "mode_filter_fallback_used": True,
+                "metadata_coverage_ratio": 0.0,
+                "authority_weighting_enabled": True,
+            },
+        )
 
     monkeypatch.setattr(documents_router, "_require_ai_packages", lambda: None)
     monkeypatch.setattr(documents_router, "_retrieve_hybrid_sources", fake_retrieve_hybrid_sources)
@@ -308,9 +316,7 @@ def test_ai_analysis_persists_analysis_job_and_returns_job_id(
     }
 
     persisted_job = (
-        db_session.query(AnalysisJob)
-        .filter(AnalysisJob.id == body["analysis_job_id"])
-        .first()
+        db_session.query(AnalysisJob).filter(AnalysisJob.id == body["analysis_job_id"]).first()
     )
     assert persisted_job is not None
     assert persisted_job.flight_test_id == flight_test.id
@@ -460,9 +466,7 @@ def test_ai_analysis_uses_requested_dataset_version_and_persists_dataset_version
     assert payload["dataset_version_id"] == v1.id
 
     persisted_job = (
-        db_session.query(AnalysisJob)
-        .filter(AnalysisJob.id == payload["analysis_job_id"])
-        .first()
+        db_session.query(AnalysisJob).filter(AnalysisJob.id == payload["analysis_job_id"]).first()
     )
     assert persisted_job is not None
     assert persisted_job.dataset_version_id == v1.id

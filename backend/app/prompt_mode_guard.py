@@ -284,9 +284,7 @@ def evaluate_prompt_mode_guard(
     elif inferred_mode_key == "general":
         severity = MismatchSeverity.SOFT
         reason_key = "specific_mode_selected_with_general_prompt_intent"
-        message = (
-            "Prompt appears broad/general while selected mode is specific."
-        )
+        message = "Prompt appears broad/general while selected mode is specific."
     elif normalized_selected_mode in _STRICT_DETERMINISTIC_MODES:
         severity = MismatchSeverity.STRONG
         reason_key = "strong_prompt_mode_mismatch"

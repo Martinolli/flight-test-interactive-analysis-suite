@@ -10,7 +10,7 @@ from fastapi import status
 def test_root_endpoint(client):
     """Test root endpoint returns welcome message"""
     response = client.get("/")
-    
+
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert "message" in data
@@ -24,7 +24,7 @@ def test_root_endpoint(client):
 def test_health_check(client):
     """Test health check endpoint"""
     response = client.get("/api/health")
-    
+
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert "status" in data
@@ -37,7 +37,7 @@ def test_health_check(client):
 def test_ping_endpoint(client):
     """Test ping endpoint"""
     response = client.get("/api/ping")
-    
+
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert "message" in data

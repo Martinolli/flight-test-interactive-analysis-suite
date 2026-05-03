@@ -71,27 +71,17 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["Health"])
-app.include_router(
-    auth.router, prefix="/api/auth", tags=["Authentication"]
-)
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(
     flight_tests.router,
     prefix="/api/flight-tests",
     tags=["Flight Tests"],
 )
-app.include_router(
-    parameters.router, prefix="/api/parameters", tags=["Parameters"]
-)
-app.include_router(
-    documents.router, prefix="/api/documents", tags=["Documents"]
-)
-app.include_router(
-    frat.router, prefix="/api/frat", tags=["FRAT"]
-)
-app.include_router(
-    admin.router, prefix="/api/admin", tags=["Admin"]
-)
+app.include_router(parameters.router, prefix="/api/parameters", tags=["Parameters"])
+app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(frat.router, prefix="/api/frat", tags=["FRAT"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 
 @app.get("/")

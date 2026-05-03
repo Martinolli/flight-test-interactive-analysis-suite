@@ -127,7 +127,10 @@ def test_landing_calculator_blocks_when_wow_signal_missing(db_session, test_user
     result = compute_landing_metrics(db_session, flight_test.id)
     assert result["available"] is False
     assert result["capability_reason_key"] == "missing_required_signals"
-    assert "Weight-on-wheels" in result["reason"] or "Weight-on-wheels".lower() in result["reason"].lower()
+    assert (
+        "Weight-on-wheels" in result["reason"]
+        or "Weight-on-wheels".lower() in result["reason"].lower()
+    )
 
 
 def test_performance_calculator_returns_non_takeoff_metrics(db_session, test_user):
@@ -255,7 +258,10 @@ def test_buffet_vibration_calculator_exposes_regime_event_and_frequency_summarie
     assert len(result["grouped_channel_summaries"]) >= 1
     assert len(result["dominant_channels_ranked"]) >= 1
     assert len(result["regime_segmentation_summary"]) >= 1
-    assert any("ground" in item["regime"] or "airborne" in item["regime"] for item in result["regime_segmentation_summary"])
+    assert any(
+        "ground" in item["regime"] or "airborne" in item["regime"]
+        for item in result["regime_segmentation_summary"]
+    )
     assert len(result["anomaly_windows"]) >= 1
     assert "regime" in result["anomaly_windows"][0]
     assert result["frequency_screening"]["channels_attempted"] >= 1
@@ -355,7 +361,10 @@ def test_flutter_support_calculator_gracefully_handles_missing_oscillation_chann
     result = compute_flutter_support_metrics(db_session, flight_test.id)
     assert result["available"] is False
     assert result["capability_key"] == "flutter_support"
-    assert result["capability_reason_key"] in {"missing_required_signals", "insufficient_data_coverage"}
+    assert result["capability_reason_key"] in {
+        "missing_required_signals",
+        "insufficient_data_coverage",
+    }
 
 
 def test_handling_qualities_calculator_returns_control_response_pairings(db_session, test_user):

@@ -166,7 +166,9 @@ def _infer_authority_type(text_blob: str, doc_type: Optional[str]) -> str:
 
 
 def _infer_document_revision(text_blob: str) -> Optional[str]:
-    rev_match = re.search(r"\brev(?:ision)?[\s\-_]*([a-z0-9\.\-]+)\b", text_blob, flags=re.IGNORECASE)
+    rev_match = re.search(
+        r"\brev(?:ision)?[\s\-_]*([a-z0-9\.\-]+)\b", text_blob, flags=re.IGNORECASE
+    )
     if rev_match:
         return f"rev {rev_match.group(1)}"
     date_match = re.search(r"\b(20\d{2}[-_/]\d{2}[-_/]\d{2})\b", text_blob)
@@ -238,11 +240,17 @@ def derive_document_retrieval_metadata(
             (description or ""),
         ]
     ).lower()
-    resolved_authority = normalize_authority_type(authority_type or _infer_authority_type(text_blob, doc_type))
+    resolved_authority = normalize_authority_type(
+        authority_type or _infer_authority_type(text_blob, doc_type)
+    )
     resolved_domain_tags = normalize_tags(domain_tags) or _infer_domain_tags(text_blob)
-    resolved_capability_tags = normalize_tags(capability_tags) or _infer_capability_tags(resolved_domain_tags)
+    resolved_capability_tags = normalize_tags(capability_tags) or _infer_capability_tags(
+        resolved_domain_tags
+    )
     resolved_revision = (document_revision or "").strip() or _infer_document_revision(text_blob)
-    resolved_aircraft_scope = (aircraft_scope or "").strip() or _infer_aircraft_scope(" ".join([filename or "", title or ""]))
+    resolved_aircraft_scope = (aircraft_scope or "").strip() or _infer_aircraft_scope(
+        " ".join([filename or "", title or ""])
+    )
     resolved_system_scope = (system_scope or "").strip() or _infer_system_scope(text_blob)
     resolved_priority = coerce_source_priority(source_priority, resolved_authority)
 
@@ -266,7 +274,9 @@ class RetrievalModeProfile:
     is_general: bool = False
 
 
-def build_retrieval_mode_profile(mode_key: Optional[str], capability_key: Optional[str] = None) -> RetrievalModeProfile:
+def build_retrieval_mode_profile(
+    mode_key: Optional[str], capability_key: Optional[str] = None
+) -> RetrievalModeProfile:
     normalized_mode = (mode_key or "general").strip().lower()
     if normalized_mode not in MODE_DOMAIN_PREFERENCES:
         normalized_mode = "general"
@@ -292,8 +302,8 @@ def extract_row_retrieval_metadata(row: Any) -> Dict[str, Any]:
     document_revision = getattr(row, "document_revision", None)
     domain_tags = _safe_json_list(getattr(row, "domain_tags_json", None))
     capability_tags = _safe_json_list(getattr(row, "capability_tags_json", None))
-    aircraft_scope = (getattr(row, "aircraft_scope", None) or None)
-    system_scope = (getattr(row, "system_scope", None) or None)
+    aircraft_scope = getattr(row, "aircraft_scope", None) or None
+    system_scope = getattr(row, "system_scope", None) or None
     source_priority = coerce_source_priority(getattr(row, "source_priority", None), authority_type)
     return {
         "authority_type": authority_type,
@@ -409,4 +419,3 @@ def rerank_candidates_with_metadata(
         "authority_weighting_enabled": True,
     }
     return ranked, debug
-

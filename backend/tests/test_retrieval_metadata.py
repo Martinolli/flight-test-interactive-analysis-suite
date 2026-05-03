@@ -74,12 +74,21 @@ def test_mode_aware_reranking_prefers_mode_matching_high_authority_sources():
 def test_mode_aware_reranking_falls_back_when_metadata_is_sparse():
     profile = build_retrieval_mode_profile("landing", "landing")
     candidates = [
-        {"id": 1, "base_score": 0.5, "row": {"id": 1}, "metadata": {"domain_tags": [], "capability_tags": []}},
-        {"id": 2, "base_score": 0.45, "row": {"id": 2}, "metadata": {"domain_tags": [], "capability_tags": []}},
+        {
+            "id": 1,
+            "base_score": 0.5,
+            "row": {"id": 1},
+            "metadata": {"domain_tags": [], "capability_tags": []},
+        },
+        {
+            "id": 2,
+            "base_score": 0.45,
+            "row": {"id": 2},
+            "metadata": {"domain_tags": [], "capability_tags": []},
+        },
     ]
     ranked, debug = rerank_candidates_with_metadata(candidates=candidates, profile=profile)
     assert len(ranked) == 2
     assert debug["mode_filter_enabled"] is True
     assert debug["mode_filter_fallback_used"] is True
     assert debug["metadata_coverage_ratio"] == 0.0
-

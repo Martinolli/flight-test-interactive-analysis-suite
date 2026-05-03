@@ -402,13 +402,19 @@ def _capability_registry() -> Dict[str, CapabilityDefinition]:
             authority=CapabilityAuthority.RAG_GUIDANCE_ONLY,
             required_inputs=CapabilityRequiredInputs(
                 required_signals=[],
-                optional_signals=["electrical_parameters", "hydraulic_parameters", "engine_parameters"],
+                optional_signals=[
+                    "electrical_parameters",
+                    "hydraulic_parameters",
+                    "engine_parameters",
+                ],
             ),
             blocked_rules=[],
             applicability_boundaries=[
                 "Provides trend/anomaly screening, not authoritative fault isolation."
             ],
-            default_limitations=["Requires domain-specific deterministic modules for authoritative conclusions."],
+            default_limitations=[
+                "Requires domain-specific deterministic modules for authoritative conclusions."
+            ],
             output_contract=CapabilityOutputContract(
                 deterministic_metrics=[],
                 standards_crosscheck_allowed=True,
@@ -565,7 +571,10 @@ def _normalize_signal_key(raw_signal: str) -> str:
         return "ground_speed"
     if any(token in s for token in ["weight_on_wheels", "weight on wheels", "wow"]):
         return "weight_on_wheels"
-    if any(token in s for token in ["longitudinal_acceleration", "longitudinal accel", "x_accel", "x accel"]):
+    if any(
+        token in s
+        for token in ["longitudinal_acceleration", "longitudinal accel", "x_accel", "x accel"]
+    ):
         return "longitudinal_acceleration"
     if any(
         token in s
