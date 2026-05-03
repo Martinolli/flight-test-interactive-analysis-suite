@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
-
 FRAT_STATUS_DRAFT = "draft"
 FRAT_STATUS_SCORED = "scored"
 FRAT_STATUS_NEEDS_REVIEW = "needs_review"

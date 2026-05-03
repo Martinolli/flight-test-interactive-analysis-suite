@@ -13,7 +13,6 @@ from app.database import Base, get_db
 from app.main import app
 from app.models import User
 
-
 # Test database URL (in-memory SQLite for fast tests)
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 

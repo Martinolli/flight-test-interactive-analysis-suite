@@ -14,7 +14,6 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-
 DEFAULT_AUTHORITY_TYPE = "handbook"
 DEFAULT_SOURCE_PRIORITY = 60
 VALID_AUTHORITY_TYPES = {

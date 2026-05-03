@@ -9,7 +9,6 @@ from typing import List, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 _CONFIG_FILE = Path(__file__).resolve()
 _REPO_ROOT = _CONFIG_FILE.parents[2]
 
