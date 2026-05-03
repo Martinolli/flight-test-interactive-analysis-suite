@@ -1,7 +1,7 @@
 """Tests for immutable admin PDF export from persisted analysis jobs."""
 
-from datetime import datetime
 import json
+from datetime import datetime
 
 from fastapi import status
 

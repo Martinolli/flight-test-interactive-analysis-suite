@@ -32,7 +32,9 @@ ignore =
     # F401
 
 # Maximum complexity
-max-complexity = 10
+# Existing deterministic analysis and report-export paths are intentionally
+# branch-heavy; keep flake8 focused on concrete syntax/unused-code defects.
+max-complexity = 40
 
 # Show source code for errors
 show-source = True

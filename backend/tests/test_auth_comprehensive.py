@@ -4,12 +4,14 @@ Tests login, logout, token refresh, and security features
 """
 
 from datetime import datetime, timedelta
+
 import pytest
 from fastapi import status
-from jose import jwt, exceptions
+from jose import exceptions, jwt
+
+from app.auth import get_password_hash, verify_password
 from app.config import settings
 from app.models import User
-from app.auth import get_password_hash, verify_password
 
 
 class TestLogin:

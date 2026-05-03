@@ -6,10 +6,9 @@ Superuser-only endpoints:
 """
 
 import io
-import logging
-import os
-import re
 import json
+import logging
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -22,7 +21,7 @@ from app.analysis_controls import parse_analysis_controls
 from app.auth import get_current_superuser, get_password_hash
 from app.capabilities import get_capability_definition
 from app.database import get_db
-from app.models import AnalysisJob, Document, FlightTest, User
+from app.models import AnalysisJob, FlightTest, User
 
 logger = logging.getLogger(__name__)
 
@@ -661,9 +660,9 @@ def _build_pdf(
     """
     try:
         from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-        from reportlab.lib.enums import TA_CENTER
         from reportlab.lib.units import cm
         from reportlab.platypus import (
             HRFlowable,
@@ -748,16 +747,6 @@ def _build_pdf(
         spaceBefore=3,
         spaceAfter=8,
         fontName="Helvetica-Oblique",
-    )
-    narrative_heading_style = ParagraphStyle(
-        "NarrativeHeading",
-        parent=styles["Heading3"],
-        fontSize=11,
-        leading=14,
-        textColor=colors.HexColor("#1f3b57"),
-        spaceBefore=7,
-        spaceAfter=3,
-        fontName="Helvetica-Bold",
     )
     meta_label_style = ParagraphStyle(
         "MetaLabel",

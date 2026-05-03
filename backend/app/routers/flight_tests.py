@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import and_, distinct, func
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app import auth, schemas

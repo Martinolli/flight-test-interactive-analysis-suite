@@ -5,13 +5,13 @@ embed with OpenAI text-embedding-3-small, store in pgvector,
 and answer questions with the built-in LLM.
 """
 
+import hashlib
+import json
 import logging
 import os
 import re
 import tempfile
 import time
-import json
-import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -37,18 +37,30 @@ from sqlalchemy.orm import Session
 
 from app.analysis import (
     build_deterministic_buffet_vibration_section as _build_deterministic_buffet_vibration_section_impl,
-    build_deterministic_flutter_support_section as _build_deterministic_flutter_support_section_impl,
-    build_deterministic_handling_qualities_section as _build_deterministic_handling_qualities_section_impl,
-    build_deterministic_landing_section as _build_deterministic_landing_section_impl,
-    build_deterministic_performance_section as _build_deterministic_performance_section_impl,
-    build_deterministic_takeoff_section as _build_deterministic_takeoff_section_impl,
-    compute_buffet_vibration_metrics as _compute_buffet_vibration_metrics_impl,
-    compute_flutter_support_metrics as _compute_flutter_support_metrics_impl,
-    compute_handling_qualities_metrics as _compute_handling_qualities_metrics_impl,
-    compute_landing_metrics as _compute_landing_metrics_impl,
-    compute_performance_metrics as _compute_performance_metrics_impl,
-    compute_takeoff_metrics as _compute_takeoff_metrics_impl,
 )
+from app.analysis import (
+    build_deterministic_flutter_support_section as _build_deterministic_flutter_support_section_impl,
+)
+from app.analysis import (
+    build_deterministic_handling_qualities_section as _build_deterministic_handling_qualities_section_impl,
+)
+from app.analysis import (
+    build_deterministic_landing_section as _build_deterministic_landing_section_impl,
+)
+from app.analysis import (
+    build_deterministic_performance_section as _build_deterministic_performance_section_impl,
+)
+from app.analysis import (
+    build_deterministic_takeoff_section as _build_deterministic_takeoff_section_impl,
+)
+from app.analysis import compute_buffet_vibration_metrics as _compute_buffet_vibration_metrics_impl
+from app.analysis import compute_flutter_support_metrics as _compute_flutter_support_metrics_impl
+from app.analysis import (
+    compute_handling_qualities_metrics as _compute_handling_qualities_metrics_impl,
+)
+from app.analysis import compute_landing_metrics as _compute_landing_metrics_impl
+from app.analysis import compute_performance_metrics as _compute_performance_metrics_impl
+from app.analysis import compute_takeoff_metrics as _compute_takeoff_metrics_impl
 from app.analysis_controls import (
     AnalysisControlSnapshot,
     evaluate_analysis_controls,

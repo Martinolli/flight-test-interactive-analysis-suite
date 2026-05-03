@@ -16,8 +16,8 @@ from __future__ import annotations
 import math
 import re
 from collections import defaultdict
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -27,8 +27,8 @@ from app.analysis.air_data import (
     estimate_mach_from_tas_knots_and_temperature_c,
     estimate_tas_from_cas_and_sigma_knots,
     isa_atmosphere_from_pressure_altitude_ft,
-    summarize_series as summarize_air_data_series,
 )
+from app.analysis.air_data import summarize_series as summarize_air_data_series
 from app.capabilities import CapabilityEvaluation, evaluate_capability_request
 from app.models import DataPoint, TestParameter
 
@@ -1773,7 +1773,6 @@ def compute_buffet_vibration_metrics(
         )
 
     selected_ids = {p["id"] for p in selected}
-    param_map = {p["id"]: p for p in params}
     channel_series: Dict[int, List[Tuple[Any, float]]] = defaultdict(list)
     timeline: Dict[Any, Dict[int, float]] = defaultdict(dict)
 
@@ -2096,7 +2095,6 @@ def compute_flutter_support_metrics(
         )
 
     channel_summaries = list(buffet.get("channel_summaries") or [])
-    grouped_summaries = list(buffet.get("grouped_channel_summaries") or [])
     anomaly_windows = sorted(
         list(buffet.get("anomaly_windows") or []),
         key=lambda item: float(item.get("peak_deviation") or 0.0),
