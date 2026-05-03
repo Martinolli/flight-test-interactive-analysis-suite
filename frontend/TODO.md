@@ -178,6 +178,18 @@ These should be protected from regression.
   * risk meaning of each field
 * This is a UX hardening task, not a workflow redesign.
 
+### P4.1 FRAT No-Go / not-approved report availability and explanation layer ✅
+
+* Added frontend API contract support for `decision_explanation`.
+* FRAT page now renders decision basis, score composition, no-linked-analysis warnings, dominant risk drivers, and recommended next actions after scoring/reopen.
+* FRAT export is enabled for scored rejected/no-go/unacceptable/needs-review/hard-stop cases, not only finalized assessments.
+* Unscored drafts show a clear disabled-state export message.
+
+### P4.2 Report chart label readability fix
+
+* Next planned task.
+* Improve exported report chart label readability without changing report provenance or FRAT export behavior.
+
 ### P3.6 Report/readability polish in frontend-visible surfaces
 
 * Improve readability of control summaries:
@@ -203,10 +215,11 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P3.6 — Report/control readability polish**
-2. **P3.7 — Manual / help integration**
-3. **P3.5a — FRAT usability hardening**
-4. **P3.3 — Atmosphere / air-data support UX**
+1. **P4.2 — Report chart label readability fix**
+2. **P3.6 — Report/control readability polish**
+3. **P3.7 — Manual / help integration**
+4. **P3.5a — FRAT usability hardening**
+5. **P3.3 — Atmosphere / air-data support UX**
 
 ---
 

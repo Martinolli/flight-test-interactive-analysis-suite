@@ -326,6 +326,83 @@ export interface FratAnalysisJobReference {
   created_at: string;
 }
 
+export interface FratDecisionExplanation {
+  assessment?: {
+    id?: number;
+    name?: string | null;
+    flight_test_id?: number;
+  };
+  lifecycle_state?: string;
+  dataset_version?: {
+    id?: number | null;
+    label?: string | null;
+  };
+  linked_analysis_job_ids?: number[];
+  linked_analysis_job_id?: number | null;
+  score_composition?: {
+    categories?: Array<{
+      key?: string;
+      label?: string;
+      base_score?: number;
+    }>;
+    base_score?: number;
+    manual_adjustment?: number;
+    analysis_indicator_score?: number;
+    final_total_score?: number | null;
+    risk_band?: string | null;
+    recommendation?: string | null;
+  };
+  hard_stops?: {
+    triggered?: boolean;
+    flags?: string[];
+    reasons?: string[];
+    items?: Array<{
+      code?: string;
+      severity?: string;
+      message?: string;
+      source?: string;
+    }>;
+  };
+  linked_analysis?: {
+    available?: boolean;
+    controls_summary?: Array<{
+      analysis_job_id?: number;
+      analysis_mode?: string;
+      dataset_version_id?: number | null;
+      status?: string;
+      result_strength?: string;
+      warning_level?: string;
+      applicability_status?: string;
+      retrieval_coverage?: string;
+      deterministic_confidence?: string;
+      blocking_or_downgrade_reason?: string | null;
+      warning_messages?: string[];
+    }>;
+    no_linked_analysis_statement?: string | null;
+    warning?: string | null;
+  };
+  dominant_risk_drivers?: Array<{
+    type?: string;
+    label?: string;
+    score?: number | null;
+    reason?: string;
+  }>;
+  decision?: {
+    outcome?: string | null;
+    risk_band?: string | null;
+    is_acceptable?: boolean;
+    why_not_acceptable?: string[];
+    driver_types?: string[];
+    recommended_next_actions?: string[];
+  };
+  notes?: {
+    review_notes?: string | null;
+    override_rationale_notes?: string | null;
+    transition_notes?: string | null;
+  };
+  provenance_statement?: string;
+}
+
 export interface FratAssessment {
   id: number;
   flight_test_id: number;
@@ -365,6 +442,7 @@ export interface FratAssessment {
     message?: string;
     source?: string;
   }>;
+  decision_explanation?: FratDecisionExplanation;
   approval_notes?: string | null;
   approved_by_id?: number | null;
   approved_at?: string | null;

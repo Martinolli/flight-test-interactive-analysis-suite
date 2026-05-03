@@ -384,7 +384,11 @@ export default function Frat() {
 
   async function handleExport() {
     if (!selectedAssessmentId) {
-      toast.warning('Select a finalized assessment first.');
+      toast.warning('Select an assessment first.');
+      return;
+    }
+    if (!canExport) {
+      toast.warning(exportBlockedMessage);
       return;
     }
     setExporting(true);
@@ -441,11 +445,22 @@ export default function Frat() {
   }
 
   const scoreSnapshot = selectedAssessment?.score_snapshot;
+  const explanation = selectedAssessment?.decision_explanation;
+  const scoreComposition = explanation?.score_composition;
+  const linkedAnalysisExplanation = explanation?.linked_analysis;
+  const decisionExplanation = explanation?.decision;
+  const dominantRiskDrivers = explanation?.dominant_risk_drivers ?? [];
   const hardStops = selectedAssessment?.hard_stop_snapshot ?? [];
   const scoreStatusText =
     scoreSnapshot && scoreSnapshot.total_score != null
       ? `${scoreSnapshot.total_score} points`
       : 'Not scored yet';
+  const hasScore = scoreSnapshot?.total_score != null;
+  const canExport = !!selectedAssessmentId && hasScore;
+  const exportBlockedMessage =
+    selectedAssessmentId && !hasScore
+      ? 'Export is unavailable until this draft has been scored.'
+      : 'Select a scored assessment to export a FRAT report.';
 
   const canApprove =
     selectedAssessmentStatus === 'scored' || selectedAssessmentStatus === 'needs_review';
@@ -864,11 +879,17 @@ export default function Frat() {
                     className="w-full"
                     variant="outline"
                     onClick={handleExport}
-                    disabled={exporting || selectedAssessmentStatus !== 'finalized'}
+                    disabled={exporting || !canExport}
+                    title={!canExport ? exportBlockedMessage : 'Export FRAT PDF report'}
                   >
                     {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
-                    Export Finalized PDF
+                    Export FRAT PDF
                   </Button>
+                  {!canExport ? (
+                    <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                      {exportBlockedMessage}
+                    </p>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -911,8 +932,99 @@ export default function Frat() {
                         : 'No hard-stop triggered.'}
                     </span>
                   </div>
+                  {scoreComposition ? (
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
+                        <p className="text-[11px] text-gray-500">Base</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {scoreComposition.base_score ?? 0}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
+                        <p className="text-[11px] text-gray-500">Manual</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {scoreComposition.manual_adjustment ?? 0}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
+                        <p className="text-[11px] text-gray-500">Analysis</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {scoreComposition.analysis_indicator_score ?? 0}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
+
+              {explanation ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Decision Explanation</CardTitle>
+                    <CardDescription>
+                      Traceable explanation generated from the scored FRAT snapshot.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {linkedAnalysisExplanation?.warning ? (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        <AlertTriangle className="w-4 h-4 inline mr-1.5" />
+                        {linkedAnalysisExplanation.warning}
+                      </div>
+                    ) : null}
+                    {!linkedAnalysisExplanation?.available && linkedAnalysisExplanation?.no_linked_analysis_statement ? (
+                      <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                        {linkedAnalysisExplanation.no_linked_analysis_statement}
+                      </div>
+                    ) : null}
+
+                    {decisionExplanation?.why_not_acceptable?.length ? (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">Decision basis</p>
+                        <ul className="space-y-1 text-xs text-gray-700">
+                          {decisionExplanation.why_not_acceptable.map((item, idx) => (
+                            <li key={`${item}-${idx}`} className="rounded-md bg-gray-50 px-2 py-1">
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        Assessment is acceptable under the current scored decision state.
+                      </div>
+                    )}
+
+                    {dominantRiskDrivers.length ? (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">Dominant risk drivers</p>
+                        <div className="space-y-1">
+                          {dominantRiskDrivers.map((item, idx) => (
+                            <div key={`${item.type ?? 'driver'}-${idx}`} className="rounded-md border border-gray-200 px-2 py-1.5 text-xs text-gray-700">
+                              <span className="font-semibold">{item.label ?? item.type}</span>
+                              {item.score != null ? ` · ${item.score} pts` : ''}
+                              {item.reason ? <span className="block text-gray-500">{item.reason}</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {decisionExplanation?.recommended_next_actions?.length ? (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">Recommended next actions</p>
+                        <ul className="space-y-1 text-xs text-gray-700">
+                          {decisionExplanation.recommended_next_actions.map((item, idx) => (
+                            <li key={`${item}-${idx}`} className="rounded-md bg-gray-50 px-2 py-1">
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
 
               <Card>
                 <CardHeader>
@@ -937,7 +1049,7 @@ export default function Frat() {
                     ))
                   )}
                   <p className="text-xs text-gray-500">
-                    Finalized FRAT exports are immutable snapshots tied to assessment ID and status.
+                    Scored FRAT assessments can be exported for Go, Review, Rejected, and No-Go cases.
                   </p>
                 </CardContent>
               </Card>

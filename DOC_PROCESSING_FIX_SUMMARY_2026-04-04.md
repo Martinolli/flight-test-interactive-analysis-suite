@@ -2763,6 +2763,47 @@ pnpm -C frontend run build
 - Backend: all selected tests passed (FRAT lifecycle + regression coverage included).
 - Frontend: production build passed.
 
+## P4.1 FRAT No-Go / Not-Approved Explanation and Export Support (2026-05-03)
+
+### Why this was added
+
+- No-Go, unacceptable, rejected, needs-review, and hard-stop FRAT cases need a report/explanation at least as much as approved cases.
+- The previous export path was finalized-only, which blocked useful artifacts for not-approved decisions.
+
+### What changed
+
+**Backend**
+
+- Added a structured `decision_explanation` payload to FRAT assessment responses after scoring/reopen.
+- Explanation includes assessment identity, lifecycle state, dataset version, linked analysis jobs, score composition, category breakdown, hard-stops, linked-analysis controls, no-linked-analysis statement/warning, dominant risk drivers, notes, recommended next actions, and provenance.
+- FRAT PDF export now accepts any scored assessment state, including approved, finalized, rejected, needs-review, no-go/unacceptable score states, and hard-stop cases.
+- Unscored draft export remains blocked with an explicit message.
+- FRAT PDF content now includes decision summary, score composition, category breakdown, hard-stops, linked-analysis/no-linked-analysis evidence, dominant risk drivers, reviewer/transition notes, and provenance.
+
+**Frontend**
+
+- Updated FRAT API contracts for `decision_explanation`.
+- Updated `/frat` to show score composition, decision basis, no-linked-analysis warning, dominant risk drivers, and recommended next actions.
+- Export button now works for scored rejected/no-go/unacceptable/needs-review/hard-stop cases and shows a clear disabled-state message for unscored drafts.
+
+### Validation run
+
+```powershell
+pytest backend/tests/test_frat_workflow.py -q
+pytest backend/tests/test_frat_explanation.py -q
+pytest backend/tests/test_analysis_controls.py -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend: all selected tests passed.
+- Frontend: production build passed. Vite emitted existing environment warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P4.2 — Report chart label readability fix.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

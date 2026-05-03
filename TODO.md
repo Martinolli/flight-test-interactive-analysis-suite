@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 03
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-03
 **Scope:** Backend + Frontend + LLM/RAG + Reporting + Operational Workflow
 **Plan basis:** aligned to REV 02, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, completed P0/P1/P2 work, and post-P2.4 review findings
 
@@ -260,38 +260,25 @@ These baseline controls should be protected by regression tests.
 
 ---
 
+## P4 — Trust, Reporting, and Export Completeness
+
+* [x] P4.1 FRAT No-Go / not-approved report availability and explanation layer
+
+  * Added structured FRAT decision explanations to scored/reopened assessment payloads.
+  * FRAT PDF export is now available for scored Go, review, rejected, no-go, unacceptable, hard-stop, approved, and finalized states.
+  * Unscored draft export remains blocked with an explicit message.
+  * Reports now include decision summary, score composition, category breakdown, hard-stops, linked-analysis/no-linked-analysis evidence, dominant risk drivers, reviewer/transition notes, and provenance.
+  * No-linked-analysis cases explicitly state that technical analysis evidence was not included and warn when score is moderate or higher.
+  * Backend and frontend contracts were updated with regression coverage.
+
+* [ ] P4.2 Report chart label readability fix
+
+  * Improve chart label spacing/readability in exported reports.
+  * Preserve existing report provenance and export behavior.
+
+---
+
 ## Deferred / Later Candidates
-
-* [ ] FRAT explanation / reporting gap for no-analysis cases
-
-  * When no analysis job is linked, FRAT currently produces a score without a structured explanation layer.
-  * This creates a decision-output gap: score-driven No-Go without clear rationale.
-
-  Proposed improvements:
-
-  * Auto-generate a minimal FRAT risk summary when no analysis is linked:
-
-    * category score breakdown
-    * dominant risk drivers
-    * explicit statement: "no technical analysis evidence linked"
-    * recommendation aligned with risk band
-
-  * Require reviewer notes when:
-
-    * score ≥ moderate
-    * AND no linked analysis job
-
-  * Optional enhancement:
-
-    * introduce bounded penalty for "no analysis" to represent uncertainty
-    * differentiate between:
-      no analysis (uncertainty)
-      weak analysis (penalized via controls)
-
-  Goal:
-
-  * Ensure every FRAT decision (especially No-Go) has a clear, traceable explanation
-  * Preserve auditability and avoid silent or ambiguous decision states
 
 * [ ] Document visibility / sharing model
 
