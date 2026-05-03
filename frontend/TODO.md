@@ -1,6 +1,6 @@
 # FTIAS Frontend TODO — REV 03
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-03
 **Scope:** Frontend UX, workflow alignment, routing clarity, engineering usability, FRAT workspace
 
 ---
@@ -185,10 +185,16 @@ These should be protected from regression.
 * FRAT export is enabled for scored rejected/no-go/unacceptable/needs-review/hard-stop cases, not only finalized assessments.
 * Unscored drafts show a clear disabled-state export message.
 
-### P4.2 Report chart label readability fix
+### P4.2 Report chart label readability fix ✅
+
+* Backend PDF report charts now use compact deterministic labels for plotted axes.
+* Full parameter/channel names remain available in report caption mappings and statistics tables.
+* No frontend chart-export code changes were required for this backend ReportLab export path.
+
+### P4.3 Upload failed/incorrect ingestion cleanup
 
 * Next planned task.
-* Improve exported report chart label readability without changing report provenance or FRAT export behavior.
+* Improve frontend recovery/cleanup affordances for failed or incorrect upload ingestion attempts once backend behavior is hardened.
 
 ### P3.6 Report/readability polish in frontend-visible surfaces
 
@@ -215,7 +221,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P4.2 — Report chart label readability fix**
+1. **P4.3 — Upload failed/incorrect ingestion cleanup**
 2. **P3.6 — Report/control readability polish**
 3. **P3.7 — Manual / help integration**
 4. **P3.5a — FRAT usability hardening**

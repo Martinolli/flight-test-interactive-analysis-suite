@@ -271,10 +271,17 @@ These baseline controls should be protected by regression tests.
   * No-linked-analysis cases explicitly state that technical analysis evidence was not included and warn when score is moderate or higher.
   * Backend and frontend contracts were updated with regression coverage.
 
-* [ ] P4.2 Report chart label readability fix
+* [x] P4.2 Report chart label readability fix
 
-  * Improve chart label spacing/readability in exported reports.
-  * Preserve existing report provenance and export behavior.
+  * Added deterministic chart label shortening/coding for ReportLab PDF figures.
+  * Preserved full parameter names in chart caption mappings and the parameter statistics table.
+  * Report generation now succeeds with long telemetry/channel names without placing raw long labels on chart axes.
+  * Backend regression coverage verifies helper behavior, axis label compaction, full-name preservation, and PDF generation.
+
+* [ ] P4.3 Upload failed/incorrect ingestion cleanup
+
+  * Next planned task.
+  * Improve cleanup/recovery behavior for failed or incorrect upload ingestion attempts.
 
 ---
 

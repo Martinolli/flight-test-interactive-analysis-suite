@@ -135,6 +135,43 @@ def _truncate_text(text: str, max_len: int = 40) -> str:
     return text[: max_len - 1].rstrip() + "…"
 
 
+def _shorten_chart_label(text: Any, max_len: int = 34) -> str:
+    label = _sanitize_pdf_text(str(text or "—"))
+    if len(label) <= max_len:
+        return label
+    if max_len <= 3:
+        return label[:max_len]
+    return label[: max_len - 3].rstrip(" _-/") + "..."
+
+
+def _build_chart_label_map(names: List[Any], max_len: int = 34) -> List[Dict[str, str]]:
+    label_map: List[Dict[str, str]] = []
+    for index, name in enumerate(names, start=1):
+        full_label = _sanitize_pdf_text(str(name or "—"))
+        display_label = _shorten_chart_label(full_label, max_len=max_len)
+        code = f"P{index}"
+        label_map.append(
+            {
+                "code": code,
+                "display": display_label,
+                "axis_label": f"{code} {display_label}",
+                "full": full_label,
+            }
+        )
+    return label_map
+
+
+def _chart_label_caption(base_caption: str, label_map: List[Dict[str, str]]) -> str:
+    if not label_map:
+        return base_caption
+    mappings = "; ".join(
+        f"{entry['code']} = {entry['full']}" for entry in label_map if entry.get("full")
+    )
+    if not mappings:
+        return base_caption
+    return f"{base_caption} Chart parameter labels: {mappings}."
+
+
 def _normalise_stats_snapshot(stats_snapshot: List[dict]) -> List[Dict[str, Any]]:
     normalized: List[Dict[str, Any]] = []
     for row in stats_snapshot or []:
@@ -1380,19 +1417,24 @@ def _build_stats_figures(stats_rows: List[Dict[str, Any]]) -> List[tuple]:
     )
     top_counts = [row for row in by_samples if int(row.get("sample_count") or 0) > 0][:8]
     if top_counts:
-        labels = [_truncate_text(str(row.get("name") or "—"), 22) for row in top_counts][::-1]
-        values = [int(row.get("sample_count") or 0) for row in top_counts][::-1]
+        chart_rows = top_counts[::-1]
+        label_map = _build_chart_label_map(
+            [row.get("name") or "—" for row in chart_rows],
+            max_len=26,
+        )
+        labels = [entry["axis_label"] for entry in label_map]
+        values = [int(row.get("sample_count") or 0) for row in chart_rows]
 
         drawing = Drawing(16.5 * cm, 7.5 * cm)
         chart = HorizontalBarChart()
-        chart.x = 3.6 * cm
+        chart.x = 4.6 * cm
         chart.y = 0.9 * cm
-        chart.width = 11.8 * cm
+        chart.width = 10.8 * cm
         chart.height = 5.8 * cm
         chart.data = [values]
         chart.categoryAxis.categoryNames = labels
         chart.categoryAxis.labels.fontName = "Helvetica"
-        chart.categoryAxis.labels.fontSize = 7
+        chart.categoryAxis.labels.fontSize = 6.5
         chart.categoryAxis.labels.boxAnchor = "e"
         chart.valueAxis.valueMin = 0
         chart.valueAxis.valueMax = max(max(values), 1) * 1.15
@@ -1408,13 +1450,20 @@ def _build_stats_figures(stats_rows: List[Dict[str, Any]]) -> List[tuple]:
             (
                 "Figure 1. Sample Count by Parameter (Top 8)",
                 drawing,
-                "Persisted parameter statistics snapshot. Higher bars indicate higher data density per channel.",
+                _chart_label_caption(
+                    "Persisted parameter statistics snapshot. Higher bars indicate higher data density per channel.",
+                    label_map,
+                ),
             )
         )
 
     top_profile = [row for row in by_samples if row.get("avg_val") is not None][:6]
     if top_profile:
-        labels = [_truncate_text(str(row.get("name") or "—"), 18) for row in top_profile]
+        label_map = _build_chart_label_map(
+            [row.get("name") or "—" for row in top_profile],
+            max_len=30,
+        )
+        labels = [entry["code"] for entry in label_map]
         min_vals = [
             row.get("min_val") if row.get("min_val") is not None else 0.0 for row in top_profile
         ]
@@ -1433,13 +1482,14 @@ def _build_stats_figures(stats_rows: List[Dict[str, Any]]) -> List[tuple]:
         drawing = Drawing(16.5 * cm, 8.5 * cm)
         chart = VerticalBarChart()
         chart.x = 1.0 * cm
-        chart.y = 1.5 * cm
+        chart.y = 1.9 * cm
         chart.width = 12.6 * cm
-        chart.height = 5.8 * cm
+        chart.height = 5.4 * cm
         chart.data = [min_vals, mean_vals, max_vals]
         chart.categoryAxis.categoryNames = labels
         chart.categoryAxis.labels.fontName = "Helvetica"
         chart.categoryAxis.labels.fontSize = 7
+        chart.categoryAxis.labels.boxAnchor = "n"
         chart.valueAxis.labels.fontName = "Helvetica"
         chart.valueAxis.labels.fontSize = 7
         chart.valueAxis.valueMin = min_value * 0.98 if min_value < 0 else 0
@@ -1470,7 +1520,10 @@ def _build_stats_figures(stats_rows: List[Dict[str, Any]]) -> List[tuple]:
             (
                 "Figure 2. Min / Mean / Max Profile (Top 6 by Sample Count)",
                 drawing,
-                "Statistical profile derived from persisted snapshots. Use with detailed table for exact values and units.",
+                _chart_label_caption(
+                    "Statistical profile derived from persisted snapshots. Use with detailed table for exact values and units.",
+                    label_map,
+                ),
             )
         )
 
