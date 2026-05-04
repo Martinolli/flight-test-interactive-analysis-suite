@@ -1,162 +1,199 @@
-# FTIAS Project Description Requirements
+# Flight Test Interactive Analysis Suite (FTIAS)
 
-## Version 1.0 - 2025-08-07
+## Overview
 
-## 1. Introduction
+Flight Test Interactive Analysis Suite (FTIAS) is a web-based engineering support system for structured, traceable, and reproducible flight-test data analysis.
 
-1.1. Purpose
-To develop a secure, scalable, and interactive software suite for flight test data analysis, enabling engineers to visualize, interrogate, and report on test results with flexibility and precision. The tool must support future AI/LLM integration and geospatial visualization.
+FTIAS supports flight-test data ingestion, immutable dataset versioning, parameter exploration, deterministic engineering calculations, AI/RAG-assisted interpretation, PDF report generation, and FRAT mission-risk workflows.
 
-1.2. Scope
-Import, manage, and visualize flight test datasets.
+FTIAS is an engineering review and decision-support tool. It is not a certification system, an automatic operational approval system, or a substitute for qualified engineering judgment.
 
-Flexible charting: any parameter on any axis.
+## Current Capabilities
 
-Interactive controls: time interval, zoom, annotations.
+### Flight-Test Data Management
 
-User management, session save/load, audit logging.
+- Flight-test record creation and management
+- CSV upload for time-series flight-test data
+- Persisted ingestion sessions with status, errors, and upload history
+- Immutable dataset versions for successful uploads
+- Active dataset selection for dashboards, parameters, and analysis
+- Cleanup support for failed ingestion artifacts while preserving valid dataset history
 
-Ready for AI agent and Google Earth integration.
+### Parameter Exploration
 
-Professional deployment for corporate environments.
+- Parameter search and selection
+- Interactive charts for selected telemetry channels
+- Favorites and saved parameter sets
+- Dataset-aware parameter viewing
+- Dataset comparison support
+- Chart export for review and reporting workflows
 
-1.3. Stakeholders
-Flight test engineers, analysts, data scientists.
+### AI Standards Query
 
-Project managers.
+- Document-centered RAG query workflow
+- Uploaded technical documents, standards, handbooks, and references
+- Source-backed answers with retrieval metadata
+- Backend-controlled retrieval and answer generation
 
-IT administrators.
+### AI Analysis
 
-## 2. Overall Description
+- Mode-driven flight-test analysis from selected or active dataset versions
+- Saved immutable analysis jobs with provenance snapshots
+- Prompt-to-mode guard for mismatch detection and safer execution
+- Analysis controls for:
+  - deterministic confidence
+  - retrieval coverage
+  - applicability status
+  - warning level
+  - result strength
+- Reopen/export support from saved analysis artifacts
 
-    2.1. Product Perspective
-    FTIAS is a web-based application hosted on the company network, accessible to authorized users via browser.
-    Future versions will support AI analysis agents and geospatial flight path overlays.
+### Deterministic / Bounded Engineering Modes
 
-    2.2. User Classes and Characteristics
-    User Role Description
-    Viewer Can view, explore, and export charts and reports
-    Analyst Can upload data, create and save sessions, annotate, generate reports
-    Admin User/role management, audit log access, backend configuration
+Current bounded engineering modes include:
 
-    2.3. Operating Environment
-    Web browsers (Chrome, Edge, Firefox)
+- Takeoff Performance
+- Landing Performance
+- Performance / Climb / Air Data
+- Handling / Control Response
+- Vibration & Loads
+- Flutter Support Pre-screen
+- General Summary
 
-    Company server (Linux or Windows)
+These modes are bounded by available telemetry, implemented deterministic models, data quality, and explicit applicability limits. Missing signals or weak applicability are surfaced through warnings and controls rather than hidden.
 
-    Dockerized deployment
+### Reports
 
-    2.4. Design/Implementation Constraints
-    Use Plotly for charting (via Plotly.js/React or Dash)
+- PDF/report export from saved analysis artifacts
+- Dataset, analysis-job, source, and control provenance
+- Analysis controls and warning summaries
+- Engineering narrative rendering with assumptions, limitations, and applicability boundaries
+- Report charts generated from persisted parameter statistics
+- Chart label readability improvements for long telemetry/channel names
 
-    Backend in Python (FastAPI recommended)
+### FRAT / Mission Risk
 
-    Store data locally or in PostgreSQL/SQLite
+- FRAT assessment draft, score, review, approve, reject, finalize, and export workflow
+- Score composition across mission/test profile, weather/environment, runway/operational, aircraft system status, and crew readiness categories
+- Manual adjustments, analysis indicators, total score, risk band, and recommendation tracking
+- Hard-stop flag support
+- Linked-analysis support for analysis evidence and controls
+- No-linked-analysis explanation and warning behavior where applicable
+- No-Go, unacceptable, rejected, needs-review, and hard-stop report/explanation support
 
-    Authentication via LDAP/SSO or JWT
+## Architecture
 
-    Modular to support LLM/AI and geospatial upgrades
+- Frontend: React + TypeScript + Vite
+- Backend: FastAPI + SQLAlchemy
+- Database: PostgreSQL with pgvector support
+- Runtime: Docker Compose
+- External AI/RAG services are accessed through backend-controlled workflows
 
-## 3. System Features and Requirements
+```text
+User Browser -> Frontend -> Backend -> PostgreSQL
+                                  -> External AI/RAG
+                                  -> Reports/Exports
+```
 
-    3.1. Core Features (MVP Phase)
-    Feature    Description    Priority    Review Point
-    Data Import    Upload Excel/CSV/XLSX; parse and validate headers/units    Must    Demo file import, validation check with sample data
-    Parameter Browser    List all available parameters with codes/units/descriptions    Must    User can search/browse parameters
-    Flexible Charting    User selects X/Y (and optional Z/color) from any parameters    Must    User demo: Plot time vs altitude, then velocity vs altitude
-    Interactive Charts    Pan, zoom, hover tooltips, hide/show traces, export chart    Must    Chart features tested with real data
-    Time Interval Select    Slider or input to filter visible time window    Must    User sets time range, chart updates instantly
-    Data Table View    Preview raw/filtered data, synchronized with chart    Should    Data table shows only selected time window
-    Session Save/Load    Save/load chart configs, selected parameters, and filters    Should    Load previous session, restore all state
-    Export Data/Charts    Export selected chart as PNG, HTML, CSV    Should    Exported files open correctly
+## Repository Structure
 
-    3.2. Security & Corporate Features
-    Feature    Description    Priority    Review Point
-    User Authentication    SSO/LDAP or JWT login, role-based access    Must    Demo login flow, test with test users
-    Audit Logging    Log file uploads, session activity, chart generation    Should    Audit log exports show all key activities
-    Data Privacy    Ensure sensitive data is only visible to authorized users    Must    Test with multiple users and permissions
+```text
+backend/                                  FastAPI application, routers, models, tests
+backend/migrations/                       SQL migration files
+frontend/                                 React + TypeScript + Vite frontend
+database/                                 Database initialization assets
+docker/                                   Docker build files
+docs/                                     Supporting documentation
+Project_Documents/                        Project document assets
+sample_data/                              Sample data fixtures and reference files
+scripts/                                  Utility scripts
+TODO.md                                  Backend/product roadmap and execution plan
+frontend/TODO.md                         Frontend roadmap and UX planning
+DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md Development history and implementation notes
+FTIAS_Manual_V00.pdf                     Current FTIAS manual
+```
 
-    3.3. Future Feature Phases
-    A. LLM Agent Integration
-    Feature    Description    Priority    Review Point
-    LLM Chat Panel    Users can ask questions, request summaries, or get chart suggestions    Could    Demo basic LLM integration with OpenAI (test queries)
-    Report Generation    LLM can generate flight summaries, charts, and insight commentary    Could    LLM produces summary on real data
+## Getting Started
 
-    B. Geospatial/Google Earth Integration
-    Feature    Description    Priority    Review Point
-    KML/KMZ Export    Export trajectory (lat/lon/alt) as Google Earth file    Should    KML opened in Google Earth, flight path matches
-    In-App Map Viewer    (Optional) CesiumJS/Kepler.gl for flight path playback    Could    Display and animate flight on map in-app
+Build and start the backend and frontend services:
 
-    C. Engineering Utilities
-    Feature    Description    Priority    Review Point
-    Derived Parameters    User-defined formulas (e.g., TAS - GS, or altitude difference)    Could    User defines, plots new parameter
-    Annotation & Notes    Add notes to chart for review/traceability    Could    Save, display annotation; link to session
-    Automated Data Checks    Highlight anomalies or data quality issues    Could    Visual or LLM flags for gaps, spikes
+```powershell
+docker compose up -d --build backend frontend
+```
 
-## 4. Technical Stack Recommendations
+Check service status:
 
-    Component Recommended Tech Notes
-    Frontend React.js + Plotly.js Best for interactive, modern web UI; rich Plotly support
-    Backend Python + FastAPI Modern, async, great for data processing and LLM APIs
-    Data Storage PostgreSQL Robust, scalable, good for metadata/session/user data
-    File Storage Local server/NAS Large data files; can integrate with S3 or similar
-    Auth LDAP/SSO or JWT Corporate authentication
-    Deployment Docker Easy update and rollback
-    LLM Integration OpenAI API (v1), local LLM (future) Modular API-based; can switch providers as needed
-    Map/3D Viewer CesiumJS or Kepler.gl Optional, for future phase
+```powershell
+docker compose ps
+```
 
-## 5. Project Phases and Review Points
+Follow backend logs:
 
-    Phase Milestone/Review Gate
-    1. MVP Core File import, charting, parameter browser, time interval, user auth
-    - Review: Demo with real data, user tests all key features
-    2. Corporate Deployment Audit logging, role-based permissions, data privacy test
-    - Review: Security walkthrough, admin/test user scenarios
-    3. Session/Export Utility Session save/load, export charts/data
-    - Review: Save/load test, exported file QA
-    4. LLM Prototype LLM chat for basic queries, report generation (OpenAI API or local)
-    - Review: LLM responds to at least 3 user test queries, generates summary
-    5. Geospatial Export KML/KMZ flight path export, Google Earth playback
-    - Review: Visual flight path on Google Earth from test export
-    6. Map/3D Viewer Optional: In-app map viewer with basic animation
-    - Review: Trajectory visible in dashboard, responds to chart selection
-    7. Advanced Utilities Derived parameters, annotations, automated checks
-    - Review: User creates annotation, new parameter, sees automated data flag
+```powershell
+docker compose logs -f backend
+```
 
----
+The frontend is typically available at:
 
-## Current Implementation Status (March 2026)
+```text
+http://localhost:5173
+```
 
-### Completed Phases
+The backend API docs are typically available at:
 
-| Phase | Feature | Status |
-| --- | --- | --- |
-| Sprint 1 | Docker environment, CI/CD pipeline | ✅ Complete |
-| Sprint 2 | FastAPI backend, PostgreSQL, JWT auth | ✅ Complete |
-| Sprint 2 | Flight test CRUD, CSV upload, parameter management | ✅ Complete |
-| Sprint 2 | React frontend, dashboard, parameter visualization | ✅ Complete |
-| Phase 6 | RAG system: Docling parsing, pgvector embeddings, AI analysis | ✅ Complete |
+```text
+http://localhost:8000/docs
+```
 
-### Phase 6 — RAG System (AI-Powered Document Analysis)
+Environment values are read from `.env` and `.env.example`. AI/RAG features require the relevant backend environment variables, including an OpenAI API key when using OpenAI-backed workflows.
 
-The following features are now implemented:
+## Database Migrations
 
-- **Document Library** (`/documents`): Upload PDF standards/handbooks (MIL-STD, FAR/CS, RTCA DO-xxx). Docling parses the PDF preserving tables and section hierarchy. Each chunk is embedded with OpenAI `text-embedding-3-small` and stored in pgvector.
-- **AI Standards Query** (`/ai-query`): Chat-style interface for semantic search across the document library. Answers are grounded in indexed documents with source citations.
-- **AI Analysis Panel** (on flight test detail page): Cross-references flight test parameter statistics against relevant document excerpts to generate a structured engineering analysis report.
+When new SQL migration files are added under `backend/migrations/`, apply them to the running PostgreSQL container before relying on the related feature.
 
-### Configuration Required for AI Features
+PowerShell example:
 
-Add to `backend/.env`:
+```powershell
+Get-Content backend/migrations/<migration_file>.sql -Raw | docker compose exec -T postgres sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
 
-    ```bash
-    OPENAI_API_KEY=sk-...
-    ```
+## Validation
 
-### Next Phase (Phase 7)
+Common validation commands:
 
-- Background task processing for large PDF uploads
-- Document re-indexing endpoint
-- Local embedding model fallback (sentence-transformers)
-- Unit tests for documents router
-- User management (Phase 8)
+```powershell
+black --check --diff backend/app backend/tests
+pytest backend/tests -q
+pnpm -C frontend run build
+```
+
+The frontend build may warn if Node.js is `20.18.1` while Vite expects `20.19+` or `22.12+`. The build can still complete successfully, but the runtime should be upgraded when practical.
+
+## Documentation
+
+- `FTIAS_Manual_V00.pdf` - current FTIAS manual
+- `TODO.md` - active backend/product roadmap and execution plan
+- `frontend/TODO.md` - frontend roadmap and UX planning
+- `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` - implementation history and technical notes
+- `CONTRIBUTING.md` - contribution guidance
+- `Docker_Troubleshooting_Guide.md` - Docker troubleshooting notes
+
+## Roadmap
+
+The active roadmap and deferred items are tracked in `TODO.md` and `frontend/TODO.md` rather than duplicated here.
+
+Next planned task after P4.3:
+
+```text
+P4.4 - Dashboard duration window derivation
+```
+
+## Responsible Use / Limitations
+
+- FTIAS supports engineering review, traceability, and repeatable analysis workflows.
+- Deterministic outputs are bounded by available telemetry, assumptions, implemented models, and data quality.
+- AI/RAG outputs are advisory and contextual; source citations and retrieval metadata must be reviewed.
+- Flutter Support Pre-screen is pre-screening only and is not flutter clearance.
+- Vibration and loads outputs are screening support only and are not formal loads substantiation.
+- FRAT output supports mission-risk review but does not replace organizational authority, safety review, or formal approval processes.
+- Certification, operational approval, and final safety decisions remain with qualified personnel and the governing organization.
