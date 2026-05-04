@@ -4,7 +4,7 @@ Data validation and serialization schemas
 """
 
 from datetime import date, datetime, time
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -201,6 +201,17 @@ class DatasetVersionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class IngestionCleanupResponse(BaseModel):
+    """Response for failed ingestion cleanup actions."""
+
+    status: str
+    ingestion_session_id: int
+    dataset_version_id: Optional[int] = None
+    deleted_data_point_count: int = 0
+    removed_records: Dict[str, int] = Field(default_factory=dict)
+    message: str
 
 
 # Test Parameter Schemas

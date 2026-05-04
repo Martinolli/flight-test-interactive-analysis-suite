@@ -28,6 +28,15 @@ from app.models import (
 
 router = APIRouter()
 
+FAILED_CLEANUP_SESSION_STATUSES = {"failed", "cancelled", "canceled", "error"}
+FAILED_CLEANUP_DATASET_STATUSES = {
+    "failed",
+    "cancelled",
+    "canceled",
+    "error",
+    "processing",
+}
+
 
 def _persist_ingestion_failure(
     db: Session,
@@ -309,6 +318,196 @@ async def get_ingestion_session(
             detail="Ingestion session not found",
         )
     return session
+
+
+@router.delete(
+    "/{test_id}/ingestion-sessions/{session_id}/cleanup",
+    response_model=schemas.IngestionCleanupResponse,
+)
+async def cleanup_failed_ingestion_session(
+    test_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user),
+):
+    """Delete failed/cancelled ingestion artifacts without touching valid history."""
+    session = (
+        db.query(IngestionSession)
+        .join(FlightTest, FlightTest.id == IngestionSession.flight_test_id)
+        .filter(
+            IngestionSession.id == session_id,
+            IngestionSession.flight_test_id == test_id,
+            IngestionSession.uploaded_by_id == current_user.id,
+            FlightTest.created_by_id == current_user.id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ingestion session not found for this flight test",
+        )
+
+    session_status = (session.status or "").lower()
+    if session_status not in FAILED_CLEANUP_SESSION_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Cleanup is only available for failed or cancelled ingestion sessions. "
+                "Successful dataset versions are preserved."
+            ),
+        )
+
+    flight_test = session.flight_test
+    if not flight_test or flight_test.created_by_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Flight test not found",
+        )
+
+    dataset_versions = []
+    if session.dataset_version_id is not None:
+        dataset_version = (
+            db.query(DatasetVersion)
+            .filter(
+                DatasetVersion.id == session.dataset_version_id,
+                DatasetVersion.flight_test_id == test_id,
+                DatasetVersion.created_by_id == current_user.id,
+            )
+            .first()
+        )
+        if not dataset_version:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Linked dataset version was not found or is not owned by the current user.",
+            )
+        dataset_versions.append(dataset_version)
+
+    source_dataset_versions = (
+        db.query(DatasetVersion)
+        .filter(
+            DatasetVersion.source_session_id == session.id,
+            DatasetVersion.flight_test_id == test_id,
+            DatasetVersion.created_by_id == current_user.id,
+        )
+        .all()
+    )
+    seen_dataset_ids = {dataset.id for dataset in dataset_versions}
+    for dataset_version in source_dataset_versions:
+        if dataset_version.id not in seen_dataset_ids:
+            dataset_versions.append(dataset_version)
+            seen_dataset_ids.add(dataset_version.id)
+
+    dataset_ids = [dataset.id for dataset in dataset_versions]
+
+    for dataset_version in dataset_versions:
+        dataset_status = (dataset_version.status or "").lower()
+        if dataset_status == "success":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Successful dataset versions cannot be cleaned up by failed-upload cleanup. "
+                    "Use a dedicated dataset deletion workflow when available."
+                ),
+            )
+        if dataset_status not in FAILED_CLEANUP_DATASET_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Dataset version {dataset_version.id} is not cleanup-eligible.",
+            )
+        if flight_test.active_dataset_version_id == dataset_version.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Active dataset versions cannot be cleaned up.",
+            )
+
+    if dataset_ids:
+        analysis_refs = (
+            db.query(AnalysisJob).filter(AnalysisJob.dataset_version_id.in_(dataset_ids)).count()
+        )
+        if analysis_refs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cleanup blocked: dataset version is referenced by a saved analysis job.",
+            )
+
+        frat_refs = (
+            db.query(FratAssessment)
+            .filter(FratAssessment.dataset_version_id.in_(dataset_ids))
+            .count()
+        )
+        if frat_refs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cleanup blocked: dataset version is referenced by a FRAT assessment.",
+            )
+
+        other_session_refs = (
+            db.query(IngestionSession)
+            .filter(
+                IngestionSession.dataset_version_id.in_(dataset_ids),
+                IngestionSession.id != session.id,
+            )
+            .count()
+        )
+        if other_session_refs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cleanup blocked: dataset version is referenced by another ingestion session.",
+            )
+
+    deleted_data_points = 0
+    try:
+        if dataset_ids:
+            deleted_data_points = (
+                db.query(DataPoint)
+                .filter(
+                    DataPoint.flight_test_id == test_id,
+                    DataPoint.dataset_version_id.in_(dataset_ids),
+                )
+                .delete(synchronize_session=False)
+            )
+
+            session.dataset_version_id = None
+            db.add(session)
+            for dataset_version in dataset_versions:
+                dataset_version.source_session_id = None
+                db.add(dataset_version)
+            db.flush()
+
+            deleted_dataset_versions = (
+                db.query(DatasetVersion)
+                .filter(DatasetVersion.id.in_(dataset_ids))
+                .delete(synchronize_session=False)
+            )
+        else:
+            deleted_dataset_versions = 0
+
+        db.delete(session)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clean up ingestion session: {str(exc)}",
+        ) from exc
+
+    return schemas.IngestionCleanupResponse(
+        status="cleaned",
+        ingestion_session_id=session_id,
+        dataset_version_id=dataset_ids[0] if len(dataset_ids) == 1 else None,
+        deleted_data_point_count=deleted_data_points,
+        removed_records={
+            "ingestion_sessions": 1,
+            "dataset_versions": deleted_dataset_versions,
+            "data_points": deleted_data_points,
+            "test_parameters": 0,
+        },
+        message=(
+            "Failed upload cleanup complete. Failed ingestion artifacts were removed; "
+            "successful dataset versions were preserved."
+        ),
+    )
 
 
 @router.put("/{test_id}", response_model=schemas.FlightTestResponse)

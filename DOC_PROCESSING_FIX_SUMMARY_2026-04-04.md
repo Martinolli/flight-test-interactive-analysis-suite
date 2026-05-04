@@ -2846,6 +2846,61 @@ pnpm -C frontend run build
 
 - P4.3 — Upload failed/incorrect ingestion cleanup.
 
+## P4.3 Upload Failed/Incorrect Ingestion Cleanup (2026-05-04)
+
+### Why this was added
+
+- Failed or incorrect uploads could remain visible in Upload History without a clear recovery action.
+- Cleanup needed to be narrow enough to remove failed ingestion artifacts without compromising valid dataset history, provenance, saved analyses, or FRAT records.
+
+### What changed
+
+**Backend**
+
+- Added a failed-ingestion cleanup endpoint:
+  - `DELETE /api/flight-tests/{test_id}/ingestion-sessions/{session_id}/cleanup`
+- Cleanup is owner-scoped and only allows failed/cancelled/error ingestion sessions.
+- Cleanup removes:
+  - the failed ingestion session
+  - linked failed/cleanup-eligible dataset versions
+  - associated partial data points
+- Cleanup is blocked for:
+  - successful ingestion sessions/dataset versions
+  - active dataset versions
+  - dataset versions referenced by saved analysis jobs
+  - dataset versions referenced by FRAT assessments
+  - records outside the current user's flight tests
+- Response payload includes cleanup status, session id, dataset version id when applicable, deleted data-point count, removed-record summary, and a frontend-safe message.
+
+**Frontend**
+
+- Added failed upload cleanup contract support in `frontend/src/services/api.ts`.
+- Updated Upload History table to show a cleanup action only for failed/cancelled/error records.
+- Cleanup requires user confirmation and explains that successful dataset versions are preserved.
+- Upload Data refreshes upload history and dataset versions after cleanup and surfaces backend block messages.
+
+### Validation run
+
+```powershell
+black --check --diff backend/app backend/tests
+pytest backend/tests/test_csv_upload.py -q
+pytest backend/tests/test_ingestion_cleanup.py -q
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+pytest backend/tests -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend formatting check passed.
+- Focused CSV upload, ingestion cleanup, and flight-test deletion-integrity suites passed.
+- Full backend suite passed (`183 passed`, `1 skipped`).
+- Frontend production build passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P4.4 — Dashboard duration window derivation.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

@@ -1,6 +1,6 @@
 # FTIAS — Unified TODO (Execution Plan) — REV 03
 
-**Last updated:** 2026-05-03
+**Last updated:** 2026-05-04
 **Scope:** Backend + Frontend + LLM/RAG + Reporting + Operational Workflow
 **Plan basis:** aligned to REV 02, `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md`, completed P0/P1/P2 work, and post-P2.4 review findings
 
@@ -278,10 +278,18 @@ These baseline controls should be protected by regression tests.
   * Report generation now succeeds with long telemetry/channel names without placing raw long labels on chart axes.
   * Backend regression coverage verifies helper behavior, axis label compaction, full-name preservation, and PDF generation.
 
-* [ ] P4.3 Upload failed/incorrect ingestion cleanup
+* [x] P4.3 Upload failed/incorrect ingestion cleanup
+
+  * Added owner-scoped failed-ingestion cleanup endpoint for failed/cancelled/error upload sessions.
+  * Cleanup removes failed ingestion sessions, failed dataset versions, and associated partial data points while preserving successful and active datasets.
+  * Cleanup is blocked for successful datasets, active datasets, saved-analysis references, FRAT references, and another user's records.
+  * Upload Data now exposes a confirmed cleanup action only on failed/cancelled/error upload rows and refreshes history/dataset versions after cleanup.
+  * Backend regression coverage verifies cleanup success, blocked states, reference safety, tenant isolation, and response summaries.
+
+* [ ] P4.4 Dashboard duration window derivation
 
   * Next planned task.
-  * Improve cleanup/recovery behavior for failed or incorrect upload ingestion attempts.
+  * Improve dashboard duration/window derivation from active dataset telemetry.
 
 ---
 

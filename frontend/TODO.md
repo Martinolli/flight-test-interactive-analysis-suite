@@ -1,6 +1,6 @@
 # FTIAS Frontend TODO — REV 03
 
-**Last updated:** 2026-05-03
+**Last updated:** 2026-05-04
 **Scope:** Frontend UX, workflow alignment, routing clarity, engineering usability, FRAT workspace
 
 ---
@@ -191,10 +191,17 @@ These should be protected from regression.
 * Full parameter/channel names remain available in report caption mappings and statistics tables.
 * No frontend chart-export code changes were required for this backend ReportLab export path.
 
-### P4.3 Upload failed/incorrect ingestion cleanup
+### P4.3 Upload failed/incorrect ingestion cleanup ✅
+
+* Upload History now shows a cleanup action only for failed/cancelled/error ingestion records.
+* Cleanup requires confirmation and explains that successful dataset versions are preserved.
+* After cleanup succeeds, upload history and dataset versions refresh from backend truth.
+* Backend block messages are surfaced clearly when cleanup is not allowed.
+
+### P4.4 Dashboard duration window derivation
 
 * Next planned task.
-* Improve frontend recovery/cleanup affordances for failed or incorrect upload ingestion attempts once backend behavior is hardened.
+* Improve dashboard duration/window derivation from active dataset telemetry.
 
 ### P3.6 Report/readability polish in frontend-visible surfaces
 
@@ -221,7 +228,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P4.3 — Upload failed/incorrect ingestion cleanup**
+1. **P4.4 — Dashboard duration window derivation**
 2. **P3.6 — Report/control readability polish**
 3. **P3.7 — Manual / help integration**
 4. **P3.5a — FRAT usability hardening**

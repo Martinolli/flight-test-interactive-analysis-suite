@@ -31,6 +31,7 @@ export default function Upload() {
   const [loadingDatasetVersions, setLoadingDatasetVersions] = useState(false);
   const [selectedDatasetVersionId, setSelectedDatasetVersionId] = useState<number | ''>('');
   const [activatingDataset, setActivatingDataset] = useState(false);
+  const [cleaningSessionId, setCleaningSessionId] = useState<number | null>(null);
 
   const hasActiveIngestion = history.some(
     (record) => record.status === 'pending' || record.status === 'processing'
@@ -189,6 +190,37 @@ export default function Upload() {
       );
     } finally {
       setActivatingDataset(false);
+    }
+  };
+
+  const handleCleanupFailedUpload = async (record: UploadRecord) => {
+    if (!selectedTestId) return;
+    const confirmed = window.confirm(
+      `Clean up failed upload "${record.filename}"?\n\n` +
+        'Cleanup removes failed ingestion artifacts only. Successful dataset versions are preserved.'
+    );
+    if (!confirmed) return;
+
+    setCleaningSessionId(record.id);
+    try {
+      const result = await ApiService.cleanupFailedUpload(Number(selectedTestId), record.id);
+      toast.success('Failed upload cleaned up', result.message);
+      const [updatedHistory, versions] = await Promise.all([
+        ApiService.getUploadHistory(Number(selectedTestId)).catch(() => []),
+        ApiService.getDatasetVersions(Number(selectedTestId)).catch(() => []),
+      ]);
+      setHistory(updatedHistory);
+      setDatasetVersions(versions);
+      const preferred =
+        versions.find((v) => v.is_active)?.id ?? versions.find((v) => v.status === 'success')?.id;
+      setSelectedDatasetVersionId(preferred ?? '');
+    } catch (err) {
+      toast.error(
+        'Cleanup blocked',
+        err instanceof Error ? err.message : 'Failed upload cleanup was not allowed'
+      );
+    } finally {
+      setCleaningSessionId(null);
     }
   };
 
@@ -393,12 +425,18 @@ export default function Upload() {
               <CardHeader>
                 <CardTitle>Upload History</CardTitle>
                 <CardDescription>
-                  Previous uploads for the selected flight test
+                  Previous uploads for the selected flight test. Cleanup removes failed ingestion
+                  artifacts only; successful dataset versions are preserved.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="max-h-[380px] overflow-y-auto">
-                  <UploadHistoryTable records={history} isLoading={loadingHistory} />
+                  <UploadHistoryTable
+                    records={history}
+                    isLoading={loadingHistory}
+                    onCleanupFailedUpload={handleCleanupFailedUpload}
+                    cleaningSessionId={cleaningSessionId}
+                  />
                 </div>
               </CardContent>
             </Card>

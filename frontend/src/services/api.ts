@@ -33,12 +33,21 @@ export interface UploadRecord {
   file_type: 'csv';
   source_format?: string;
   row_count: number | null;
-  status: 'pending' | 'processing' | 'success' | 'failed';
+  status: 'pending' | 'processing' | 'success' | 'failed' | 'cancelled' | 'canceled' | 'error';
   error_message: string | null;
   error_log?: string | null;
   uploaded_by_id: number;
   created_at: string;
   updated_at?: string | null;
+}
+
+export interface IngestionCleanupResponse {
+  status: string;
+  ingestion_session_id: number;
+  dataset_version_id?: number | null;
+  deleted_data_point_count: number;
+  removed_records: Record<string, number>;
+  message: string;
 }
 
 export interface UploadResponse {
@@ -629,6 +638,16 @@ export class ApiService {
 
   static async getUploadHistory(flightTestId: number): Promise<UploadRecord[]> {
     return this.request<UploadRecord[]>(`/api/flight-tests/${flightTestId}/ingestion-sessions`);
+  }
+
+  static async cleanupFailedUpload(
+    flightTestId: number,
+    sessionId: number
+  ): Promise<IngestionCleanupResponse> {
+    return this.request<IngestionCleanupResponse>(
+      `/api/flight-tests/${flightTestId}/ingestion-sessions/${sessionId}/cleanup`,
+      { method: 'DELETE' }
+    );
   }
 
   static async getAllUploads(): Promise<UploadRecord[]> {
