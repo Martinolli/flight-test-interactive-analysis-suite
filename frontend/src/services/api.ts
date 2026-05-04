@@ -64,6 +64,16 @@ export interface UploadResponse {
   row_count?: number;
 }
 
+export interface DatasetDuration {
+  dataset_version_id: number;
+  dataset_label: string;
+  start_timestamp: string | null;
+  end_timestamp: string | null;
+  duration_seconds: number | null;
+  duration_label: string;
+  status: 'available' | 'unavailable' | 'invalid_timestamps' | 'no_data' | string;
+}
+
 export interface DatasetVersion {
   id: number;
   flight_test_id: number;
@@ -77,6 +87,7 @@ export interface DatasetVersion {
   created_at: string;
   updated_at?: string | null;
   is_active: boolean;
+  dataset_duration: DatasetDuration;
 }
 
 export interface ParameterInfo {

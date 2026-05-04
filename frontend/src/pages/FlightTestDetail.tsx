@@ -63,16 +63,6 @@ function formatDateTime(dateString: string): string {
   });
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return 'N/A';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-
 function formatTimeCursor(timestamp: string): string {
   const parsed = new Date(timestamp);
   if (Number.isNaN(parsed.getTime())) return timestamp;
@@ -1238,6 +1228,8 @@ export default function FlightTestDetail() {
       ? undefined
       : datasetVersions.find((v) => v.id === Number(selectedDatasetVersionId));
   const activeDatasetVersion = datasetVersions.find((v) => v.is_active);
+  const selectedDatasetDuration = selectedDatasetVersion?.dataset_duration;
+  const selectedDatasetDurationAvailable = selectedDatasetDuration?.status === 'available';
 
   const handleActivateDatasetVersion = async () => {
     if (!flightTest || selectedDatasetVersionId === '') return;
@@ -1360,10 +1352,29 @@ export default function FlightTestDetail() {
                   <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center shrink-0">
                     <Clock className="w-5 h-5 text-purple-500" />
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Duration</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
+                      Duration Window
+                    </p>
                     <p className="text-sm font-semibold text-gray-900 mt-0.5">
-                      {formatDuration(flightTest.duration_seconds)}
+                      {selectedDatasetDurationAvailable
+                        ? (selectedDatasetDuration?.duration_label ?? 'N/A')
+                        : 'N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Selected dataset: {selectedDatasetVersion?.label ?? 'none'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Start:{' '}
+                      {selectedDatasetDurationAvailable && selectedDatasetDuration.start_timestamp
+                        ? formatDateTime(selectedDatasetDuration.start_timestamp)
+                        : '—'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      End:{' '}
+                      {selectedDatasetDurationAvailable && selectedDatasetDuration.end_timestamp
+                        ? formatDateTime(selectedDatasetDuration.end_timestamp)
+                        : '—'}
                     </p>
                   </div>
                 </CardContent>

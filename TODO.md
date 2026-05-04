@@ -286,10 +286,17 @@ These baseline controls should be protected by regression tests.
   * Upload Data now exposes a confirmed cleanup action only on failed/cancelled/error upload rows and refreshes history/dataset versions after cleanup.
   * Backend regression coverage verifies cleanup success, blocked states, reference safety, tenant isolation, and response summaries.
 
-* [ ] P4.4 Dashboard duration window derivation
+* [x] P4.4 Dashboard duration window derivation
+
+  * Added dataset-scoped duration derivation from persisted timestamp min/max aggregation.
+  * Dataset version responses now include structured duration status, start/end timestamps, seconds, and display label.
+  * Flight Test Detail now shows the selected dataset duration window instead of static flight-test duration metadata.
+  * Backend regression coverage verifies multi-point, single-point, no-data, dataset-scoped, tenant-isolated, and invalid timestamp cases.
+
+* [ ] P4.5 Event marker UX clarification/fix
 
   * Next planned task.
-  * Improve dashboard duration/window derivation from active dataset telemetry.
+  * Clarify event marker behavior and fix any confusing marker display/control states.
 
 ---
 

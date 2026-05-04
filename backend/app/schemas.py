@@ -183,6 +183,18 @@ class IngestionSessionResponse(BaseModel):
         from_attributes = True
 
 
+class DatasetDurationResponse(BaseModel):
+    """Dataset-scoped timestamp coverage summary."""
+
+    dataset_version_id: int
+    dataset_label: str
+    start_timestamp: Optional[datetime] = None
+    end_timestamp: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+    duration_label: str = "N/A"
+    status: str
+
+
 class DatasetVersionResponse(BaseModel):
     """Schema for persisted dataset versions under a flight test."""
 
@@ -198,6 +210,7 @@ class DatasetVersionResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     is_active: bool = False
+    dataset_duration: DatasetDurationResponse
 
     class Config:
         from_attributes = True

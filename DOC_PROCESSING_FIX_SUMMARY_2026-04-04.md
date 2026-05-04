@@ -2901,6 +2901,56 @@ pnpm -C frontend run build
 
 - P4.4 — Dashboard duration window derivation.
 
+## P4.4 Dashboard Duration Window Derivation (2026-05-04)
+
+### Why this was added
+
+- Flight Test Detail showed a static/manual duration value that could remain `N/A` even when the selected dataset contained valid timestamped telemetry.
+- The dashboard needs to show the actual time coverage for the selected or active dataset version without mixing historical dataset versions.
+
+### What changed
+
+**Backend**
+
+- Added dataset duration derivation from persisted `DataPoint.timestamp` records.
+- Dataset version list responses now include `dataset_duration` with:
+  - dataset version id and label
+  - start timestamp
+  - end timestamp
+  - duration in seconds
+  - human-readable duration label
+  - status (`available`, `no_data`, or `invalid_timestamps`)
+- Duration is computed with database aggregation (`min(timestamp)`, `max(timestamp)`, and count), scoped to each dataset version.
+- Added guards for no-data, single-timestamp, invalid timestamp, and tenant-isolation cases.
+
+**Frontend**
+
+- Updated API contracts for `dataset_duration`.
+- Replaced the Flight Test Detail duration card with a selected-dataset `Duration Window` card.
+- The card now shows selected dataset label, start/end timestamps, and backend-derived duration label when available.
+- `N/A` remains visible for no-data or invalid/unavailable duration states.
+
+### Validation run
+
+```powershell
+black --check --diff backend/app backend/tests
+pytest backend/tests/test_dashboard_duration.py -q
+pytest backend/tests/test_flight_tests_comprehensive.py -q
+pytest backend/tests -q
+pnpm -C frontend run build
+```
+
+**Result:**
+
+- Backend formatting check passed.
+- Focused dashboard-duration and flight-test regression suites passed.
+- Full backend suite passed (`189 passed`, `1 skipped`).
+- Frontend production build passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P4.5 — Event marker UX clarification/fix.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

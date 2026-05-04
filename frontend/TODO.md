@@ -198,10 +198,16 @@ These should be protected from regression.
 * After cleanup succeeds, upload history and dataset versions refresh from backend truth.
 * Backend block messages are surfaced clearly when cleanup is not allowed.
 
-### P4.4 Dashboard duration window derivation
+### P4.4 Dashboard duration window derivation ✅
+
+* Flight Test Detail now displays the selected dataset duration window from backend-derived dataset timestamp coverage.
+* Duration card shows selected dataset label, start timestamp, end timestamp, and duration label when available.
+* No-data or invalid timestamp states remain explicit as `N/A`.
+
+### P4.5 Event marker UX clarification/fix
 
 * Next planned task.
-* Improve dashboard duration/window derivation from active dataset telemetry.
+* Clarify event marker behavior and fix confusing marker display/control states.
 
 ### P3.6 Report/readability polish in frontend-visible surfaces
 
@@ -228,7 +234,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P4.4 — Dashboard duration window derivation**
+1. **P4.5 — Event marker UX clarification/fix**
 2. **P3.6 — Report/control readability polish**
 3. **P3.7 — Manual / help integration**
 4. **P3.5a — FRAT usability hardening**

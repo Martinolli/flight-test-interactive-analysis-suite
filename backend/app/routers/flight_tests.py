@@ -38,6 +38,114 @@ FAILED_CLEANUP_DATASET_STATUSES = {
 }
 
 
+def _coerce_timestamp(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _format_duration_label(duration_seconds: float | None) -> str:
+    if duration_seconds is None:
+        return "N/A"
+    if duration_seconds < 0:
+        return "N/A"
+    if duration_seconds < 60:
+        if duration_seconds == int(duration_seconds):
+            return f"{int(duration_seconds)} s"
+        return f"{duration_seconds:.1f} s"
+
+    total_seconds = int(round(duration_seconds))
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    if hours > 0:
+        return f"{hours} h {minutes:02d} min {seconds:02d} s"
+    return f"{minutes} min {seconds:02d} s"
+
+
+def _build_dataset_duration(
+    dataset_version: DatasetVersion,
+    *,
+    timestamp_summary=None,
+) -> schemas.DatasetDurationResponse:
+    if timestamp_summary is None:
+        return schemas.DatasetDurationResponse(
+            dataset_version_id=dataset_version.id,
+            dataset_label=dataset_version.label,
+            start_timestamp=None,
+            end_timestamp=None,
+            duration_seconds=None,
+            duration_label="N/A",
+            status="no_data",
+        )
+
+    point_count = int(timestamp_summary.get("count") or 0)
+    if point_count <= 0:
+        return schemas.DatasetDurationResponse(
+            dataset_version_id=dataset_version.id,
+            dataset_label=dataset_version.label,
+            start_timestamp=None,
+            end_timestamp=None,
+            duration_seconds=None,
+            duration_label="N/A",
+            status="no_data",
+        )
+
+    start_timestamp = _coerce_timestamp(timestamp_summary.get("start"))
+    end_timestamp = _coerce_timestamp(timestamp_summary.get("end"))
+    if start_timestamp is None or end_timestamp is None:
+        return schemas.DatasetDurationResponse(
+            dataset_version_id=dataset_version.id,
+            dataset_label=dataset_version.label,
+            start_timestamp=None,
+            end_timestamp=None,
+            duration_seconds=None,
+            duration_label="N/A",
+            status="invalid_timestamps",
+        )
+
+    try:
+        duration_seconds = (end_timestamp - start_timestamp).total_seconds()
+    except TypeError:
+        return schemas.DatasetDurationResponse(
+            dataset_version_id=dataset_version.id,
+            dataset_label=dataset_version.label,
+            start_timestamp=None,
+            end_timestamp=None,
+            duration_seconds=None,
+            duration_label="N/A",
+            status="invalid_timestamps",
+        )
+
+    if duration_seconds < 0:
+        return schemas.DatasetDurationResponse(
+            dataset_version_id=dataset_version.id,
+            dataset_label=dataset_version.label,
+            start_timestamp=None,
+            end_timestamp=None,
+            duration_seconds=None,
+            duration_label="N/A",
+            status="invalid_timestamps",
+        )
+
+    return schemas.DatasetDurationResponse(
+        dataset_version_id=dataset_version.id,
+        dataset_label=dataset_version.label,
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        duration_seconds=duration_seconds,
+        duration_label=_format_duration_label(duration_seconds),
+        status="available",
+    )
+
+
 def _persist_ingestion_failure(
     db: Session,
     *,
@@ -225,6 +333,32 @@ async def list_dataset_versions(
         .order_by(DatasetVersion.version_number.desc(), DatasetVersion.id.desc())
         .all()
     )
+    version_ids = [version.id for version in versions]
+    duration_by_dataset: dict[int, dict] = {}
+    if version_ids:
+        duration_rows = (
+            db.query(
+                DataPoint.dataset_version_id,
+                func.min(DataPoint.timestamp).label("start_timestamp"),
+                func.max(DataPoint.timestamp).label("end_timestamp"),
+                func.count(DataPoint.id).label("point_count"),
+            )
+            .filter(
+                DataPoint.flight_test_id == test_id,
+                DataPoint.dataset_version_id.in_(version_ids),
+            )
+            .group_by(DataPoint.dataset_version_id)
+            .all()
+        )
+        duration_by_dataset = {
+            int(row.dataset_version_id): {
+                "start": row.start_timestamp,
+                "end": row.end_timestamp,
+                "count": row.point_count,
+            }
+            for row in duration_rows
+            if row.dataset_version_id is not None
+        }
 
     return [
         schemas.DatasetVersionResponse(
@@ -240,6 +374,10 @@ async def list_dataset_versions(
             created_at=v.created_at,
             updated_at=v.updated_at,
             is_active=(flight_test.active_dataset_version_id == v.id),
+            dataset_duration=_build_dataset_duration(
+                v,
+                timestamp_summary=duration_by_dataset.get(v.id),
+            ),
         )
         for v in versions
     ]
