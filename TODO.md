@@ -299,10 +299,16 @@ These baseline controls should be protected by regression tests.
   * Renamed the control to `Show demo event markers` and added explicit marker availability/visibility copy.
   * Chart markers now render in front of traces with stronger labels, and the UI states that no backend event marker source exists yet.
 
-* [ ] P3.6 / P4.6 Report/control readability polish in frontend-visible surfaces
+* [x] P3.6 / P4.6 Report/control readability polish in frontend-visible surfaces
+
+  * Added frontend-readable analysis routing, result-control, provenance, limitation, and report-readiness cards.
+  * Prompt-to-mode warnings now answer whether the selected mode likely matches the prompt intent.
+  * Saved analysis reopen wording now states the artifact is immutable and tied to the captured dataset/controls.
+
+* [ ] P3.7 Manual / help integration
 
   * Next planned task.
-  * Continue polishing report/control wording and readability in frontend-visible surfaces.
+  * Add focused help surfaces for mode selection, report interpretation, FRAT usage, and capability limitations.
 
 ---
 

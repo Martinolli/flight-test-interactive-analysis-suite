@@ -211,17 +211,12 @@ These should be protected from regression.
 * Added marker status copy for available, visible, and unavailable marker states.
 * Chart marker lines now render in front of traces with stronger labels.
 
-### P3.6 / P4.6 Report/control readability polish in frontend-visible surfaces
+### P3.6 / P4.6 Report/control readability polish in frontend-visible surfaces ✅
 
-* Improve readability of control summaries:
-
-  * use human-readable labels instead of enum-like names
-  * e.g. `High`, `Bounded`, `Advisory only`
-* Deduplicate repeated limitation/applicability text where surfaced in UI previews.
-* Improve empty/zero-retrieval wording:
-
-  * avoid abrupt or confusing phrasing
-  * make limitations explicit but readable
+* Flight Test Detail AI Analysis results now group trust metadata into routing, result controls, provenance, and limitations/report-readiness cards.
+* Control values now use human-readable labels and consistent status colors instead of raw enum-style presentation.
+* Prompt-to-mode warning copy now directly answers whether the selected mode likely matches the prompt.
+* Saved analysis reopen wording now makes immutable artifact provenance explicit.
 
 ### P3.7 Manual / help integration
 
@@ -236,10 +231,9 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P3.6 / P4.6 — Report/control readability polish**
-2. **P3.7 — Manual / help integration**
-3. **P3.5a — FRAT usability hardening**
-4. **P3.3 — Atmosphere / air-data support UX**
+1. **P3.7 — Manual / help integration**
+2. **P3.5a — FRAT usability hardening**
+3. **P3.3 — Atmosphere / air-data support UX**
 
 ---
 

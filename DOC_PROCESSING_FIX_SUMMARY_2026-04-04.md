@@ -2988,6 +2988,48 @@ pnpm -C frontend run build
 
 - P3.6 / P4.6 — Report/control readability polish in frontend-visible surfaces.
 
+## P3.6 / P4.6 Report/Control Readability Polish (2026-05-06)
+
+### Why this was added
+
+- Frontend analysis surfaces exposed mature trust metadata, but important controls were either dense, enum-like, or embedded inside narrative output.
+- Users needed a clearer explanation of routing, controls, provenance, limitations, and report readiness without changing backend scoring or analysis semantics.
+
+### What changed
+
+**Frontend**
+
+- Added plain-language helpers and badge styling for:
+  - result strength
+  - deterministic confidence
+  - applicability
+  - retrieval coverage
+  - warning level
+- Grouped AI Analysis result metadata into readable sections:
+  - Analysis routing
+  - Result controls
+  - Provenance
+  - Limitations and report readiness
+- Improved prompt-to-mode warning copy so it answers whether the selected mode likely matches the detected prompt intent.
+- Improved saved-analysis reopen copy to state that reopened jobs are immutable saved artifacts tied to the captured dataset version, controls, guard snapshot, retrieved sources, and output hash.
+- Report readiness now identifies the saved Analysis Job ID used for PDF export and states when export depends on a saved job artifact.
+
+**Backend**
+
+- No backend changes were required. Existing response fields already contained the needed control, guard, provenance, and report-export identifiers.
+
+### Validation
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:** Passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P3.7 — Manual / help integration.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

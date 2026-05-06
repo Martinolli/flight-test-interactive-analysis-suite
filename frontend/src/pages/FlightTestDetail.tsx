@@ -296,6 +296,117 @@ function statusBadgeClasses(status?: string): string {
   }
 }
 
+type AnalysisControlsSnapshot = AIAnalysisResponse['analysis_controls'];
+type PromptModeGuardSnapshot = AIAnalysisResponse['prompt_mode_guard'];
+type ControlField = keyof Pick<
+  AnalysisControlsSnapshot,
+  | 'result_strength'
+  | 'deterministic_confidence'
+  | 'retrieval_coverage'
+  | 'applicability_status'
+  | 'warning_level'
+>;
+
+const MODE_LABELS: Record<string, string> = {
+  takeoff: 'Takeoff Performance',
+  landing: 'Landing Performance',
+  performance: 'Performance / Climb / Air Data',
+  handling_qualities: 'Handling / Control Response',
+  buffet_vibration: 'Vibration & Loads',
+  flutter: 'Flutter Support Pre-screen',
+  propulsion_systems: 'Propulsion Systems',
+  electrical_systems: 'Electrical Systems',
+  general: 'General Summary',
+  unknown: 'Unknown',
+};
+
+const CONTROL_HELP_TEXT: Record<ControlField, string> = {
+  result_strength: 'How strongly the result should be interpreted.',
+  deterministic_confidence:
+    'How strongly the computed result is supported by available telemetry and implemented deterministic logic.',
+  retrieval_coverage:
+    'How much relevant document/context support was retrieved for the narrative.',
+  applicability_status:
+    'Whether the result applies fully, partially, or only as advisory support.',
+  warning_level: 'Overall caution level returned by backend controls.',
+};
+
+function readableModeLabel(mode?: string | null): string {
+  if (!mode) return 'Not recorded';
+  return MODE_LABELS[mode] ?? readableControlValue(mode);
+}
+
+function readableControlValue(value?: string | null): string {
+  if (!value) return 'Not recorded';
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function controlBadgeClasses(field: ControlField, value?: string | null): string {
+  if (!value) return 'bg-gray-100 text-gray-700 border-gray-200';
+
+  if (
+    (field === 'warning_level' && value === 'none') ||
+    (field === 'deterministic_confidence' && value === 'high') ||
+    (field === 'retrieval_coverage' && value === 'strong') ||
+    (field === 'applicability_status' && value === 'fully_applicable') ||
+    (field === 'result_strength' && value === 'authoritative')
+  ) {
+    return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+  }
+
+  if (
+    value === 'medium' ||
+    value === 'moderate' ||
+    value === 'bounded' ||
+    value === 'advisory' ||
+    value === 'partially_applicable' ||
+    value === 'advisory_only' ||
+    value === 'info' ||
+    value === 'caution'
+  ) {
+    return 'bg-amber-100 text-amber-800 border-amber-200';
+  }
+
+  if (
+    value === 'high' ||
+    value === 'low' ||
+    value === 'weak' ||
+    value === 'blocked' ||
+    value === 'unavailable' ||
+    value === 'not_applicable' ||
+    value === 'none'
+  ) {
+    return 'bg-rose-100 text-rose-800 border-rose-200';
+  }
+
+  return 'bg-gray-100 text-gray-700 border-gray-200';
+}
+
+function guardBadgeClasses(severity?: PromptMismatchSeverity | string): string {
+  switch (severity) {
+    case 'none':
+      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    case 'soft':
+      return 'bg-amber-100 text-amber-800 border-amber-200';
+    case 'strong':
+      return 'bg-rose-100 text-rose-800 border-rose-200';
+    default:
+      return 'bg-gray-100 text-gray-700 border-gray-200';
+  }
+}
+
+function modeAlignmentAnswer(guard?: PromptModeGuardSnapshot): string {
+  if (!guard) return 'Not checked';
+  if (guard.mismatch_severity === 'none') return 'No mode mismatch detected.';
+  if (guard.mismatch_severity === 'soft') return 'Review mode choice; prompt cues may fit another mode.';
+  if (guard.auto_downgraded || guard.guarded_execution) {
+    return 'Yes. Backend limited or downgraded execution for traceability.';
+  }
+  return 'Yes. Prompt cues strongly suggest a different mode.';
+}
+
 // ─── Parameters & Data Panel ─────────────────────────────────────────────────
 
 function ParametersPanel({
@@ -495,6 +606,7 @@ function AIAnalysisPanel({
   const [savedJobIdInput, setSavedJobIdInput] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
   const [selectedAnalysisMode, setSelectedAnalysisMode] = useState<AnalysisModeKey>('takeoff');
+  const [resultSource, setResultSource] = useState<'fresh' | 'saved' | null>(null);
   const [analysisModes, setAnalysisModes] = useState<AnalysisModeInfo[]>([]);
   const [loadingAnalysisModes, setLoadingAnalysisModes] = useState(false);
   const { user } = useAuth();
@@ -530,6 +642,24 @@ function AIAnalysisPanel({
   const preRunSuggestedModeInfo =
     analysisModes.find((mode) => mode.key === preRunGuard.suggestedMode) ?? null;
   const backendPromptGuard = result?.prompt_mode_guard;
+  const executedMode = backendPromptGuard?.execution_mode ?? result?.analysis_mode ?? activeModeFromResult;
+  const selectedModeAtExecution = backendPromptGuard?.selected_mode ?? result?.analysis_mode ?? activeModeFromResult;
+  const resultControls = result?.analysis_controls;
+  const suggestedGuardMode = backendPromptGuard?.suggested_modes[0];
+  const reportReady = Boolean(result?.analysis_job_id);
+  const controlSummaries = resultControls
+    ? ([
+        { field: 'result_strength', label: 'Result strength', value: resultControls.result_strength },
+        {
+          field: 'deterministic_confidence',
+          label: 'Deterministic confidence',
+          value: resultControls.deterministic_confidence,
+        },
+        { field: 'applicability_status', label: 'Applicability', value: resultControls.applicability_status },
+        { field: 'retrieval_coverage', label: 'Retrieval coverage', value: resultControls.retrieval_coverage },
+        { field: 'warning_level', label: 'Warning level', value: resultControls.warning_level },
+      ] satisfies Array<{ field: ControlField; label: string; value: string }>)
+    : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -632,6 +762,7 @@ function AIAnalysisPanel({
     setLoading(true);
     setError('');
     setResult(null);
+    setResultSource(null);
     try {
       const data = await ApiService.getAIAnalysis(
         flightTestId,
@@ -640,6 +771,7 @@ function AIAnalysisPanel({
         selectedAnalysisMode
       );
       setResult(data);
+      setResultSource('fresh');
       if (data.analysis_mode) {
         setSelectedAnalysisMode(data.analysis_mode as AnalysisModeKey);
       }
@@ -679,6 +811,7 @@ function AIAnalysisPanel({
         analysis_controls: job.analysis_controls,
         prompt_mode_guard: job.prompt_mode_guard,
       });
+      setResultSource('saved');
       if (job.analysis_mode) {
         setSelectedAnalysisMode(job.analysis_mode as AnalysisModeKey);
       }
@@ -788,11 +921,17 @@ function AIAnalysisPanel({
             )}
           >
             <p className="font-semibold">
-              Prompt-to-mode warning ({preRunGuard.mismatchSeverity})
+              Prompt-to-mode check: review selected mode
             </p>
             <p className="mt-0.5">
-              Detected intent: <strong>{preRunGuard.inferredIntent}</strong>.
-              {' '}Selected mode: <strong>{selectedAnalysisMode}</strong>.
+              Did I select the wrong mode?{' '}
+              <strong>
+                {preRunGuard.mismatchSeverity === 'strong'
+                  ? 'Likely yes'
+                  : 'Possibly'}
+              </strong>
+              . Detected intent: <strong>{readableModeLabel(preRunGuard.inferredIntent)}</strong>.
+              {' '}Selected mode: <strong>{readableModeLabel(selectedAnalysisMode)}</strong>.
               {' '}Suggested mode:{' '}
               <strong>{preRunSuggestedModeInfo?.label ?? preRunGuard.suggestedMode}</strong>
               {preRunSuggestedModeInfo ? (
@@ -827,6 +966,10 @@ function AIAnalysisPanel({
         <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600 mb-2">
             Re-open Saved Analysis by ID
+          </p>
+          <p className="mb-2 text-xs text-gray-500">
+            Opens an immutable saved artifact. It keeps the dataset version, controls, guard snapshot,
+            and retrieved-source provenance captured when the job was created.
           </p>
           <div className="flex gap-2">
             <input
@@ -888,70 +1031,196 @@ function AIAnalysisPanel({
 
         {result && expanded && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 text-xs text-gray-500 pb-2 border-b border-gray-100">
-              <span>{result.parameters_analysed} parameters analysed</span>
-              <span>·</span>
-              <span>Flight test: {result.flight_test_name}</span>
-              <span>·</span>
-              <span>Mode: {backendPromptGuard?.execution_mode ?? result.analysis_mode ?? activeModeFromResult}</span>
-              <span>·</span>
-              <span>Narrative citations: {narrativeCitations.length}</span>
-              <span>·</span>
-              <span>Retrieved sources: {retrievedSourceCount}</span>
-              <span>·</span>
-              <span>Analysis dataset: {analysisDatasetLabel}</span>
-              <span>·</span>
-              <span>Analysis Job #{result.analysis_job_id}</span>
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+              <p className="font-semibold text-slate-900">
+                {resultSource === 'saved' ? 'Saved immutable analysis artifact' : 'Saved analysis artifact ready'}
+              </p>
+              <p className="mt-0.5">
+                This reflects the dataset, routing decision, controls, source retrieval, and output hash captured
+                when Analysis Job #{result.analysis_job_id} was created. Changing the current active dataset does
+                not rewrite this saved result.
+              </p>
             </div>
-            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-              Narrative citations are the sources explicitly cited in the visible analysis text. Retrieved sources are
-              the full source set saved with this analysis job artifact and used for provenance/reporting.
-            </div>
-            {backendPromptGuard && (
-              <div
-                className={cn(
-                  'rounded-lg border px-3 py-2 text-xs',
-                  backendPromptGuard.mismatch_severity === 'strong'
-                    ? 'border-rose-200 bg-rose-50 text-rose-800'
-                    : backendPromptGuard.mismatch_severity === 'soft'
-                      ? 'border-amber-200 bg-amber-50 text-amber-800'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                )}
-              >
-                <p className="font-semibold">
-                  Prompt-to-mode guard: {backendPromptGuard.mismatch_severity}
-                </p>
-                <p className="mt-0.5">
-                  Selected <strong>{backendPromptGuard.selected_mode}</strong>
-                  {' '}• Executed <strong>{backendPromptGuard.execution_mode}</strong>
-                  {' '}• Inferred intent <strong>{backendPromptGuard.inferred_intent}</strong>
-                </p>
-                <p className="mt-0.5">{backendPromptGuard.message}</p>
-                {backendPromptGuard.matched_keywords.length > 0 && (
-                  <p className="mt-0.5 text-[11px]">
-                    Matched cues: {backendPromptGuard.matched_keywords.join(', ')}
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                    Analysis routing
                   </p>
-                )}
-                {backendPromptGuard.suggested_modes.length > 0 && (
-                  <p className="mt-0.5 text-[11px]">
-                    Suggested modes:{' '}
-                    {backendPromptGuard.suggested_modes
-                      .map((mode) => `${mode.key} (${mode.capability_status})`)
-                      .join(' · ')}
-                  </p>
+                  {backendPromptGuard && (
+                    <span
+                      className={cn(
+                        'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                        guardBadgeClasses(backendPromptGuard.mismatch_severity)
+                      )}
+                    >
+                      {readableControlValue(backendPromptGuard.mismatch_severity)}
+                    </span>
+                  )}
+                </div>
+                <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                  <div>
+                    <dt className="text-gray-500">Selected mode</dt>
+                    <dd className="font-medium text-gray-900">{readableModeLabel(selectedModeAtExecution)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500">Executed mode</dt>
+                    <dd className="font-medium text-gray-900">{readableModeLabel(executedMode)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500">Detected prompt intent</dt>
+                    <dd className="font-medium text-gray-900">
+                      {readableModeLabel(backendPromptGuard?.inferred_intent)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500">Suggested mode</dt>
+                    <dd className="font-medium text-gray-900">
+                      {suggestedGuardMode ? suggestedGuardMode.label : 'No alternate suggestion'}
+                    </dd>
+                  </div>
+                </dl>
+                {backendPromptGuard && (
+                  <div className="mt-2 rounded-md border border-white bg-white px-2.5 py-2 text-xs text-gray-700">
+                    <p>
+                      <strong>Did I select the wrong mode?</strong> {modeAlignmentAnswer(backendPromptGuard)}
+                    </p>
+                    <p className="mt-1">{backendPromptGuard.message}</p>
+                    {backendPromptGuard.matched_keywords.length > 0 && (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Matched cues: {backendPromptGuard.matched_keywords.join(', ')}
+                      </p>
+                    )}
+                    {backendPromptGuard.auto_downgraded || backendPromptGuard.guarded_execution ? (
+                      <p className="mt-1 font-medium text-amber-800">
+                        Execution was limited or downgraded to keep the result traceable.
+                      </p>
+                    ) : null}
+                  </div>
                 )}
               </div>
-            )}
-            {result.analysis_mode && result.analysis_mode !== selectedAnalysisMode && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                Loaded analysis was generated in mode <strong>{result.analysis_mode}</strong>, while current
-                selection is <strong>{selectedAnalysisMode}</strong>.
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                  Result controls
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {controlSummaries.map((item) => (
+                    <div key={item.field} className="rounded-md border border-white bg-white px-2.5 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-gray-700">{item.label}</span>
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                            controlBadgeClasses(item.field, item.value)
+                          )}
+                        >
+                          {readableControlValue(item.value)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
+                        {CONTROL_HELP_TEXT[item.field]}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {resultControls?.blocking_or_downgrade_reason && (
+                  <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+                    <strong>Backend limitation:</strong> {resultControls.blocking_or_downgrade_reason}
+                  </div>
+                )}
+                {(resultControls?.warning_messages.length ?? 0) > 0 && (
+                  <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+                    <p className="font-semibold">Control warnings</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {resultControls?.warning_messages.map((message) => (
+                        <li key={message}>{message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                <p className="font-semibold">Provenance</p>
+                <dl className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-blue-700/80">Flight test</dt>
+                    <dd className="font-medium">{result.flight_test_name}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-blue-700/80">Dataset version used</dt>
+                    <dd className="font-medium">{analysisDatasetLabel}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-blue-700/80">Analysis job</dt>
+                    <dd className="font-medium">#{result.analysis_job_id}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-blue-700/80">Created</dt>
+                    <dd className="font-medium">{formatDateTime(result.created_at)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-blue-700/80">Output hash</dt>
+                    <dd className="font-mono text-[11px]">{result.output_sha256.slice(0, 12)}...</dd>
+                  </div>
+                  <div>
+                    <dt className="text-blue-700/80">Sources</dt>
+                    <dd className="font-medium">
+                      {narrativeCitations.length} cited / {retrievedSourceCount} retrieved
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-[11px] text-blue-800">
+                  Narrative citations are sources cited in the visible text. Retrieved sources are the saved
+                  provenance set used for reports.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p className="font-semibold">Limitations and report readiness</p>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-amber-100 bg-white/70 px-2.5 py-2">
+                    <p className="font-medium">Use boundary</p>
+                    <p className="mt-1 text-amber-800">
+                      Engineering support only. Not certification approval or automatic operational acceptance.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-amber-100 bg-white/70 px-2.5 py-2">
+                    <p className="font-medium">Mode boundary</p>
+                    <p className="mt-1 text-amber-800">
+                      Deterministic modes are bounded by available telemetry and implemented models.
+                      Flutter output is pre-screening only.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-amber-100 bg-white/70 px-2.5 py-2">
+                    <p className="font-medium">Report export</p>
+                    <p className="mt-1 text-amber-800">
+                      {reportReady
+                        ? `Ready from saved Analysis Job #${result.analysis_job_id}.`
+                        : 'Unavailable until analysis is saved with a job ID.'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-amber-100 bg-white/70 px-2.5 py-2">
+                    <p className="font-medium">Artifact state</p>
+                    <p className="mt-1 text-amber-800">
+                      {resultSource === 'saved'
+                        ? 'Reopened immutable artifact.'
+                        : 'Newly generated and saved artifact.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {analysisDatasetDiffersFromSelection && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 Reopened analysis provenance uses <strong>{analysisDatasetLabel}</strong>, while
-                current page selection is <strong>{selectedDatasetLabel}</strong>.
+                current page selection is <strong>{selectedDatasetLabel}</strong>. The current selection does not
+                change the saved analysis artifact.
               </div>
             )}
 
@@ -1101,7 +1370,12 @@ function AIAnalysisPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setResult(null); setError(''); setUserPrompt(''); }}
+                  onClick={() => {
+                    setResult(null);
+                    setResultSource(null);
+                    setError('');
+                    setUserPrompt('');
+                  }}
                   className="text-gray-500 border-gray-200 hover:bg-gray-50"
                 >
                   New Query
