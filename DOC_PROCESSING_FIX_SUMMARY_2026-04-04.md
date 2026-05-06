@@ -2951,6 +2951,43 @@ pnpm -C frontend run build
 
 - P4.5 — Event marker UX clarification/fix.
 
+## P4.5 Event Marker UX Clarification/Fix (2026-05-06)
+
+### Current marker behavior found
+
+- Parameters chart event markers are frontend demo/manual baseline overlays.
+- No backend dataset-event marker source currently exists for the Parameters workflow.
+- Demo markers are derived from selected chart data:
+  - start timestamp
+  - midpoint timestamp
+  - end timestamp
+  - optional WOW transition when a WeightOnWheels/WOW channel transition is present
+
+### What changed
+
+**Frontend**
+
+- Renamed the chart overlay control to `Show demo event markers`.
+- Added explicit marker-state copy so the user can see whether markers are visible, available as demo overlays, or unavailable for the current chart selection.
+- States clearly that demo markers are illustrative only and are not derived from dataset events.
+- Keeps the existing marker overlay visible by rendering marker lines in front of traces and strengthening marker labels.
+
+**Backend**
+
+- No backend changes were required because no real dataset-event marker source exists yet.
+
+### Validation
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:** Passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P3.6 / P4.6 — Report/control readability polish in frontend-visible surfaces.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

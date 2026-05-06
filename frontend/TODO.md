@@ -204,12 +204,14 @@ These should be protected from regression.
 * Duration card shows selected dataset label, start timestamp, end timestamp, and duration label when available.
 * No-data or invalid timestamp states remain explicit as `N/A`.
 
-### P4.5 Event marker UX clarification/fix
+### P4.5 Event marker UX clarification/fix ✅
 
-* Next planned task.
-* Clarify event marker behavior and fix confusing marker display/control states.
+* Confirmed Parameters chart markers are demo/manual baseline overlays derived from selected chart data.
+* Renamed the control to `Show demo event markers`.
+* Added marker status copy for available, visible, and unavailable marker states.
+* Chart marker lines now render in front of traces with stronger labels.
 
-### P3.6 Report/readability polish in frontend-visible surfaces
+### P3.6 / P4.6 Report/control readability polish in frontend-visible surfaces
 
 * Improve readability of control summaries:
 
@@ -234,11 +236,10 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P4.5 — Event marker UX clarification/fix**
-2. **P3.6 — Report/control readability polish**
-3. **P3.7 — Manual / help integration**
-4. **P3.5a — FRAT usability hardening**
-5. **P3.3 — Atmosphere / air-data support UX**
+1. **P3.6 / P4.6 — Report/control readability polish**
+2. **P3.7 — Manual / help integration**
+3. **P3.5a — FRAT usability hardening**
+4. **P3.3 — Atmosphere / air-data support UX**
 
 ---
 

@@ -43,6 +43,8 @@ function formatCursorValue(value: number | undefined): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+// Current marker support is a demo/manual baseline only. There is no backend
+// dataset-event marker source yet, so these labels are derived from chart data.
 function buildDemoEventMarkers(seriesData: ParameterSeries[]): TimeSeriesEventMarker[] {
   if (seriesData.length === 0) return [];
 
@@ -386,10 +388,24 @@ export default function Parameters() {
     const units = new Set(seriesData.map((series) => series.unit ?? 'value'));
     return units.size > 1;
   }, [seriesData]);
-  const eventMarkers = useMemo(
-    () => (showEventMarkers ? buildDemoEventMarkers(seriesData) : []),
-    [showEventMarkers, seriesData]
+  const demoEventMarkers = useMemo(() => buildDemoEventMarkers(seriesData), [seriesData]);
+  const hasTimeSeriesData = useMemo(
+    () => seriesData.some((series) => series.data.length > 0),
+    [seriesData]
   );
+  const visibleEventMarkers = showEventMarkers ? demoEventMarkers : [];
+  const markerStatusText = useMemo(() => {
+    if (!hasTimeSeriesData) {
+      return 'No event marker source is available for this dataset selection.';
+    }
+    if (showEventMarkers && visibleEventMarkers.length > 0) {
+      return `Markers visible: ${visibleEventMarkers.length}. Demo markers are illustrative only and are not derived from dataset events.`;
+    }
+    if (showEventMarkers) {
+      return 'No demo markers in the current chart data range.';
+    }
+    return `Demo markers available: ${demoEventMarkers.length}. No backend event marker source is available for this dataset.`;
+  }, [demoEventMarkers.length, hasTimeSeriesData, showEventMarkers, visibleEventMarkers.length]);
   const thresholdOverlay = useMemo<TimeSeriesThresholdOverlay | undefined>(() => {
     const lower = thresholdLowerInput.trim() === '' ? undefined : Number(thresholdLowerInput);
     const upper = thresholdUpperInput.trim() === '' ? undefined : Number(thresholdUpperInput);
@@ -817,14 +833,22 @@ export default function Parameters() {
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label className="flex items-center gap-2 text-xs text-gray-700">
+                        <label
+                          className={cn(
+                            'flex items-center gap-2 text-xs',
+                            hasTimeSeriesData
+                              ? 'text-gray-700'
+                              : 'text-gray-400 cursor-not-allowed'
+                          )}
+                        >
                           <input
                             type="checkbox"
                             checked={showEventMarkers}
+                            disabled={!hasTimeSeriesData}
                             onChange={(e) => setShowEventMarkers(e.target.checked)}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
-                          Show event markers (demo/manual baseline)
+                          Show demo event markers
                         </label>
 
                         <label className="flex items-center gap-2 text-xs text-gray-700">
@@ -836,6 +860,17 @@ export default function Parameters() {
                           />
                           Shade band between lower/upper limits
                         </label>
+                      </div>
+
+                      <div
+                        className={cn(
+                          'rounded-md border px-3 py-2 text-xs',
+                          showEventMarkers && visibleEventMarkers.length > 0
+                            ? 'border-blue-200 bg-blue-50 text-blue-800'
+                            : 'border-gray-200 bg-white text-gray-600'
+                        )}
+                      >
+                        {markerStatusText}
                       </div>
 
                       {compareModeEnabled && compareDatasetVersionId !== '' && compareMissingParameters.length > 0 && (
@@ -954,7 +989,7 @@ export default function Parameters() {
                         syncId={`parameters-timeseries-${selectedTestId}`}
                         onHoverPoint={handleHoverSnapshot}
                         thresholdOverlay={thresholdOverlay}
-                        eventMarkers={eventMarkers}
+                        eventMarkers={visibleEventMarkers}
                         compareSeriesKeys={compareSeriesKeys}
                       />
                     </div>

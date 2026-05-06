@@ -293,10 +293,16 @@ These baseline controls should be protected by regression tests.
   * Flight Test Detail now shows the selected dataset duration window instead of static flight-test duration metadata.
   * Backend regression coverage verifies multi-point, single-point, no-data, dataset-scoped, tenant-isolated, and invalid timestamp cases.
 
-* [ ] P4.5 Event marker UX clarification/fix
+* [x] P4.5 Event marker UX clarification/fix
+
+  * Confirmed Parameters chart markers are a demo/manual baseline only, derived from selected chart data.
+  * Renamed the control to `Show demo event markers` and added explicit marker availability/visibility copy.
+  * Chart markers now render in front of traces with stronger labels, and the UI states that no backend event marker source exists yet.
+
+* [ ] P3.6 / P4.6 Report/control readability polish in frontend-visible surfaces
 
   * Next planned task.
-  * Clarify event marker behavior and fix any confusing marker display/control states.
+  * Continue polishing report/control wording and readability in frontend-visible surfaces.
 
 ---
 

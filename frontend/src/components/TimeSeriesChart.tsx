@@ -517,24 +517,6 @@ export default function TimeSeriesChart({
             />
           )}
 
-          {normalizedEventMarkers.map((marker, index) => (
-            <ReferenceLine
-              key={`event-marker-${marker.timestamp}-${marker.label}`}
-              x={marker.timestamp}
-              stroke={marker.color ?? '#7c3aed'}
-              strokeDasharray="5 2"
-              strokeWidth={2}
-              strokeOpacity={1}
-              ifOverflow="extendDomain"
-              label={{
-                value: marker.label,
-                position: index % 2 === 0 ? 'top' : 'insideTop',
-                fontSize: 10,
-                fill: marker.color ?? '#6d28d9',
-              }}
-            />
-          ))}
-
           {/* Lines for left axis */}
           {leftSeries.map((s) => (
             // Compare series are rendered with a lighter dashed style.
@@ -604,6 +586,25 @@ export default function TimeSeriesChart({
                 />
               );
             })}
+
+          {normalizedEventMarkers.map((marker, index) => (
+            <ReferenceLine
+              key={`event-marker-${marker.timestamp}-${marker.label}`}
+              x={marker.timestamp}
+              stroke={marker.color ?? '#7c3aed'}
+              strokeDasharray="5 2"
+              strokeWidth={2}
+              strokeOpacity={1}
+              ifOverflow="extendDomain"
+              label={{
+                value: marker.label,
+                position: index % 2 === 0 ? 'top' : 'insideTop',
+                fontSize: 10,
+                fill: marker.color ?? '#6d28d9',
+                fontWeight: 700,
+              }}
+            />
+          ))}
         </ComposedChart>
       </ResponsiveContainer>
     </div>
