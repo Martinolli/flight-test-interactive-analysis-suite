@@ -125,14 +125,14 @@ These should be protected from regression.
   * Parameters page integration
   * possible dedicated handling-analysis section later
 
-### P3.3 Atmosphere / air-data support UX
+### P3.3 Atmosphere / air-data support UX ✅
 
 * Backend deterministic support is now available in performance analysis output.
-* Frontend hardening slice (pending) should improve dedicated readability for atmosphere/air-data fields:
+* Frontend hardening now improves dedicated readability for atmosphere/air-data fields:
 
-  * corrected values
-  * derived air-data summaries
-  * explicit assumptions/limitations
+  * Performance / Climb / Air Data label and quick prompt
+  * CAS/TAS/Mach, ISA, pressure-altitude, and density-altitude support wording
+  * explicit assumptions/limitations in selected-mode and result surfaces
 * Keep derived/engineering-calculated values visibly separated from raw telemetry.
 
 ### P3.4 Buffet / vibration workflow hardening ✅
@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P3.3 — Atmosphere / air-data support UX**
+1. **Release readiness / internal alpha preparation**
 
 ---
 

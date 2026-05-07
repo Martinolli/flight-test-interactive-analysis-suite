@@ -3137,6 +3137,52 @@ pnpm -C frontend run build
 
 - P3.3 — Atmosphere / air-data support UX.
 
+## P3.3 Atmosphere / Air-Data Support UX (2026-05-07)
+
+### Why this was added
+
+- Backend atmosphere and air-data support existed in performance mode, but frontend guidance still read like climb-only performance analysis.
+- Users needed clearer boundaries for CAS/TAS/Mach, ISA, pressure-altitude, density-altitude, and air-data consistency outputs.
+
+### What changed
+
+**Frontend**
+
+- Renamed the quick analysis preset to `Performance / Climb / Air Data`.
+- Updated the quick prompt to request bounded climb/performance and air-data consistency analysis using altitude, vertical speed, CAS/TAS/Mach, temperature, and pressure-related channels where available.
+- Expanded local prompt-intent cues for the performance mode with:
+  - air data / air-data
+  - Mach
+  - CAS / TAS / IAS
+  - ISA
+  - pressure altitude
+  - density altitude
+  - true airspeed
+  - calibrated airspeed
+- Added selected-mode guidance explaining that the mode supports altitude, climb/descent, airspeed, Mach, ISA, pressure-altitude, density-altitude, and air-data consistency as bounded engineering support.
+- Added result-side interpretation guidance when selected/executed mode is performance:
+  - bounded by available channels and implemented models
+  - CAS/TAS/Mach consistency depends on sensor quality, units, and synchronized timestamps
+  - ISA/density-altitude outputs are engineering support only unless certification correction models are explicitly applied
+  - missing pressure, temperature, or calibrated-speed channels may reduce applicability
+- Updated `/help` with a Performance / Climb / Air Data card and a concise air-data interpretation boundary section.
+
+**Backend**
+
+- No backend changes were required. This task only changed labels, guidance, prompt templates, and Help content.
+
+### Validation
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:** Passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned step
+
+- Release readiness / internal alpha preparation.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

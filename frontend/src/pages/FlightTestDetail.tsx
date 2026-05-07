@@ -139,9 +139,9 @@ const QUICK_ANALYSIS_PRESETS: QuickAnalysisPreset[] = [
     text: 'Analyse the landing performance: approach speed, touchdown point, ground roll distance, and deceleration rate.',
   },
   {
-    label: 'Climb Performance',
+    label: 'Performance / Climb / Air Data',
     mode: 'performance',
-    text: 'Analyse the climb performance: rate of climb, climb gradient, engine parameters during climb, and fuel consumption.',
+    text: 'Assess climb/performance and air-data consistency using altitude, vertical speed, CAS/TAS/Mach, temperature, and pressure-related channels where available. Treat outputs as bounded engineering support, not certification-corrected performance reduction.',
   },
   {
     label: 'Handling / Control Response',
@@ -180,7 +180,24 @@ type PromptMismatchSeverity = 'none' | 'soft' | 'strong';
 const PROMPT_INTENT_KEYWORDS: Record<Exclude<PromptIntentKey, 'unknown'>, string[]> = {
   takeoff: ['takeoff', 'rotation', 'ground roll', 'liftoff', 'vr'],
   landing: ['landing', 'touchdown', 'rollout', 'deceleration', 'approach speed'],
-  performance: ['climb', 'rate of climb', 'climb gradient', 'altitude gain', 'performance'],
+  performance: [
+    'climb',
+    'rate of climb',
+    'climb gradient',
+    'altitude gain',
+    'performance',
+    'air data',
+    'air-data',
+    'mach',
+    'cas',
+    'tas',
+    'ias',
+    'isa',
+    'pressure altitude',
+    'density altitude',
+    'true airspeed',
+    'calibrated airspeed',
+  ],
   flutter: ['flutter', 'aeroelastic', 'instability', 'oscillation onset', 'modal coupling', 'flutter support'],
   buffet_vibration: ['vibration', 'buffet', 'load', 'loads', 'frequency', 'rms'],
   handling_qualities: [
@@ -330,6 +347,14 @@ const CONTROL_HELP_TEXT: Record<ControlField, string> = {
     'Whether the result applies fully, partially, or only as advisory support.',
   warning_level: 'Overall caution level returned by backend controls.',
 };
+
+const AIR_DATA_MODE_HELP = [
+  'Use for altitude, climb/descent, airspeed, Mach, ISA, pressure-altitude, density-altitude, and air-data consistency support.',
+  'Air-data support is bounded by available channels and implemented deterministic models.',
+  'CAS/TAS/Mach consistency depends on sensor quality, units, and synchronized timestamps.',
+  'ISA and density-altitude outputs are engineering support only unless certification correction models are explicitly applied.',
+  'Missing pressure, temperature, or calibrated-speed channels may reduce applicability.',
+];
 
 function readableModeLabel(mode?: string | null): string {
   if (!mode) return 'Not recorded';
@@ -644,6 +669,8 @@ function AIAnalysisPanel({
   const backendPromptGuard = result?.prompt_mode_guard;
   const executedMode = backendPromptGuard?.execution_mode ?? result?.analysis_mode ?? activeModeFromResult;
   const selectedModeAtExecution = backendPromptGuard?.selected_mode ?? result?.analysis_mode ?? activeModeFromResult;
+  const selectedAirDataMode = selectedAnalysisMode === 'performance';
+  const resultAirDataMode = selectedModeAtExecution === 'performance' || executedMode === 'performance';
   const resultControls = result?.analysis_controls;
   const suggestedGuardMode = backendPromptGuard?.suggested_modes[0];
   const reportReady = Boolean(result?.analysis_job_id);
@@ -896,7 +923,12 @@ function AIAnalysisPanel({
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span className="text-gray-500">
-            Selected mode: <strong>{selectedModeInfo?.label ?? selectedAnalysisMode}</strong>
+            Selected mode:{' '}
+            <strong>
+              {selectedAnalysisMode === 'performance'
+                ? MODE_LABELS.performance
+                : (selectedModeInfo?.label ?? readableModeLabel(selectedAnalysisMode))}
+            </strong>
           </span>
           {loadingAnalysisModes ? (
             <span className="inline-flex items-center gap-1 text-gray-400">
@@ -923,6 +955,19 @@ function AIAnalysisPanel({
           <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             This mode is currently <strong>{selectedModeInfo.capability_status}</strong>. Results are bounded by
             capability limits and may return guidance/partial output instead of full deterministic analysis.
+          </div>
+        )}
+        {selectedAirDataMode && (
+          <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            <p className="font-semibold">Performance / Climb / Air Data guidance</p>
+            <p className="mt-0.5">
+              Use for altitude, climb/descent, CAS/TAS/Mach, ISA, pressure-altitude,
+              density-altitude, and air-data consistency support. Outputs are bounded engineering
+              support, not certification-corrected performance reduction.
+            </p>
+            <a href="/help#air-data" className="mt-1 inline-block font-medium text-blue-700 underline">
+              Air-data interpretation help
+            </a>
           </div>
         )}
       </CardHeader>
@@ -1240,6 +1285,24 @@ function AIAnalysisPanel({
                 Reopened analysis provenance uses <strong>{analysisDatasetLabel}</strong>, while
                 current page selection is <strong>{selectedDatasetLabel}</strong>. The current selection does not
                 change the saved analysis artifact.
+              </div>
+            )}
+
+            {resultAirDataMode && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold">Air-data interpretation boundary</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {AIR_DATA_MODE_HELP.slice(1).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <a href="/help#air-data" className="shrink-0 font-medium text-blue-700 underline">
+                    Air-data help
+                  </a>
+                </div>
               </div>
             )}
 

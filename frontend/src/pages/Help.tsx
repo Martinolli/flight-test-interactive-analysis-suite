@@ -38,7 +38,13 @@ const helpTopics = [
     id: 'ai-analysis',
     title: 'AI Analysis',
     icon: Sparkles,
-    description: 'Mode selection, prompt-to-mode guard, controls, limitations, and saved artifacts.',
+    description: 'Mode selection, prompt-to-mode guard, controls, limitations, saved artifacts, and performance/climb/air-data interpretation.',
+  },
+  {
+    id: 'air-data',
+    title: 'Performance / Climb / Air Data',
+    icon: BarChart3,
+    description: 'Altitude, climb/descent, CAS/TAS/Mach, ISA, pressure-altitude, density-altitude, and air-data consistency support.',
   },
   {
     id: 'reports',
@@ -130,6 +136,30 @@ export default function Help() {
             );
           })}
         </div>
+
+        <Card id="air-data-guidance" className="border-blue-100 bg-blue-50/50">
+          <CardHeader>
+            <CardTitle className="text-base">Air-Data Interpretation Boundaries</CardTitle>
+            <CardDescription>
+              Use the Performance / Climb / Air Data mode as bounded engineering support.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-blue-900">
+            <p>
+              Supported prompts may reference altitude, climb/descent, airspeed, Mach, ISA,
+              pressure-altitude, density-altitude, and air-data consistency when the relevant
+              channels are present.
+            </p>
+            <p>
+              CAS/TAS/Mach consistency depends on sensor quality, units, and synchronized timestamps.
+              Missing pressure, temperature, or calibrated-speed channels can reduce applicability.
+            </p>
+            <p>
+              ISA and density-altitude outputs are engineering support only unless certification
+              correction models are explicitly applied. FTIAS does not provide certification approval.
+            </p>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

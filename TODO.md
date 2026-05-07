@@ -317,10 +317,16 @@ These baseline controls should be protected by regression tests.
   * Added compact 0-20 category scoring guide and local category-base preview while keeping backend score authoritative.
   * Added workflow status, hard-stop prominence, notes/rationale reminders, and clearer score composition.
 
-* [ ] P3.3 Atmosphere / air-data support UX
+* [x] P3.3 Atmosphere / air-data support UX
 
-  * Next planned task.
-  * Improve user-facing guidance for atmosphere and air-data support boundaries.
+  * Updated Performance / Climb / Air Data quick prompt copy and local prompt-intent keywords.
+  * Added frontend guidance for CAS/TAS/Mach, ISA, pressure-altitude, density-altitude, and air-data consistency interpretation.
+  * Added Help page air-data guidance and contextual links while keeping backend calculations authoritative.
+
+* [ ] Release readiness / internal alpha preparation
+
+  * Next planned step.
+  * Review validation checklist, known warnings, documentation, and deployment readiness for internal alpha use.
 
 ---
 
