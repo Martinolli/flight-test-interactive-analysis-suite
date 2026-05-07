@@ -225,12 +225,19 @@ These should be protected from regression.
 * Served Manual V-00 from `/manual/FTIAS-MANUAL-V00.pdf`.
 * Added contextual help links on Upload, Parameters, Flight Test Detail / AI Analysis, report export, and FRAT surfaces.
 
+### P3.5a FRAT usability hardening ✅
+
+* Added field-level helper text for FRAT assessment inputs, category scores, linked analysis, hard-stops, and notes.
+* Added compact 0-20 score interpretation guide near category inputs.
+* Added workflow status panel covering scoring, review, hard-stops, and export availability.
+* Improved score composition clarity and linked/no-linked-analysis messaging.
+* Added non-blocking warnings for non-zero manual adjustment without rationale and moderate-or-higher scored FRAT without linked analysis notes.
+
 ---
 
 ## Immediate Frontend Execution Order
 
-1. **P3.5a — FRAT usability hardening**
-2. **P3.3 — Atmosphere / air-data support UX**
+1. **P3.3 — Atmosphere / air-data support UX**
 
 ---
 

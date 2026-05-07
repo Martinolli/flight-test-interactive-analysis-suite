@@ -58,6 +58,60 @@ const CATEGORY_FIELDS: Array<{ key: CategoryKey; label: string }> = [
   { key: 'crew_readiness', label: 'Crew Readiness' },
 ];
 
+const CATEGORY_GUIDANCE: Record<CategoryKey, string> = {
+  mission_profile:
+    'Complexity of the planned mission/test profile. Higher values mean more demanding objectives, envelope expansion, or abnormal procedures.',
+  weather_environment:
+    'Weather, visibility, turbulence, temperature, winds, and environmental margins affecting the mission.',
+  runway_operational:
+    'Runway, airspace, range, traffic, NOTAM, recovery, and operational constraints.',
+  aircraft_system_status:
+    'Aircraft configuration, maintenance status, deferred defects, instrumentation, and system readiness.',
+  crew_readiness:
+    'Crew currency, workload, fatigue, briefing quality, and readiness for the planned profile.',
+};
+
+const FIELD_GUIDANCE = {
+  assessmentName: 'Use a recognizable mission window, test card, sortie, or review name.',
+  datasetVersion:
+    'Selects the dataset version this FRAT assessment references. The saved assessment keeps this provenance.',
+  requestedAuthority:
+    'Authoritative support is intended for formal review. Advisory support records risk context without implying approval authority.',
+  manualAdjustment:
+    'Optional -10 to +10 reviewer adjustment. Use sparingly and document the rationale when non-zero.',
+  linkedAnalysis:
+    'Attach saved AI/engineering analysis jobs so technical evidence can contribute to the FRAT explanation and score composition.',
+  reviewNotes:
+    'General reasoning, reviewer observations, and risk-basis comments. Recommended for moderate or higher risk.',
+  overrideNote:
+    'Rationale for manual adjustments or formal acceptance decisions. Recommended when manual adjustment is not zero.',
+  transitionNotes:
+    'Notes recorded with approval, rejection, or finalization actions. Explain why the lifecycle state changed.',
+};
+
+const HARD_STOP_GUIDANCE: Record<keyof FratFormState['criticalFlags'], string> = {
+  critical_system_unavailable:
+    'Select when a required aircraft, safety, instrumentation, or mission-critical system is unavailable.',
+  mandatory_data_missing:
+    'Select when required evidence or dataset coverage is missing for the decision being requested.',
+  crew_unfit:
+    'Select when crew readiness, medical, currency, fatigue, or qualification concerns prevent safe continuation.',
+};
+
+const HARD_STOP_LABELS: Record<keyof FratFormState['criticalFlags'], string> = {
+  critical_system_unavailable: 'Critical system unavailable',
+  mandatory_data_missing: 'Mandatory data missing',
+  crew_unfit: 'Crew unfit',
+};
+
+const SCORE_GUIDE = [
+  ['0-4', 'Minimal', 'Normal condition, no meaningful added risk'],
+  ['5-8', 'Low', 'Minor concern, manageable with standard controls'],
+  ['9-12', 'Moderate', 'Noticeable risk contributor, requires awareness/monitoring'],
+  ['13-16', 'High', 'Significant risk contributor, mitigation/review required'],
+  ['17-20', 'Critical', 'Severe contributor, escalation or no-go unless formally accepted'],
+];
+
 function createDefaultFormState(): FratFormState {
   return {
     assessmentName: '',
@@ -132,6 +186,30 @@ function formatDateTime(value?: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function workflowStatusMessage({
+  status,
+  hasScore,
+  hasHardStop,
+  canExport,
+}: {
+  status: string;
+  hasScore: boolean;
+  hasHardStop: boolean;
+  canExport: boolean;
+}): string {
+  if (status === 'finalized') return 'Finalized: immutable final artifact. Export remains available for traceability.';
+  if (status === 'rejected') return 'Rejected / No-Go: export remains available for traceability and review records.';
+  if (status === 'approved') return 'Approved: review transition notes and finalize when the decision is ready to lock.';
+  if (status === 'needs_review') return 'Needs review: resolve risk drivers, document rationale, then approve or reject.';
+  if (status === 'scored') {
+    return hasHardStop
+      ? 'Scored with hard-stop active: resolve or formally reject/no-go. Low numeric score does not cancel a hard-stop.'
+      : 'Scored: review score composition, notes, and approve or reject.';
+  }
+  if (!hasScore) return 'Draft: complete inputs, save the draft, then score the assessment.';
+  return canExport ? 'Scored assessment: export is available.' : 'Select or score an assessment to continue.';
 }
 
 export default function Frat() {
@@ -461,6 +539,39 @@ export default function Frat() {
     selectedAssessmentId && !hasScore
       ? 'Export is unavailable until this draft has been scored.'
       : 'Select a scored assessment to export a FRAT report.';
+  const localCategoryBaseScore = CATEGORY_FIELDS.reduce(
+    (total, field) => total + form.categories[field.key].score,
+    0
+  );
+  const activeHardStopLabels = (
+    Object.entries(form.criticalFlags) as Array<[keyof FratFormState['criticalFlags'], boolean]>
+  )
+    .filter(([, active]) => active)
+    .map(([key]) => HARD_STOP_LABELS[key]);
+  const scoredHardStopLabels = hardStops
+    .map((item) => item.message || item.code)
+    .filter((item): item is string => Boolean(item));
+  const hasActiveHardStops =
+    activeHardStopLabels.length > 0 ||
+    scoreSnapshot?.hard_stop_triggered ||
+    hardStops.length > 0;
+  const linkedAnalysisCount = form.selectedAnalysisJobIds.size;
+  const categoryBaseScore = scoreComposition?.base_score ?? scoreSnapshot?.base_score;
+  const manualAdjustmentScore =
+    scoreComposition?.manual_adjustment ?? scoreSnapshot?.manual_adjustment ?? form.manualAdjustment;
+  const analysisIndicatorScore =
+    scoreComposition?.analysis_indicator_score ?? scoreSnapshot?.analysis_indicator_score ?? 0;
+  const finalTotalScore = scoreComposition?.final_total_score ?? scoreSnapshot?.total_score;
+  const riskBand = scoreSnapshot?.risk_band ?? scoreComposition?.risk_band ?? undefined;
+  const riskIsModerateOrHigher = ['moderate', 'high', 'unacceptable'].includes(riskBand ?? '');
+  const missingManualRationale = form.manualAdjustment !== 0 && !form.overrideNote.trim();
+  const missingRiskBasisNotes = hasScore && riskIsModerateOrHigher && linkedAnalysisCount === 0 && !form.reviewerNotes.trim();
+  const workflowMessage = workflowStatusMessage({
+    status: selectedAssessmentStatus,
+    hasScore,
+    hasHardStop: !!hasActiveHardStops,
+    canExport,
+  });
 
   const canApprove =
     selectedAssessmentStatus === 'scored' || selectedAssessmentStatus === 'needs_review';
@@ -569,6 +680,45 @@ export default function Frat() {
         {selectedFlightTestId !== '' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 space-y-6">
+              <Card className={hasActiveHardStops ? 'border-rose-200 bg-rose-50/60' : 'border-blue-100 bg-blue-50/40'}>
+                <CardContent className="pt-5">
+                  <div className="flex gap-3">
+                    {hasActiveHardStops ? (
+                      <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+                    ) : (
+                      <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                    )}
+                    <div className={hasActiveHardStops ? 'text-rose-900' : 'text-blue-900'}>
+                      <p className="text-sm font-semibold">Workflow status</p>
+                      <p className="mt-1 text-sm">{workflowMessage}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <Badge className={`border ${statusClasses(selectedAssessmentStatus)}`}>
+                          {selectedAssessmentStatus}
+                        </Badge>
+                        <Badge className="border border-gray-200 bg-white text-gray-700">
+                          {hasScore ? 'Scored' : 'Scoring needed'}
+                        </Badge>
+                        <Badge className={hasActiveHardStops ? 'border border-rose-200 bg-rose-100 text-rose-800' : 'border border-emerald-200 bg-emerald-100 text-emerald-800'}>
+                          {hasActiveHardStops ? 'Hard-stop active' : 'No hard-stop selected'}
+                        </Badge>
+                        <Badge className={canExport ? 'border border-emerald-200 bg-emerald-100 text-emerald-800' : 'border border-gray-200 bg-white text-gray-700'}>
+                          {canExport ? 'Export available' : 'Export unavailable'}
+                        </Badge>
+                      </div>
+                      {hasActiveHardStops ? (
+                        <p className="mt-2 rounded-md border border-rose-200 bg-white/70 px-3 py-2 text-xs">
+                          Hard stops override normal score interpretation. Active flags:{' '}
+                          <strong>
+                            {activeHardStopLabels.concat(scoredHardStopLabels).join(', ') || 'hard-stop triggered'}
+                          </strong>
+                          . A low numeric score does not cancel a hard-stop.
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Assessment Inputs</CardTitle>
@@ -582,6 +732,7 @@ export default function Frat() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Assessment Name
                       </label>
+                      <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.assessmentName}</p>
                       <input
                         type="text"
                         value={form.assessmentName}
@@ -595,6 +746,7 @@ export default function Frat() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Dataset Version
                       </label>
+                      <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.datasetVersion}</p>
                       <select
                         value={form.datasetVersionId}
                         onChange={(e) =>
@@ -622,6 +774,7 @@ export default function Frat() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Requested Authority
                       </label>
+                      <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.requestedAuthority}</p>
                       <select
                         value={form.requestedDecisionAuthority}
                         onChange={(e) =>
@@ -642,6 +795,7 @@ export default function Frat() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Manual Adjustment (-10 to 10)
                       </label>
+                      <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.manualAdjustment}</p>
                       <input
                         type="number"
                         min={-10}
@@ -662,6 +816,7 @@ export default function Frat() {
 
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Linked Analysis Jobs</p>
+                    <p className="mb-2 text-xs text-gray-500">{FIELD_GUIDANCE.linkedAnalysis}</p>
                     {analysisJobs.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-500">
                         No analysis jobs available yet for this flight test.
@@ -696,15 +851,37 @@ export default function Frat() {
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">
-                      Category Scores (0–20 per category)
-                    </p>
+                    <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">
+                          Category Scores (0-20 per category)
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Input preview category base: <strong>{localCategoryBaseScore}</strong>. Backend score is authoritative after scoring.
+                        </p>
+                      </div>
+                      <a href="/help#frat" className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                        FRAT scoring guide
+                      </a>
+                    </div>
+                    <details className="mb-3 rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 text-xs text-blue-900">
+                      <summary className="cursor-pointer font-semibold">0-20 category scoring interpretation</summary>
+                      <div className="mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-5">
+                        {SCORE_GUIDE.map(([range, level, meaning]) => (
+                          <div key={range} className="rounded-md border border-blue-100 bg-white px-2 py-2">
+                            <p className="font-semibold">{range}: {level}</p>
+                            <p className="mt-1 text-blue-800">{meaning}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {CATEGORY_FIELDS.map((field) => (
                         <div key={field.key} className="rounded-lg border border-gray-200 p-3 space-y-2">
                           <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
                             {field.label}
                           </label>
+                          <p className="text-xs text-gray-500">{CATEGORY_GUIDANCE[field.key]}</p>
                           <input
                             type="number"
                             min={0}
@@ -752,6 +929,9 @@ export default function Frat() {
 
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
                     <p className="text-sm font-semibold text-amber-900">Critical Hard-Stop Flags</p>
+                    <p className="text-xs text-amber-900">
+                      Select only when the condition should force no-go/review behavior regardless of the numeric score.
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-amber-900">
                       {[
                         ['critical_system_unavailable', 'Critical system unavailable'],
@@ -775,17 +955,30 @@ export default function Frat() {
                             }
                             disabled={!canEdit}
                           />
-                          {label}
+                          <span>
+                            <span className="font-medium">{label}</span>
+                            <span className="mt-0.5 block text-amber-800">
+                              {HARD_STOP_GUIDANCE[key as keyof FratFormState['criticalFlags']]}
+                            </span>
+                          </span>
                         </label>
                       ))}
                     </div>
                   </div>
+
+                  {hasActiveHardStops ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                      <AlertTriangle className="mr-1.5 inline h-4 w-4" />
+                      Hard-stop selected. Resolve the condition or document rejection/no-go rationale; normal score totals do not override this state.
+                    </div>
+                  ) : null}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Reviewer Notes
                       </label>
+                      <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.reviewNotes}</p>
                       <textarea
                         value={form.reviewerNotes}
                         onChange={(e) => setForm((prev) => ({ ...prev, reviewerNotes: e.target.value }))}
@@ -798,6 +991,7 @@ export default function Frat() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Override / Rationale Notes
                       </label>
+                      <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.overrideNote}</p>
                       <textarea
                         value={form.overrideNote}
                         onChange={(e) => setForm((prev) => ({ ...prev, overrideNote: e.target.value }))}
@@ -812,6 +1006,7 @@ export default function Frat() {
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       Transition Notes (approve/reject/finalize)
                     </label>
+                    <p className="mb-1.5 text-xs text-gray-500">{FIELD_GUIDANCE.transitionNotes}</p>
                     <textarea
                       value={form.transitionNotes}
                       onChange={(e) => setForm((prev) => ({ ...prev, transitionNotes: e.target.value }))}
@@ -819,6 +1014,17 @@ export default function Frat() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
                     />
                   </div>
+
+                  {missingManualRationale ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      Manual adjustment is non-zero. Add override/rationale notes so reviewers can trace why the final score changed.
+                    </div>
+                  ) : null}
+                  {missingRiskBasisNotes ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      This scored assessment is moderate or higher with no linked analysis. Add review notes explaining the risk basis.
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </div>
@@ -905,8 +1111,17 @@ export default function Frat() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Scoring Snapshot</CardTitle>
+                  <CardDescription>
+                    Authoritative values come from the backend score snapshot after scoring.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                    <p className="font-semibold">Final Score = Category Base Score + Manual Adjustment + Analysis Indicator Score</p>
+                    <p className="mt-1">
+                      Category input preview: {localCategoryBaseScore}. Backend score composition appears after scoring.
+                    </p>
+                  </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Status</span>
                     <Badge className={`border ${statusClasses(selectedAssessmentStatus)}`}>
@@ -941,28 +1156,43 @@ export default function Frat() {
                         : 'No hard-stop triggered.'}
                     </span>
                   </div>
-                  {scoreComposition ? (
-                    <div className="grid grid-cols-3 gap-2 text-center">
+                  {hasScore ? (
+                    <div className="grid grid-cols-2 gap-2 text-center md:grid-cols-4">
                       <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
-                        <p className="text-[11px] text-gray-500">Base</p>
+                        <p className="text-[11px] text-gray-500">Category Base</p>
                         <p className="text-sm font-semibold text-gray-900">
-                          {scoreComposition.base_score ?? 0}
+                          {categoryBaseScore ?? 0}
                         </p>
                       </div>
                       <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
                         <p className="text-[11px] text-gray-500">Manual</p>
                         <p className="text-sm font-semibold text-gray-900">
-                          {scoreComposition.manual_adjustment ?? 0}
+                          {manualAdjustmentScore ?? 0}
                         </p>
                       </div>
                       <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
-                        <p className="text-[11px] text-gray-500">Analysis</p>
+                        <p className="text-[11px] text-gray-500">Analysis Indicator</p>
                         <p className="text-sm font-semibold text-gray-900">
-                          {scoreComposition.analysis_indicator_score ?? 0}
+                          {analysisIndicatorScore}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-2">
+                        <p className="text-[11px] text-gray-500">Total</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {finalTotalScore ?? '—'}
                         </p>
                       </div>
                     </div>
                   ) : null}
+                  {linkedAnalysisCount === 0 ? (
+                    <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                      No linked analysis job is attached. Technical analysis evidence is not included in this FRAT score.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                      Linked analysis controls contributed <strong>{analysisIndicatorScore}</strong> point{analysisIndicatorScore === 1 ? '' : 's'} to the final score.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

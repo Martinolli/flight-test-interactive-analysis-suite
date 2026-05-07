@@ -311,10 +311,16 @@ These baseline controls should be protected by regression tests.
   * Served `FTIAS-MANUAL-V00.pdf` through the frontend static manual path.
   * Added contextual help links for Upload, Dataset Versioning, Parameters, AI Analysis, Reports, and FRAT.
 
-* [ ] P3.5a FRAT usability hardening
+* [x] P3.5a FRAT usability hardening
+
+  * Added field-level guidance for assessment scope, authority, manual adjustment, linked analysis, categories, hard-stops, and notes.
+  * Added compact 0-20 category scoring guide and local category-base preview while keeping backend score authoritative.
+  * Added workflow status, hard-stop prominence, notes/rationale reminders, and clearer score composition.
+
+* [ ] P3.3 Atmosphere / air-data support UX
 
   * Next planned task.
-  * Improve FRAT checklist clarity, field guidance, and review workflow affordances.
+  * Improve user-facing guidance for atmosphere and air-data support boundaries.
 
 ---
 

@@ -3081,6 +3081,62 @@ pnpm -C frontend run build
 
 - P3.5a — FRAT usability hardening.
 
+## P3.5a FRAT Usability Hardening (2026-05-07)
+
+### Why this was added
+
+- FRAT scoring was functionally complete, but users needed clearer field guidance, scoring interpretation, hard-stop visibility, and review workflow affordances.
+- The page needed to make score composition understandable without changing backend scoring or lifecycle semantics.
+
+### What changed
+
+**Frontend**
+
+- Added concise helper text for:
+  - assessment name
+  - dataset version
+  - requested authority
+  - manual adjustment
+  - linked analysis jobs
+  - five category score inputs
+  - three hard-stop flags
+  - review, override/rationale, and transition notes
+- Added a compact 0-20 category scoring interpretation guide:
+  - 0-4 Minimal
+  - 5-8 Low
+  - 9-12 Moderate
+  - 13-16 High
+  - 17-20 Critical
+- Added local category-base preview clearly labeled as input preview only.
+- Added workflow status panel showing current state, scoring need, hard-stop status, export availability, and next action.
+- Added prominent hard-stop warning language explaining that hard stops override normal score interpretation.
+- Improved scoring snapshot:
+  - final score formula
+  - category base score
+  - manual adjustment
+  - analysis indicator score
+  - total score
+  - linked/no-linked-analysis statement
+- Added non-blocking review reminders:
+  - non-zero manual adjustment without override/rationale notes
+  - moderate-or-higher scored FRAT without linked analysis and review notes
+
+**Backend**
+
+- No backend changes were required. Existing FRAT score snapshots and explanation payloads were sufficient.
+
+### Validation
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:** Passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P3.3 — Atmosphere / air-data support UX.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added
