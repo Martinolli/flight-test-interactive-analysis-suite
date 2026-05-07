@@ -39,6 +39,7 @@ export default function Sidebar({ children }: SidebarProps) {
       items: [
         { name: 'Document Library', href: '/documents', icon: BookOpen },
         { name: 'AI Standards Query', href: '/ai-query', icon: Sparkles },
+        { name: 'Manual / Help', href: '/help', icon: BookOpen },
       ],
     },
     {

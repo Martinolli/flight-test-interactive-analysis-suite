@@ -229,8 +229,18 @@ export default function Upload() {
       <div className="mx-auto flex h-[100dvh] w-full max-w-[1400px] flex-col p-3 sm:p-4 md:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 shrink-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Upload Data</h1>
-          <p className="text-gray-500">Import flight test data from CSV files</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">Upload Data</h1>
+              <p className="text-gray-500">Import flight test data from CSV files</p>
+            </div>
+            <a
+              href="/help#upload"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              Upload checklist
+            </a>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
@@ -351,6 +361,9 @@ export default function Upload() {
                   <p>
                     Dashboard, Parameters, and AI Analysis use the active dataset only.
                   </p>
+                  <a href="/help#dataset-versioning" className="text-xs font-medium text-amber-800 underline">
+                    Dataset versioning guidance
+                  </a>
                 </div>
               </div>
             </CardContent>

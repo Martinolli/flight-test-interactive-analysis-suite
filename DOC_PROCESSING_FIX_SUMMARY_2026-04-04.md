@@ -3030,6 +3030,57 @@ pnpm -C frontend run build
 
 - P3.7 — Manual / help integration.
 
+## P3.7 Manual / Help Integration (2026-05-07)
+
+### Why this was added
+
+- The FTIAS Manual V-00 exists in the repository, but users needed an in-app entry point for major workflows.
+- Advanced workflows such as dataset versioning, AI controls, reports, and FRAT should be discoverable without searching the repository.
+
+### What changed
+
+**Frontend**
+
+- Added a protected `/help` page titled `FTIAS Manual / Help`.
+- Added a global `Manual / Help` sidebar entry.
+- Added quick help cards for:
+  - Upload Data
+  - Dataset Versioning
+  - Parameters and Charts
+  - AI Analysis
+  - Reports
+  - FRAT
+  - Troubleshooting
+- Added responsible-use wording that FTIAS is engineering support, not certification approval or operational authorization.
+- Added contextual help links on:
+  - Upload page
+  - Dataset versioning notice
+  - Parameters page
+  - Flight Test Detail AI Analysis panel
+  - Report export readiness area
+  - FRAT page and FRAT export area
+
+**Manual asset**
+
+- Root manual file found: `FTIAS-MANUAL-V00.pdf`.
+- Frontend static manual path added: `/manual/FTIAS-MANUAL-V00.pdf`.
+
+**Backend**
+
+- No backend changes were required.
+
+### Validation
+
+```powershell
+pnpm -C frontend run build
+```
+
+**Result:** Passed. Vite emitted existing warnings for Node.js 20.18.1 versus required 20.19+ and chunk size.
+
+### Next planned task
+
+- P3.5a — FRAT usability hardening.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

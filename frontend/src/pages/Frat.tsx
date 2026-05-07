@@ -475,6 +475,12 @@ export default function Frat() {
             <p className="text-gray-500 mt-1">
               Deterministic mission risk scoring with hard-stops, approval workflow, and immutable export.
             </p>
+            <a
+              href="/help#frat"
+              className="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              FRAT checklist and scoring guide
+            </a>
           </div>
           <Badge className="border border-blue-200 bg-blue-50 text-blue-700">P2.5</Badge>
         </div>
@@ -890,6 +896,9 @@ export default function Frat() {
                       {exportBlockedMessage}
                     </p>
                   ) : null}
+                  <a href="/help#reports" className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                    Report and PDF generation guidance
+                  </a>
                 </CardContent>
               </Card>
 

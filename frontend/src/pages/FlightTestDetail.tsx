@@ -828,19 +828,35 @@ function AIAnalysisPanel({
   return (
     <Card className="mt-4 border-purple-200">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base text-purple-700">
-            <Sparkles className="w-4 h-4" />
-            AI Analysis
-          </CardTitle>
-          {result && (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="text-gray-400 hover:text-gray-600"
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CardTitle className="flex items-center gap-2 text-base text-purple-700">
+              <Sparkles className="w-4 h-4" />
+              AI Analysis
+            </CardTitle>
+            <a
+              href="/help#ai-analysis"
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
             >
-              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-          )}
+              AI workflow help
+            </a>
+          </div>
+          <div className="flex items-center gap-3">
+            <a
+              href="/help#reports"
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              Report export help
+            </a>
+            {result && (
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-xs text-gray-500 mt-1">
           Cross-references your flight data against indexed standards and handbooks using RAG.
@@ -1203,6 +1219,9 @@ function AIAnalysisPanel({
                         ? `Ready from saved Analysis Job #${result.analysis_job_id}.`
                         : 'Unavailable until analysis is saved with a job ID.'}
                     </p>
+                    <a href="/help#reports" className="mt-1 inline-block text-xs font-medium text-amber-800 underline">
+                      Report and PDF generation guidance
+                    </a>
                   </div>
                   <div className="rounded-md border border-amber-100 bg-white/70 px-2.5 py-2">
                     <p className="font-medium">Artifact state</p>

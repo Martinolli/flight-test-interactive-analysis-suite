@@ -527,8 +527,18 @@ export default function Parameters() {
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Parameters</h1>
-          <p className="text-gray-500">Visualize and analyze flight test parameters</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">Parameters</h1>
+              <p className="text-gray-500">Visualize and analyze flight test parameters</p>
+            </div>
+            <a
+              href="/help#parameters"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              Charts and comparison guidance
+            </a>
+          </div>
         </div>
 
         {/* Flight test selector */}

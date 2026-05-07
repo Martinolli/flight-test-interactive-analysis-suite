@@ -12,6 +12,7 @@ import DocumentLibrary from './pages/DocumentLibrary';
 import AIQuery from './pages/AIQuery';
 import AdminUsers from './pages/AdminUsers';
 import Frat from './pages/Frat';
+import Help from './pages/Help';
 
 function App() {
   return (
@@ -78,6 +79,12 @@ function App() {
         <Route path="/frat">
           <ProtectedRoute>
             <Frat />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/help">
+          <ProtectedRoute>
+            <Help />
           </ProtectedRoute>
         </Route>
 

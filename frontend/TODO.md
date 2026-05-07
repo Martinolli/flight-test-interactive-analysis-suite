@@ -218,22 +218,19 @@ These should be protected from regression.
 * Prompt-to-mode warning copy now directly answers whether the selected mode likely matches the prompt.
 * Saved analysis reopen wording now makes immutable artifact provenance explicit.
 
-### P3.7 Manual / help integration
+### P3.7 Manual / help integration ✅
 
-* Support future user guidance surfaces:
-
-  * mode selection help
-  * report interpretation help
-  * FRAT usage help
-  * capability limitations quick reference
+* Added a protected `/help` page with quick workflow cards and responsible-use reminder.
+* Added a sidebar `Manual / Help` entry.
+* Served Manual V-00 from `/manual/FTIAS-MANUAL-V00.pdf`.
+* Added contextual help links on Upload, Parameters, Flight Test Detail / AI Analysis, report export, and FRAT surfaces.
 
 ---
 
 ## Immediate Frontend Execution Order
 
-1. **P3.7 — Manual / help integration**
-2. **P3.5a — FRAT usability hardening**
-3. **P3.3 — Atmosphere / air-data support UX**
+1. **P3.5a — FRAT usability hardening**
+2. **P3.3 — Atmosphere / air-data support UX**
 
 ---
 

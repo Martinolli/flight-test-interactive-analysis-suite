@@ -305,10 +305,16 @@ These baseline controls should be protected by regression tests.
   * Prompt-to-mode warnings now answer whether the selected mode likely matches the prompt intent.
   * Saved analysis reopen wording now states the artifact is immutable and tied to the captured dataset/controls.
 
-* [ ] P3.7 Manual / help integration
+* [x] P3.7 Manual / help integration
+
+  * Added a protected `/help` page with Manual V-00 access and workflow cards.
+  * Served `FTIAS-MANUAL-V00.pdf` through the frontend static manual path.
+  * Added contextual help links for Upload, Dataset Versioning, Parameters, AI Analysis, Reports, and FRAT.
+
+* [ ] P3.5a FRAT usability hardening
 
   * Next planned task.
-  * Add focused help surfaces for mode selection, report interpretation, FRAT usage, and capability limitations.
+  * Improve FRAT checklist clarity, field guidance, and review workflow affordances.
 
 ---
 
