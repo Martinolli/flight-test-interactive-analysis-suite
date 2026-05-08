@@ -16,7 +16,7 @@ FTIAS is engineering support only. It is not certification approval, operational
 
 Status: documentation and workflow readiness pass complete for internal alpha preparation.
 
-This repository is suitable for controlled technical preview only after the checks below pass in the target environment. Wider release still requires deployment, security, data-handling, and license metadata review.
+This repository is suitable for controlled technical preview only after the checks below pass in the target environment. Wider release still requires deployment, security, data-handling, and organizational/legal suitability review.
 
 ## Current Validation Baseline
 
@@ -89,6 +89,7 @@ Expected local URLs:
 - [ ] `TODO.md` and `frontend/TODO.md` show the next planned step.
 - [ ] `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` records the readiness pass.
 - [ ] `LICENSE` exists and is referenced.
+- [ ] MIT License terms are suitable for the intended distribution group.
 
 ## Responsible-Use Checks
 
@@ -103,7 +104,8 @@ Expected local URLs:
 
 - Vite may warn that Node.js `20.18.1` is installed while Vite expects `20.19+` or `22.12+`. Builds have completed successfully with the warning, but Node should be upgraded when practical.
 - Vite may warn that some frontend chunks are larger than 500 kB after minification. This is acceptable for internal alpha but should be revisited before wider release.
-- The repository `LICENSE` file exists and states MIT License terms, but it still contains placeholder metadata in some contact/author fields. Clean this up before external redistribution.
+- The repository currently uses MIT License terms.
+- Confirm organizational/legal suitability before external redistribution.
 
 ## Known Limitations
 
@@ -138,7 +140,7 @@ Share only if all applicable items are true:
 - [ ] Docker rebuild is successful.
 - [ ] Manual opens from the app.
 - [ ] README is current.
-- [ ] `LICENSE` is present and license metadata issues are understood.
+- [ ] `LICENSE` is present and MIT License terms are understood.
 - [ ] No secrets are present in the repository.
 - [ ] Sample/demo data policy is clear.
 - [ ] Known limitations are visible to reviewers.

@@ -329,10 +329,15 @@ These baseline controls should be protected by regression tests.
   * Added `INTERNAL_ALPHA_NOTES.md` for peer-facing technical preview guidance.
   * Updated README and GitHub workflow README references for current alpha documentation.
 
-* [ ] License selection and v0.1.0-alpha release tagging
+* [x] License metadata cleanup
+
+  * Standardized the MIT `LICENSE` file with the selected copyright line.
+  * Removed placeholder contact/author metadata.
+
+* [ ] v0.1.0-alpha release tagging
 
   * Next planned step.
-  * Clean up placeholder license metadata, confirm internal/external distribution terms, and tag the first alpha release when validation gates pass.
+  * Confirm validation gates and create the first alpha release tag.
 
 ---
 

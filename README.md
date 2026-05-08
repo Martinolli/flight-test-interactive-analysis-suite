@@ -183,7 +183,7 @@ The frontend build may warn if Node.js is `20.18.1` while Vite expects `20.19+` 
 - `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` - implementation history and technical notes
 - `CONTRIBUTING.md` - contribution guidance
 - `Docker_Troubleshooting_Guide.md` - Docker troubleshooting notes
-- `LICENSE` - repository license file
+- `LICENSE` - MIT License terms
 
 ## Roadmap
 
@@ -198,7 +198,7 @@ Internal Alpha / Technical Preview readiness
 Next planned step:
 
 ```text
-License selection and v0.1.0-alpha release tagging
+v0.1.0-alpha release tagging
 ```
 
 ## Responsible Use / Limitations

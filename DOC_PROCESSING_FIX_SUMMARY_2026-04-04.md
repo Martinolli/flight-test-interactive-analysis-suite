@@ -3224,7 +3224,7 @@ pnpm -C frontend run build
 **License status**
 
 - `LICENSE` exists and states MIT License terms.
-- The file still contains placeholder metadata in some contact/author fields; this should be cleaned before external redistribution.
+- At the time of the release-readiness pass, placeholder contact/author metadata still required cleanup before external redistribution.
 
 ### Validation
 
@@ -3235,6 +3235,23 @@ git diff -- README.md RELEASE_READINESS.md INTERNAL_ALPHA_NOTES.md .github/READM
 ### Next planned step
 
 - License selection and v0.1.0-alpha release tagging.
+
+## License Metadata Cleanup for Alpha (2026-05-08)
+
+### What changed
+
+- Cleaned the root `LICENSE` file.
+- Retained standard MIT License terms.
+- Replaced placeholder metadata with:
+  - `Copyright (c) 2026 João Martinolli`
+- Removed placeholder contact and author fields from the license file.
+- Updated `RELEASE_READINESS.md` to state that the repository currently uses MIT License terms and that organizational/legal suitability should be confirmed before external redistribution.
+- Updated `README.md` license wording.
+- Updated `TODO.md` to mark license metadata cleanup complete and set the next step to `v0.1.0-alpha` release tagging.
+
+### Next planned step
+
+- v0.1.0-alpha release tagging.
 
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
