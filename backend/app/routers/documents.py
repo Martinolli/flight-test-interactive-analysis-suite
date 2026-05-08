@@ -715,7 +715,8 @@ def _retrieve_hybrid_sources(
 
     embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
 
-    vector_sql = text("""
+    vector_sql = text(
+        """
         SELECT
             dc.id,
             dc.document_id,
@@ -739,7 +740,8 @@ def _retrieve_hybrid_sources(
           AND dc.embedding IS NOT NULL
         ORDER BY dc.embedding <=> :embedding ::vector
         LIMIT :limit_n
-        """)
+        """
+    )
     vector_rows = db.execute(
         vector_sql,
         {
@@ -750,7 +752,8 @@ def _retrieve_hybrid_sources(
     ).fetchall()
 
     lexical_rows = []
-    lexical_sql = text("""
+    lexical_sql = text(
+        """
         SELECT
             dc.id,
             dc.document_id,
@@ -778,7 +781,8 @@ def _retrieve_hybrid_sources(
           AND websearch_to_tsquery('english', :question) @@ to_tsvector('english', dc.text)
         ORDER BY lexical_score DESC
         LIMIT :limit_n
-        """)
+        """
+    )
     try:
         lexical_rows = db.execute(
             lexical_sql,
