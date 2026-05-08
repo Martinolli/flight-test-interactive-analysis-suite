@@ -1,5 +1,7 @@
 # FTIAS CI/CD Workflows
 
+This README documents GitHub Actions workflows. For the main project overview, see `../README.md`.
+
 This directory contains GitHub Actions workflows for continuous integration and deployment.
 
 ---

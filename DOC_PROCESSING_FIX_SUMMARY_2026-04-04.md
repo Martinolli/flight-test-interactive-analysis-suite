@@ -3183,6 +3183,59 @@ pnpm -C frontend run build
 
 - Release readiness / internal alpha preparation.
 
+## Release Readiness / Internal Alpha Preparation (2026-05-08)
+
+### Why this was added
+
+- The current roadmap slice is complete and the repository needs a controlled technical-preview handoff package.
+- Internal reviewers need explicit validation gates, known limitations, responsible-use boundaries, and peer-review instructions.
+
+### What changed
+
+**Documentation**
+
+- Added `RELEASE_READINESS.md`:
+  - release type: Internal Alpha / Technical Preview
+  - intended audience
+  - responsible-use statement
+  - validation baseline
+  - manual smoke-test checklist
+  - documentation checks
+  - known warnings
+  - known limitations
+  - peer-review workflow
+  - share/no-share gate
+- Added `INTERNAL_ALPHA_NOTES.md`:
+  - what FTIAS is
+  - what to try
+  - what not to trust yet
+  - requested feedback
+  - issue-reporting guidance
+  - recommended test scenarios
+- Updated `README.md`:
+  - corrected manual filename to `FTIAS-MANUAL-V00.pdf`
+  - added Manual / Help mention
+  - added release-readiness and internal-alpha notes references
+  - updated roadmap section to point to alpha readiness and license/tagging next step
+  - referenced `LICENSE`
+- Updated `.github/README.md` with a clarification that it documents GitHub Actions workflows, not the main project overview.
+- Updated `TODO.md` and `frontend/TODO.md` to mark release readiness complete and set next step to license selection and `v0.1.0-alpha` release tagging.
+
+**License status**
+
+- `LICENSE` exists and states MIT License terms.
+- The file still contains placeholder metadata in some contact/author fields; this should be cleaned before external redistribution.
+
+### Validation
+
+```powershell
+git diff -- README.md RELEASE_READINESS.md INTERNAL_ALPHA_NOTES.md .github/README.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+```
+
+### Next planned step
+
+- License selection and v0.1.0-alpha release tagging.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

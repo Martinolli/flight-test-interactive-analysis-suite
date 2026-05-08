@@ -323,10 +323,16 @@ These baseline controls should be protected by regression tests.
   * Added frontend guidance for CAS/TAS/Mach, ISA, pressure-altitude, density-altitude, and air-data consistency interpretation.
   * Added Help page air-data guidance and contextual links while keeping backend calculations authoritative.
 
-* [ ] Release readiness / internal alpha preparation
+* [x] Release readiness / internal alpha preparation
+
+  * Added `RELEASE_READINESS.md` with internal alpha validation gates, known warnings, limitations, and share/no-share checklist.
+  * Added `INTERNAL_ALPHA_NOTES.md` for peer-facing technical preview guidance.
+  * Updated README and GitHub workflow README references for current alpha documentation.
+
+* [ ] License selection and v0.1.0-alpha release tagging
 
   * Next planned step.
-  * Review validation checklist, known warnings, documentation, and deployment readiness for internal alpha use.
+  * Clean up placeholder license metadata, confirm internal/external distribution terms, and tag the first alpha release when validation gates pass.
 
 ---
 

@@ -10,6 +10,8 @@ FTIAS is an engineering review and decision-support tool. It is not a certificat
 
 ## Current Capabilities
 
+The app also includes a protected `Manual / Help` page that links to the current manual and lightweight workflow guidance for Upload Data, Dataset Versioning, Parameters, AI Analysis, Reports, FRAT, and troubleshooting.
+
 ### Flight-Test Data Management
 
 - Flight-test record creation and management
@@ -110,7 +112,9 @@ scripts/                                  Utility scripts
 TODO.md                                  Backend/product roadmap and execution plan
 frontend/TODO.md                         Frontend roadmap and UX planning
 DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md Development history and implementation notes
-FTIAS_Manual_V00.pdf                     Current FTIAS manual
+FTIAS-MANUAL-V00.pdf                     Current FTIAS manual
+RELEASE_READINESS.md                     Internal alpha readiness checklist
+INTERNAL_ALPHA_NOTES.md                  Peer-facing internal alpha notes
 ```
 
 ## Getting Started
@@ -171,21 +175,30 @@ The frontend build may warn if Node.js is `20.18.1` while Vite expects `20.19+` 
 
 ## Documentation
 
-- `FTIAS_Manual_V00.pdf` - current FTIAS manual
+- `FTIAS-MANUAL-V00.pdf` - current FTIAS manual
+- `RELEASE_READINESS.md` - internal alpha readiness checklist, validation gate, and known limitations
+- `INTERNAL_ALPHA_NOTES.md` - peer-facing technical preview notes and review workflow
 - `TODO.md` - active backend/product roadmap and execution plan
 - `frontend/TODO.md` - frontend roadmap and UX planning
 - `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` - implementation history and technical notes
 - `CONTRIBUTING.md` - contribution guidance
 - `Docker_Troubleshooting_Guide.md` - Docker troubleshooting notes
+- `LICENSE` - repository license file
 
 ## Roadmap
 
 The active roadmap and deferred items are tracked in `TODO.md` and `frontend/TODO.md` rather than duplicated here.
 
-Next planned task after P4.3:
+Current readiness focus:
 
 ```text
-P4.4 - Dashboard duration window derivation
+Internal Alpha / Technical Preview readiness
+```
+
+Next planned step:
+
+```text
+License selection and v0.1.0-alpha release tagging
 ```
 
 ## Responsible Use / Limitations

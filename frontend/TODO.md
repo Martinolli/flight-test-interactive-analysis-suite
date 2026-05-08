@@ -237,7 +237,13 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **Release readiness / internal alpha preparation**
+1. **License selection and v0.1.0-alpha release tagging**
+
+### Release readiness / internal alpha preparation ✅
+
+* Added release-readiness and internal alpha peer-review notes at the repository root.
+* README now references current manual/help and alpha-readiness documentation.
+* Next step is license metadata cleanup and alpha release tagging.
 
 ---
 
