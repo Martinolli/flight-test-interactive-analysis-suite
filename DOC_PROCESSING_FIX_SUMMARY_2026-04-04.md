@@ -3364,6 +3364,53 @@ git status
 
 - P5.2 — Vibration & Frequency Analysis concept formalization.
 
+## P5.2 Vibration & Frequency Analysis Concept Formalization (2026-05-09)
+
+### Why this was added
+
+- A future Vibration & Frequency Analysis idea was captured in `Project_Documents/46_Frequency_Analysis_Tool_Suggested_Layout.md`.
+- The concept is useful, but should not be implemented directly into the internal alpha branch without a bounded design note.
+
+### What changed
+
+**Concept note**
+
+- Added `Project_Documents/P5_2_Vibration_Frequency_Analysis_Concept.md`.
+- Formalized the future module as concept-only and not implemented in `v0.1.0-alpha`.
+- Captured proposed purpose, user workflow, V1 scope, later scope, recommended defaults, sampling warnings, and relationships to existing FTIAS capabilities.
+
+**Responsible-use boundaries**
+
+- Documented that future vibration/frequency outputs would be engineering screening/support only.
+- Explicitly stated that the module must not be presented as flutter clearance, loads substantiation, structural approval, certification approval, operational authorization, or safety clearance.
+- Captured dependency on sampling rate, signal quality, units, time-window selection, preprocessing, sensor calibration, and analysis assumptions.
+
+**Original idea note**
+
+- Added a short pointer at the top of `Project_Documents/46_Frequency_Analysis_Tool_Suggested_Layout.md` to indicate that the formal roadmap concept now lives in `Project_Documents/P5_2_Vibration_Frequency_Analysis_Concept.md`.
+
+**Future roadmap tasks**
+
+- P5.3 — Vibration/Frequency data model and API design
+- P5.4 — Time-domain + PSD MVP
+- P5.5 — Data-quality checks and sampling warnings
+- P5.6 — Frequency bands and summary metrics
+- P5.7 — Spectrogram and comparison mode
+- P5.8 — Export/report integration
+
+No backend, frontend, database, workflow, or application behavior changed.
+
+### Validation
+
+```powershell
+git diff -- Project_Documents/46_Frequency_Analysis_Tool_Suggested_Layout.md Project_Documents/P5_2_Vibration_Frequency_Analysis_Concept.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+git diff --check
+```
+
+### Next planned step
+
+- Project transition / Document-Parsing-Library continuation.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

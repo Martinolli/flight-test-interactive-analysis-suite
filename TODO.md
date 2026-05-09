@@ -351,14 +351,31 @@ These baseline controls should be protected by regression tests.
   * Updated GitHub Actions documentation to clarify workflow triggers, path filters, local frontend build validation, and current warnings.
   * Added repository hygiene checks to release readiness.
 
-* [ ] P5.2 Vibration & Frequency Analysis concept formalization
+* [x] P5.2 Vibration & Frequency Analysis concept formalization
 
-  * Next planned task.
-  * Formalize the vibration/frequency analysis concept, review scope, and future implementation boundaries before feature work.
+  * Created `Project_Documents/P5_2_Vibration_Frequency_Analysis_Concept.md`.
+  * Formalized the future vibration/frequency workspace as concept-only, not implemented in v0.1.0-alpha.
+  * Captured responsible-use boundaries, V1 scope, later scope, defaults, sampling warnings, and future task breakdown.
+
+* [ ] Project transition / Document-Parsing-Library continuation
+
+  * Next planned step.
+  * Keep this repository stable for internal alpha unless a bounded P5 implementation task is explicitly selected.
 
 ---
 
 ## Deferred / Later Candidates
+
+### Future Vibration & Frequency Analysis Roadmap
+
+These are planning placeholders only. They are not active implementation tasks.
+
+* [ ] P5.3 Vibration/Frequency data model and API design
+* [ ] P5.4 Time-domain + PSD MVP
+* [ ] P5.5 Data-quality checks and sampling warnings
+* [ ] P5.6 Frequency bands and summary metrics
+* [ ] P5.7 Spectrogram and comparison mode
+* [ ] P5.8 Export/report integration
 
 * [ ] Document visibility / sharing model
 

@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P5.2 — Vibration & Frequency Analysis concept formalization**
+1. **Project transition / Document-Parsing-Library continuation**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -256,6 +256,19 @@ These should be protected from regression.
 * Removed generated coverage artifacts from version control and kept them ignored locally.
 * Clarified GitHub Actions workflow triggers, path filters, and local frontend build validation in `.github/README.md`.
 * Documented alpha repository hygiene checks and known frontend build warnings.
+
+### P5.2 Vibration & Frequency Analysis concept formalization ✅
+
+* Formalized the future Vibration & Frequency Analysis module as concept-only.
+* No frontend analysis page, controls, charts, or calculation behavior were implemented.
+* Likely future frontend surfaces include:
+
+  * dedicated vibration/frequency analysis page
+  * channel and time-window selector
+  * sampling/Nyquist warning panel
+  * time-domain and PSD panels
+  * data-quality warning summary
+  * export actions for plots and summary metrics
 
 ---
 

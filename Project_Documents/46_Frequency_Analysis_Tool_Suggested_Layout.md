@@ -1,5 +1,7 @@
 # Frequency Analysis Tool — suggested layout
 
+Note: This is the original informal idea note. The formal roadmap concept is maintained in `Project_Documents/P5_2_Vibration_Frequency_Analysis_Concept.md`.
+
 ## 1. Data input panel
 
 User selects:
