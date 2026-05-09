@@ -44,6 +44,8 @@ Please focus feedback on:
 
 ## How To Report Issues
 
+Use the GitHub issue templates for peer-review feedback, bug reports, and feature requests.
+
 For each issue, include:
 
 - Short title
@@ -56,6 +58,8 @@ For each issue, include:
 - Analysis job ID, if relevant
 - FRAT assessment ID, if relevant
 - Browser and environment notes
+
+Clearly mark safety or responsible-use concerns, especially if an output seems to imply certification approval, operational authorization, flutter clearance, loads substantiation, structural approval, or safety clearance. Include traceability IDs whenever available.
 
 ## Recommended Test Scenarios
 

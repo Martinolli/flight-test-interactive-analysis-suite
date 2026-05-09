@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **Project transition / Document-Parsing-Library continuation**
+1. **P5.4 — Internal alpha feedback intake / sample issue dry run**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -269,6 +269,18 @@ These should be protected from regression.
   * time-domain and PSD panels
   * data-quality warning summary
   * export actions for plots and summary metrics
+
+### P5.3 Internal alpha issue triage labels and guide ✅
+
+* Added issue-triage documentation for internal alpha feedback.
+* Frontend-visible workflow labels now include:
+
+  * `dashboard`
+  * `parameters-charts`
+  * `ai-analysis`
+  * `reports-export`
+  * `frat`
+  * `manual-help`
 
 ---
 

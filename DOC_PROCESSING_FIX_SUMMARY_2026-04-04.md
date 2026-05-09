@@ -3391,12 +3391,12 @@ git status
 
 **Future roadmap tasks**
 
-- P5.3 — Vibration/Frequency data model and API design
-- P5.4 — Time-domain + PSD MVP
-- P5.5 — Data-quality checks and sampling warnings
-- P5.6 — Frequency bands and summary metrics
-- P5.7 — Spectrogram and comparison mode
-- P5.8 — Export/report integration
+- P5.VF.1 — Vibration/Frequency data model and API design
+- P5.VF.2 — Time-domain + PSD MVP
+- P5.VF.3 — Data-quality checks and sampling warnings
+- P5.VF.4 — Frequency bands and summary metrics
+- P5.VF.5 — Spectrogram and comparison mode
+- P5.VF.6 — Export/report integration
 
 No backend, frontend, database, workflow, or application behavior changed.
 
@@ -3410,6 +3410,74 @@ git diff --check
 ### Next planned step
 
 - Project transition / Document-Parsing-Library continuation.
+
+## P5.3 Internal Alpha Issue Triage Labels and Guide (2026-05-09)
+
+### Why this was added
+
+- FTIAS now has peer-review issue templates and internal alpha reviewer guidance.
+- Incoming feedback needs a clear triage taxonomy so maintainers can separate defects, usability notes, responsible-use concerns, documentation issues, and future concepts.
+- The future vibration/frequency roadmap previously used `P5.3` through `P5.8`; those placeholders were renamed to `P5.VF.*` to avoid conflict with active internal-alpha task numbering.
+
+### What changed
+
+**Triage guide**
+
+- Added `ISSUE_TRIAGE_GUIDE.md`.
+- Documented internal alpha triage principles:
+  - preserve traceability
+  - prioritize safety/responsible-use concerns
+  - separate reproducible defects from usability feedback
+  - avoid turning future ideas into implementation tasks before scoping
+  - keep engineering-support boundaries visible
+
+**Label taxonomy**
+
+- Documented recommended labels for internal alpha feedback, including:
+  - `internal-alpha`
+  - `peer-review`
+  - `bug`
+  - `enhancement`
+  - `documentation`
+  - `safety-responsible-use`
+  - `data-ingestion`
+  - `dashboard`
+  - `parameters-charts`
+  - `ai-analysis`
+  - `reports-export`
+  - `frat`
+  - `manual-help`
+  - `repo-ci`
+  - `future-concept`
+  - `vibration-frequency`
+
+**Severity and release impact**
+
+- Added severity guidance from minor usability notes through safety/responsible-use concerns.
+- Added release-impact decisions:
+  - alpha blocker
+  - next alpha
+  - deferred
+  - future module
+  - not planned
+
+**Reviewer guidance**
+
+- Updated `PEER_REVIEW_GUIDE.md` with an after-submission note explaining triage labels and follow-up evidence requests.
+- Updated `INTERNAL_ALPHA_NOTES.md` to remind reviewers to use issue templates, include traceability IDs, and clearly mark safety/responsible-use concerns.
+
+No backend, frontend, database, workflow, or application behavior changed.
+
+### Validation
+
+```powershell
+git diff -- ISSUE_TRIAGE_GUIDE.md PEER_REVIEW_GUIDE.md INTERNAL_ALPHA_NOTES.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+git diff --check
+```
+
+### Next planned task
+
+- P5.4 — Internal alpha feedback intake / sample issue dry run.
 
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 

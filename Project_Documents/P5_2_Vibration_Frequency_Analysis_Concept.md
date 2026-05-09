@@ -157,9 +157,9 @@ Report export:
 
 These are future planning tasks, not active implementation tasks:
 
-- P5.3 - Vibration/Frequency data model and API design
-- P5.4 - Time-domain + PSD MVP
-- P5.5 - Data-quality checks and sampling warnings
-- P5.6 - Frequency bands and summary metrics
-- P5.7 - Spectrogram and comparison mode
-- P5.8 - Export/report integration
+- P5.VF.1 - Vibration/Frequency data model and API design
+- P5.VF.2 - Time-domain + PSD MVP
+- P5.VF.3 - Data-quality checks and sampling warnings
+- P5.VF.4 - Frequency bands and summary metrics
+- P5.VF.5 - Spectrogram and comparison mode
+- P5.VF.6 - Export/report integration

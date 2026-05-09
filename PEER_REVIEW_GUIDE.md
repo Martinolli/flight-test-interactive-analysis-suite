@@ -46,6 +46,12 @@ Use GitHub Issues and choose the template that best fits the feedback:
 - Bug report
 - Feature request
 
+## After Submitting Feedback
+
+Maintainers may label issues during triage and may ask for dataset version, analysis job ID, FRAT assessment ID, screenshots, logs, or exact reproduction steps.
+
+Future ideas may be parked as concepts instead of immediately implemented. This keeps the internal alpha focused while preserving useful engineering suggestions.
+
 ## Evidence To Include
 
 - screenshots

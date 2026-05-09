@@ -357,10 +357,16 @@ These baseline controls should be protected by regression tests.
   * Formalized the future vibration/frequency workspace as concept-only, not implemented in v0.1.0-alpha.
   * Captured responsible-use boundaries, V1 scope, later scope, defaults, sampling warnings, and future task breakdown.
 
-* [ ] Project transition / Document-Parsing-Library continuation
+* [x] P5.3 Internal alpha issue triage labels and guide
+
+  * Added `ISSUE_TRIAGE_GUIDE.md` with internal alpha triage principles, label taxonomy, severity guidance, release-impact decisions, and examples.
+  * Updated peer-review and internal alpha notes to explain post-submission triage and traceability expectations.
+  * Renamed future vibration/frequency placeholders to `P5.VF.*` to avoid conflict with active internal-alpha task numbering.
+
+* [ ] P5.4 Internal alpha feedback intake / sample issue dry run
 
   * Next planned step.
-  * Keep this repository stable for internal alpha unless a bounded P5 implementation task is explicitly selected.
+  * Create or simulate a small set of sample issues using the templates and label taxonomy to validate the feedback workflow.
 
 ---
 
@@ -370,12 +376,12 @@ These baseline controls should be protected by regression tests.
 
 These are planning placeholders only. They are not active implementation tasks.
 
-* [ ] P5.3 Vibration/Frequency data model and API design
-* [ ] P5.4 Time-domain + PSD MVP
-* [ ] P5.5 Data-quality checks and sampling warnings
-* [ ] P5.6 Frequency bands and summary metrics
-* [ ] P5.7 Spectrogram and comparison mode
-* [ ] P5.8 Export/report integration
+* [ ] P5.VF.1 Vibration/Frequency data model and API design
+* [ ] P5.VF.2 Time-domain + PSD MVP
+* [ ] P5.VF.3 Data-quality checks and sampling warnings
+* [ ] P5.VF.4 Frequency bands and summary metrics
+* [ ] P5.VF.5 Spectrogram and comparison mode
+* [ ] P5.VF.6 Export/report integration
 
 * [ ] Document visibility / sharing model
 
