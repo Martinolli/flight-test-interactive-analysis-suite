@@ -3306,6 +3306,64 @@ git diff --check
 
 - P5.1 — Repository / CI hygiene cleanup.
 
+## P5.1 Repository / CI Hygiene Cleanup (2026-05-09)
+
+### Why this was added
+
+- FTIAS has reached `v0.1.0-alpha` as an Internal Alpha / Technical Preview.
+- Generated coverage files were still tracked and modified after local test runs.
+- GitHub Actions behavior needed clearer documentation because some workflows are path-filtered and documentation-only commits may not trigger all checks.
+
+### What changed
+
+**Generated artifacts**
+
+- Removed `.coverage` and `coverage.xml` from version control with `git rm --cached`.
+- Kept local generated files ignored through `.gitignore`.
+
+**Ignore rules**
+
+- Confirmed/added backend generated artifact ignores:
+  - `.coverage`
+  - `coverage.xml`
+  - `htmlcov/`
+  - `.pytest_cache/`
+  - `__pycache__/`
+  - `*.pyc`
+- Added/confirmed frontend generated artifact ignores:
+  - `frontend/dist/`
+  - `frontend/node_modules/`
+  - `frontend/.vite/`
+- Added broader local ignore coverage for `.env.*`, preserved `!.env.example`, and kept `*.log`.
+
+**CI documentation**
+
+- Updated `.github/README.md` to document current workflow inventory:
+  - `backend-lint.yml`
+  - `backend-test.yml`
+  - `docker-build.yml`
+- Documented workflow triggers, path filters, expected checks, and local validation commands.
+- Clarified that frontend build is currently validated locally with `pnpm -C frontend run build`.
+- Documented known frontend build warnings for Node/Vite version and chunk size.
+
+**Release readiness**
+
+- Added a repository hygiene checklist to `RELEASE_READINESS.md`.
+- Updated `TODO.md` and `frontend/TODO.md` to mark P5.1 complete and set P5.2 as the next planned task.
+
+### Validation
+
+```powershell
+git status
+git diff -- .gitignore .github/README.md RELEASE_READINESS.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+git diff --check
+git status
+```
+
+### Next planned task
+
+- P5.2 — Vibration & Frequency Analysis concept formalization.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

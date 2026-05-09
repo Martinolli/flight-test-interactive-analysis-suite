@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P5.1 — Repository / CI hygiene cleanup**
+1. **P5.2 — Vibration & Frequency Analysis concept formalization**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -250,6 +250,12 @@ These should be protected from regression.
 * Added GitHub issue templates for peer review feedback, bug reports, and feature requests.
 * Added `PEER_REVIEW_GUIDE.md` for internal alpha reviewers.
 * Feedback workflow now asks reviewers for screenshots, dataset versions, analysis job IDs, FRAT assessment IDs, and reproducible steps.
+
+### P5.1 Repository / CI hygiene cleanup ✅
+
+* Removed generated coverage artifacts from version control and kept them ignored locally.
+* Clarified GitHub Actions workflow triggers, path filters, and local frontend build validation in `.github/README.md`.
+* Documented alpha repository hygiene checks and known frontend build warnings.
 
 ---
 

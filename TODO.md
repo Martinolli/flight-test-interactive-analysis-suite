@@ -344,10 +344,17 @@ These baseline controls should be protected by regression tests.
   * Added issue-template contact links to internal alpha notes and release readiness.
   * Added `PEER_REVIEW_GUIDE.md` with reviewer flow, feedback focus areas, and evidence expectations.
 
-* [ ] P5.1 Repository / CI hygiene cleanup
+* [x] P5.1 Repository / CI hygiene cleanup
+
+  * Removed generated coverage artifacts from version control while keeping them ignored locally.
+  * Updated `.gitignore` for backend coverage/cache output, frontend build/cache output, environment files, and logs.
+  * Updated GitHub Actions documentation to clarify workflow triggers, path filters, local frontend build validation, and current warnings.
+  * Added repository hygiene checks to release readiness.
+
+* [ ] P5.2 Vibration & Frequency Analysis concept formalization
 
   * Next planned task.
-  * Review repository housekeeping, CI warnings, generated artifacts, and cleanup candidates before broader alpha iteration.
+  * Formalize the vibration/frequency analysis concept, review scope, and future implementation boundaries before feature work.
 
 ---
 

@@ -61,6 +61,17 @@ Expected local URLs:
 - [ ] Docker Compose build validates the local runtime.
 - [ ] Any expected warnings are recorded in this file.
 
+## Repository Hygiene
+
+- [ ] Working tree is clean before sharing, or every remaining change is intentional and documented.
+- [ ] Generated coverage artifacts are ignored and not staged: `.coverage`, `coverage.xml`, `htmlcov/`.
+- [ ] Python caches are ignored and not staged: `.pytest_cache/`, `__pycache__/`, `*.pyc`.
+- [ ] Frontend generated artifacts are ignored and not staged: `frontend/dist/`, `frontend/node_modules/`, `frontend/.vite/`.
+- [ ] Local environment files and logs are ignored and not staged.
+- [ ] CI behavior is understood: some workflows are path-filtered, so documentation-only commits may trigger only a subset of jobs.
+- [ ] Frontend build warnings are documented and understood for internal alpha.
+- [ ] The distinction between root `README.md` and `.github/README.md` is clear to reviewers and maintainers.
+
 ## Manual Smoke-Test Checklist
 
 - [ ] Login/authentication works.
