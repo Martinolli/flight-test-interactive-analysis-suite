@@ -1,47 +1,53 @@
 ---
-name: Feature Request
-about: Suggest an idea for this project
-title: '[FEATURE] '
-labels: enhancement
-assignees: ''
+name: Feature request
+about: Suggest a future improvement or capability for FTIAS
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: ""
 ---
 
-## Feature Description
+# Feature Request
 
-A clear and concise description of the feature you'd like to see.
+## Problem / Use Case
 
-## Problem Statement
-
-Describe the problem this feature would solve. Ex. I'm always frustrated when [...]
+Describe the workflow gap, review need, or engineering problem.
 
 ## Proposed Solution
 
-A clear and concise description of what you want to happen.
+Describe the requested improvement or capability.
 
-## Alternative Solutions
+## Engineering Value
 
-Describe any alternative solutions or features you've considered.
+Explain how this improves traceability, analysis quality, reporting, data handling, FRAT, or reviewer confidence.
 
-## Use Case
+## Affected Workflow
 
-Describe how you would use this feature in your workflow.
+Check all that apply:
 
-## Benefits
+- [ ] Upload Data
+- [ ] Dataset Versioning
+- [ ] Dashboard
+- [ ] Parameters / Charts
+- [ ] AI Analysis
+- [ ] Report Export
+- [ ] FRAT / Mission Risk
+- [ ] Manual / Help
+- [ ] Administration
+- [ ] Other:
 
-- Benefit 1
-- Benefit 2
-- Benefit 3
+## Responsible-Use Considerations
 
-## Implementation Considerations
+Could this feature imply certification approval, operational authorization, flutter clearance, or safety clearance? If so, describe the needed boundaries.
 
-If you have thoughts on how this could be implemented, share them here.
+## Alternatives Considered
+
+Describe any simpler workflow, documentation, or manual process alternative.
 
 ## Priority
 
-- [ ] High - Critical for project success
-- [ ] Medium - Important but not blocking
-- [ ] Low - Nice to have
+Select one:
 
-## Additional Context
-
-Add any other context, mockups, or screenshots about the feature request here.
+- [ ] Low - nice to have
+- [ ] Medium - improves internal alpha usability
+- [ ] High - blocks peer review or technical preview use
+- [ ] Critical - safety/responsible-use or data integrity concern

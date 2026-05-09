@@ -1,46 +1,66 @@
 ---
-name: Bug Report
-about: Create a report to help us improve
-title: '[BUG] '
-labels: bug
-assignees: ''
+name: Bug report
+about: Report a reproducible defect in FTIAS
+title: "[Bug]: "
+labels: ["bug"]
+assignees: ""
 ---
 
-## Bug Description
+# Bug Report
 
-A clear and concise description of what the bug is.
+## Summary
 
-## Steps to Reproduce
-
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
-
-## Expected Behavior
-
-A clear and concise description of what you expected to happen.
-
-## Actual Behavior
-
-A clear and concise description of what actually happened.
-
-## Screenshots
-
-If applicable, add screenshots to help explain your problem.
+Briefly describe the defect.
 
 ## Environment
 
-- **OS:** [e.g., Windows 11, macOS 13, Ubuntu 22.04]
-- **Browser:** [e.g., Chrome 120, Firefox 121]
-- **FTIAS Version:** [e.g., v0.1.0]
-- **Python Version:** [e.g., 3.11.5]
-- **Node Version:** [e.g., 18.17.0]
+- OS:
+- Browser:
+- Local Docker / hosted app:
+- FTIAS version or commit:
+
+## Steps To Reproduce
+
+1.
+2.
+3.
+
+## Expected Behavior
+
+Describe what should have happened.
+
+## Actual Behavior
+
+Describe what actually happened.
+
+## Screenshots / Logs
+
+Attach screenshots, console output, backend logs, or report excerpts if useful.
+
+## Provenance / Traceability Details
+
+Include if relevant:
+
+- Flight test ID or name:
+- Dataset version ID or label:
+- Analysis job ID:
+- FRAT assessment ID:
+- Report/export file name:
+
+## Severity
+
+Select one:
+
+- [ ] Minor usability defect
+- [ ] Workflow friction
+- [ ] Incorrect or misleading result
+- [ ] Blocking issue
+- [ ] Safety/responsible-use concern
+
+## Workaround
+
+Describe any workaround found.
 
 ## Additional Context
 
-Add any other context about the problem here.
-
-## Possible Solution
-
-If you have suggestions on how to fix the bug, please describe them here.
+Add anything else that may help reproduce or diagnose the issue.

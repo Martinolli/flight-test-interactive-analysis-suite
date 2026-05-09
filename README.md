@@ -178,12 +178,15 @@ The frontend build may warn if Node.js is `20.18.1` while Vite expects `20.19+` 
 - `FTIAS-MANUAL-V00.pdf` - current FTIAS manual
 - `RELEASE_READINESS.md` - internal alpha readiness checklist, validation gate, and known limitations
 - `INTERNAL_ALPHA_NOTES.md` - peer-facing technical preview notes and review workflow
+- `PEER_REVIEW_GUIDE.md` - structured guidance for internal alpha reviewers
 - `TODO.md` - active backend/product roadmap and execution plan
 - `frontend/TODO.md` - frontend roadmap and UX planning
 - `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` - implementation history and technical notes
 - `CONTRIBUTING.md` - contribution guidance
 - `Docker_Troubleshooting_Guide.md` - Docker troubleshooting notes
 - `LICENSE` - MIT License terms
+
+GitHub Issues include templates for peer review feedback, bug reports, and feature requests.
 
 ## Roadmap
 
@@ -198,7 +201,7 @@ Internal Alpha / Technical Preview readiness
 Next planned step:
 
 ```text
-v0.1.0-alpha release tagging
+P5.1 - Repository / CI hygiene cleanup
 ```
 
 ## Responsible Use / Limitations

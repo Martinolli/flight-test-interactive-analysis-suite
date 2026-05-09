@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: FTIAS Internal Alpha Notes
+    url: https://github.com/Martinolli/flight-test-interactive-analysis-suite/blob/main/INTERNAL_ALPHA_NOTES.md
+    about: Read reviewer guidance before submitting feedback.
+  - name: FTIAS Release Readiness
+    url: https://github.com/Martinolli/flight-test-interactive-analysis-suite/blob/main/RELEASE_READINESS.md
+    about: Review validation gates, known warnings, and limitations.

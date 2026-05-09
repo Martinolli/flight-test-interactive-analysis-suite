@@ -237,13 +237,19 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **License selection and v0.1.0-alpha release tagging**
+1. **P5.1 — Repository / CI hygiene cleanup**
 
 ### Release readiness / internal alpha preparation ✅
 
 * Added release-readiness and internal alpha peer-review notes at the repository root.
 * README now references current manual/help and alpha-readiness documentation.
 * Next step is license metadata cleanup and alpha release tagging.
+
+### P5.0 Peer review issue templates and feedback workflow ✅
+
+* Added GitHub issue templates for peer review feedback, bug reports, and feature requests.
+* Added `PEER_REVIEW_GUIDE.md` for internal alpha reviewers.
+* Feedback workflow now asks reviewers for screenshots, dataset versions, analysis job IDs, FRAT assessment IDs, and reproducible steps.
 
 ---
 

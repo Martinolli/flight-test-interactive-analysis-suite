@@ -3253,6 +3253,59 @@ git diff -- README.md RELEASE_READINESS.md INTERNAL_ALPHA_NOTES.md .github/READM
 
 - v0.1.0-alpha release tagging.
 
+## P5.0 Peer Review Issue Templates and Feedback Workflow (2026-05-09)
+
+### Why this was added
+
+- FTIAS has reached `v0.1.0-alpha` as an Internal Alpha / Technical Preview.
+- The repository needs structured intake for peer-review feedback, reproducible defects, and future feature ideas.
+
+### What changed
+
+**GitHub issue templates**
+
+- Added `.github/ISSUE_TEMPLATE/peer_review_feedback.md`:
+  - reviewer context
+  - workflow checklist
+  - what worked well
+  - confusion points
+  - reproducible issue details
+  - provenance fields
+  - severity/priority
+  - responsible-use boundary feedback
+  - suggested improvement
+- Updated `.github/ISSUE_TEMPLATE/bug_report.md` for reproducible FTIAS defects.
+- Updated `.github/ISSUE_TEMPLATE/feature_request.md` for future capability requests.
+- Added `.github/ISSUE_TEMPLATE/config.yml` with links to:
+  - `INTERNAL_ALPHA_NOTES.md`
+  - `RELEASE_READINESS.md`
+
+**Peer review guide**
+
+- Added `PEER_REVIEW_GUIDE.md` with:
+  - review purpose
+  - pre-review instructions
+  - recommended review flow
+  - most useful feedback categories
+  - issue-template guidance
+  - evidence to include
+
+**Roadmap/docs**
+
+- Updated `README.md` to reference `PEER_REVIEW_GUIDE.md` and GitHub issue templates.
+- Updated `TODO.md` and `frontend/TODO.md` to mark P5.0 complete and set P5.1 as the next task.
+
+### Validation
+
+```powershell
+git diff -- .github/ISSUE_TEMPLATE PEER_REVIEW_GUIDE.md README.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+git diff --check
+```
+
+### Next planned task
+
+- P5.1 — Repository / CI hygiene cleanup.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

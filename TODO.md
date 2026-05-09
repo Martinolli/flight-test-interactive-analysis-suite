@@ -334,10 +334,20 @@ These baseline controls should be protected by regression tests.
   * Standardized the MIT `LICENSE` file with the selected copyright line.
   * Removed placeholder contact/author metadata.
 
-* [ ] v0.1.0-alpha release tagging
+* [x] v0.1.0-alpha release tagging
 
-  * Next planned step.
-  * Confirm validation gates and create the first alpha release tag.
+  * Internal alpha tag and GitHub pre-release are published.
+
+* [x] P5.0 Peer review issue templates and feedback workflow
+
+  * Added structured GitHub issue templates for peer review feedback, bug reports, and feature requests.
+  * Added issue-template contact links to internal alpha notes and release readiness.
+  * Added `PEER_REVIEW_GUIDE.md` with reviewer flow, feedback focus areas, and evidence expectations.
+
+* [ ] P5.1 Repository / CI hygiene cleanup
+
+  * Next planned task.
+  * Review repository housekeeping, CI warnings, generated artifacts, and cleanup candidates before broader alpha iteration.
 
 ---
 
