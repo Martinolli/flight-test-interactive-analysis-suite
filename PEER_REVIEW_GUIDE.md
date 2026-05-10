@@ -52,6 +52,8 @@ Maintainers may label issues during triage and may ask for dataset version, anal
 
 Future ideas may be parked as concepts instead of immediately implemented. This keeps the internal alpha focused while preserving useful engineering suggestions.
 
+A sample dry-run issue exists as Issue #1 to demonstrate the expected feedback structure.
+
 ## Evidence To Include
 
 - screenshots

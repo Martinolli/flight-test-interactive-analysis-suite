@@ -3479,6 +3479,45 @@ git diff --check
 
 - P5.4 — Internal alpha feedback intake / sample issue dry run.
 
+## P5.4 Internal Alpha Feedback Intake Dry Run (2026-05-10)
+
+### Why this was added
+
+- A sample GitHub issue was created to validate the internal alpha feedback workflow before broader peer review.
+- The dry run verifies that peer reviewers can submit structured feedback with useful workflow, provenance, severity, and responsible-use context.
+
+### Sample issue
+
+- Issue #1: `[Peer Review]: Internal alpha workflow dry run`
+- URL: https://github.com/Martinolli/flight-test-interactive-analysis-suite/issues/1
+
+### What was validated
+
+- Peer-review template rendering.
+- `internal-alpha` and `peer-review` labels.
+- Workflow checklist.
+- Provenance / traceability fields.
+- Severity / priority section.
+- Responsible-use boundary feedback section.
+
+### Documentation updates
+
+- Updated `TODO.md` and `frontend/TODO.md` to mark P5.4 complete.
+- Updated `PEER_REVIEW_GUIDE.md` with a short note that Issue #1 demonstrates the expected feedback structure.
+
+No backend, frontend, database, workflow, test, or application behavior changed.
+
+### Validation
+
+```powershell
+git diff -- TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md PEER_REVIEW_GUIDE.md
+git diff --check
+```
+
+### Next planned step
+
+- Internal alpha peer review / feedback collection.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

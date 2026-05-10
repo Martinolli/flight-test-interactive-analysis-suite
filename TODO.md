@@ -363,10 +363,15 @@ These baseline controls should be protected by regression tests.
   * Updated peer-review and internal alpha notes to explain post-submission triage and traceability expectations.
   * Renamed future vibration/frequency placeholders to `P5.VF.*` to avoid conflict with active internal-alpha task numbering.
 
-* [ ] P5.4 Internal alpha feedback intake / sample issue dry run
+* [x] P5.4 Internal alpha feedback intake / sample issue dry run
+
+  * Created Issue #1 as a peer-review dry run: `[Peer Review]: Internal alpha workflow dry run`.
+  * Confirmed template structure, `internal-alpha` / `peer-review` labels, provenance fields, severity/priority section, and responsible-use section.
+
+* [ ] Internal alpha peer review / feedback collection
 
   * Next planned step.
-  * Create or simulate a small set of sample issues using the templates and label taxonomy to validate the feedback workflow.
+  * Keep the repository stable unless a new bounded task is selected from incoming feedback.
 
 ---
 

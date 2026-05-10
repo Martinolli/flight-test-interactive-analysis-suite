@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P5.4 — Internal alpha feedback intake / sample issue dry run**
+1. **Internal alpha peer review / feedback collection**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -281,6 +281,18 @@ These should be protected from regression.
   * `reports-export`
   * `frat`
   * `manual-help`
+
+### P5.4 Internal alpha feedback intake / sample issue dry run ✅
+
+* Completed the sample feedback intake dry run with Issue #1.
+* Confirmed the peer-review template supports frontend-relevant feedback categories:
+
+  * dashboard
+  * parameters/charts
+  * AI Analysis
+  * reports/export
+  * FRAT
+  * Manual/Help
 
 ---
 
