@@ -17,7 +17,7 @@ This guide supports triage of FTIAS Internal Alpha / Technical Preview feedback.
 These labels can be created manually in GitHub repository settings. GitHub API automation is not required.
 
 | Label | Purpose |
-|---|---|
+| --- | --- |
 | internal-alpha | Feedback from v0.1.0-alpha review |
 | peer-review | Structured peer-review feedback |
 | bug | Reproducible defect |
