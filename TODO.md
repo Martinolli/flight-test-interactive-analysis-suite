@@ -368,10 +368,16 @@ These baseline controls should be protected by regression tests.
   * Created Issue #1 as a peer-review dry run: `[Peer Review]: Internal alpha workflow dry run`.
   * Confirmed template structure, `internal-alpha` / `peer-review` labels, provenance fields, severity/priority section, and responsible-use section.
 
-* [ ] Internal alpha peer review / feedback collection
+* [x] P5.5 Repository document cleanup
+
+  * Removed obsolete `TODO_V0.md` and `frontend/TODO_V1.md`.
+  * Added `Project_Documents/README.md` to classify historical planning notes, reference documents, archive candidates, and current future concepts.
+  * Clarified that current roadmap truth lives in `TODO.md` and `frontend/TODO.md`.
+
+* [ ] P5.6 Linux internal deployment guide for FTI server
 
   * Next planned step.
-  * Keep the repository stable unless a new bounded task is selected from incoming feedback.
+  * Document a bounded internal Linux deployment workflow for an FTI server environment.
 
 ---
 

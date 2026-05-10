@@ -3518,6 +3518,56 @@ git diff --check
 
 - Internal alpha peer review / feedback collection.
 
+## P5.5 Repository Document Cleanup (2026-05-10)
+
+### Why this was added
+
+- FTIAS is in Internal Alpha / Technical Preview.
+- Current operational documentation now lives in the root README, current TODO files, release-readiness notes, peer-review notes, triage guide, and manual.
+- Older planning documents should remain available for reference without being mistaken for current implementation truth.
+
+### What changed
+
+**Obsolete TODO files removed**
+
+- Removed `TODO_V0.md`.
+- Removed `frontend/TODO_V1.md`.
+- These files are superseded by:
+  - `TODO.md`
+  - `frontend/TODO.md`
+
+**Project_Documents inventory**
+
+- Added `Project_Documents/README.md`.
+- Clarified that `Project_Documents/` contains historical planning notes, implementation-session summaries, reference notes, and future concept documents.
+- Added an inventory table using these statuses:
+  - Current future concept
+  - Historical planning note
+  - Superseded / archive candidate
+  - Reference only
+- Marked `Project_Documents/P5_2_Vibration_Frequency_Analysis_Concept.md` as a current future concept.
+- Marked `Project_Documents/46_Frequency_Analysis_Tool_Suggested_Layout.md` as the original informal idea note that points to the formal P5.2 concept.
+
+**Current documentation guidance**
+
+- Updated `README.md` to note that `Project_Documents/` contains historical planning notes and future concepts, not primary user guidance.
+- Updated `TODO.md` and `frontend/TODO.md` to mark P5.5 complete and set P5.6 as the next planned task.
+
+No backend, frontend, database, workflow, test, or application behavior changed.
+
+### Validation
+
+```powershell
+git status
+git diff -- README.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md Project_Documents/README.md
+git status --short
+git diff --check
+```
+
+### Next planned task
+
+- P5.6 — Linux internal deployment guide for FTI server.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

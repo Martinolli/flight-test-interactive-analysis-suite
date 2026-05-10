@@ -182,6 +182,7 @@ The frontend build may warn if Node.js is `20.18.1` while Vite expects `20.19+` 
 - `TODO.md` - active backend/product roadmap and execution plan
 - `frontend/TODO.md` - frontend roadmap and UX planning
 - `DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md` - implementation history and technical notes
+- `Project_Documents/` - historical planning notes and future concepts, not primary user guidance
 - `CONTRIBUTING.md` - contribution guidance
 - `Docker_Troubleshooting_Guide.md` - Docker troubleshooting notes
 - `LICENSE` - MIT License terms

@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **Internal alpha peer review / feedback collection**
+1. **P5.6 — Linux internal deployment guide for FTI server**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -293,6 +293,12 @@ These should be protected from regression.
   * reports/export
   * FRAT
   * Manual/Help
+
+### P5.5 Repository document cleanup ✅
+
+* Removed superseded `frontend/TODO_V1.md`.
+* Frontend roadmap truth is now explicitly `frontend/TODO.md`.
+* `Project_Documents/README.md` now identifies historical planning notes and future concepts separately from current user guidance.
 
 ---
 
