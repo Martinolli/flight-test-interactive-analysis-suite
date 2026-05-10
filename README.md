@@ -178,6 +178,7 @@ The frontend build may warn if Node.js is `20.18.1` while Vite expects `20.19+` 
 - `FTIAS-MANUAL-V00.pdf` - current FTIAS manual
 - `RELEASE_READINESS.md` - internal alpha readiness checklist, validation gate, and known limitations
 - `INTERNAL_ALPHA_NOTES.md` - peer-facing technical preview notes and review workflow
+- `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md` - FTI-managed Linux internal alpha deployment guidance
 - `PEER_REVIEW_GUIDE.md` - structured guidance for internal alpha reviewers
 - `TODO.md` - active backend/product roadmap and execution plan
 - `frontend/TODO.md` - frontend roadmap and UX planning
@@ -202,7 +203,7 @@ Internal Alpha / Technical Preview readiness
 Next planned step:
 
 ```text
-P5.1 - Repository / CI hygiene cleanup
+Internal FTI server feasibility review
 ```
 
 ## Responsible Use / Limitations

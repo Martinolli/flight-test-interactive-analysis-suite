@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **P5.6 — Linux internal deployment guide for FTI server**
+1. **Internal FTI server feasibility review**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -299,6 +299,12 @@ These should be protected from regression.
 * Removed superseded `frontend/TODO_V1.md`.
 * Frontend roadmap truth is now explicitly `frontend/TODO.md`.
 * `Project_Documents/README.md` now identifies historical planning notes and future concepts separately from current user guidance.
+
+### P5.6 Linux internal deployment guide for FTI server ✅
+
+* Added `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md`.
+* Documented internal Linux deployment guidance, including no-GitHub transfer options.
+* Frontend deployment notes call out internal server URL/port/reverse proxy dependency, `FRONTEND_PORT`, `VITE_API_URL`, CORS alignment, and internal-alpha-only Vite server limitations.
 
 ---
 

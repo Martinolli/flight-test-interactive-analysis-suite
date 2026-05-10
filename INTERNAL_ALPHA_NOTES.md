@@ -46,6 +46,8 @@ Please focus feedback on:
 
 Use the GitHub issue templates for peer-review feedback, bug reports, and feature requests.
 
+If GitHub is blocked in the work environment, reviewers may access an internally hosted FTIAS instance if deployed by the FTI team. Feedback can still be collected manually using the same fields below and later entered into GitHub Issues when access is available.
+
 For each issue, include:
 
 - Short title

@@ -52,6 +52,7 @@ Expected local URLs:
 - [ ] Known limitations are visible to reviewers.
 - [ ] Sample/demo data policy is clear to reviewers.
 - [ ] Reviewers receive `INTERNAL_ALPHA_NOTES.md`.
+- [ ] If using an FTI-managed Linux server, `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md` has been reviewed with the server team.
 
 ## CI / Build Checks
 
@@ -156,6 +157,7 @@ Share only if all applicable items are true:
 - [ ] Sample/demo data policy is clear.
 - [ ] Known limitations are visible to reviewers.
 - [ ] Internal reviewers understand that this is a technical preview.
+- [ ] For internal server sharing, the Linux deployment guide has been followed and the internal URL/ports are documented.
 
 No-share conditions:
 

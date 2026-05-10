@@ -3568,6 +3568,51 @@ git diff --check
 
 - P5.6 — Linux internal deployment guide for FTI server.
 
+## P5.6 Linux Internal Deployment Guide for FTI Server (2026-05-10)
+
+### Why this was added
+
+- FTIAS is in Internal Alpha / Technical Preview.
+- GitHub access may be blocked in the intended work environment.
+- The likely sharing path is a Linux server managed by the FTI team, with controlled internal access.
+
+### What changed
+
+**Deployment guide**
+
+- Added `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md`.
+- Framed deployment as Internal Alpha / Technical Preview only.
+- Documented that FTIAS is engineering support software and is not certification approval, operational authorization, airworthiness determination, flutter clearance, safety clearance, or loads substantiation.
+
+**FTI server-team checklist**
+
+- Added pre-deployment questions covering Docker, Compose, Linux version, internet/GitHub access, registry access, external AI/API access, exposed ports, internal URL/hostname, persistent volumes, PostgreSQL backup ownership, data policy, user administration, logging/monitoring, HTTPS, and reverse proxy expectations.
+
+**Deployment paths**
+
+- Documented online clone from GitHub or internal mirror.
+- Documented no-GitHub ZIP/source archive transfer.
+- Documented git bundle transfer.
+- Documented prebuilt Docker image transfer for environments without registry/package access.
+
+**Operations**
+
+- Documented `.env` setup, Compose startup using current service names, service checks, migrations, backups/restores, firewall/reverse-proxy considerations, online vs restricted server modes, smoke testing, no-GitHub feedback collection, troubleshooting, and pre-share checklist.
+- Updated `README.md`, `RELEASE_READINESS.md`, `INTERNAL_ALPHA_NOTES.md`, `TODO.md`, and `frontend/TODO.md` to reference the guide and mark P5.6 complete.
+
+No backend, frontend, database, workflow, test, Docker, or application behavior changed.
+
+### Validation
+
+```powershell
+git diff -- LINUX_INTERNAL_DEPLOYMENT_GUIDE.md README.md RELEASE_READINESS.md INTERNAL_ALPHA_NOTES.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+git diff --check
+```
+
+### Next planned step
+
+- Internal FTI server feasibility review.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

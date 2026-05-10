@@ -374,10 +374,15 @@ These baseline controls should be protected by regression tests.
   * Added `Project_Documents/README.md` to classify historical planning notes, reference documents, archive candidates, and current future concepts.
   * Clarified that current roadmap truth lives in `TODO.md` and `frontend/TODO.md`.
 
-* [ ] P5.6 Linux internal deployment guide for FTI server
+* [x] P5.6 Linux internal deployment guide for FTI server
+
+  * Added `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md`.
+  * Documented FTI server-team questions, Linux/Docker prerequisites, online and no-GitHub transfer options, environment setup, Compose startup, backups, smoke tests, and responsible-use boundaries.
+
+* [ ] Internal FTI server feasibility review
 
   * Next planned step.
-  * Document a bounded internal Linux deployment workflow for an FTI server environment.
+  * Review server policy, Docker/Compose availability, GitHub/registry access, internal URL/port plan, persistence, backups, and feedback collection path with the FTI server team.
 
 ---
 
