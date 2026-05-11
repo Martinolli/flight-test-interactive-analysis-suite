@@ -237,7 +237,7 @@ These should be protected from regression.
 
 ## Immediate Frontend Execution Order
 
-1. **Internal FTI server feasibility review**
+1. **Work IT dependency approval / Windows setup feasibility review**
 
 ### Release readiness / internal alpha preparation ✅
 
@@ -305,6 +305,12 @@ These should be protected from regression.
 * Added `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md`.
 * Documented internal Linux deployment guidance, including no-GitHub transfer options.
 * Frontend deployment notes call out internal server URL/port/reverse proxy dependency, `FRONTEND_PORT`, `VITE_API_URL`, CORS alignment, and internal-alpha-only Vite server limitations.
+
+### P5.7 Windows local installation guide and environment template cleanup ✅
+
+* Added `WINDOWS_NATIVE_SETUP_GUIDE.md`.
+* Windows-native frontend setup requires Node `20.19+` or `22.12+` and pnpm.
+* The guide documents local frontend port `5173`, backend URL `http://localhost:8000`, and CORS / `VITE_API_URL` alignment.
 
 ---
 

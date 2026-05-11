@@ -53,6 +53,7 @@ Expected local URLs:
 - [ ] Sample/demo data policy is clear to reviewers.
 - [ ] Reviewers receive `INTERNAL_ALPHA_NOTES.md`.
 - [ ] If using an FTI-managed Linux server, `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md` has been reviewed with the server team.
+- [ ] If Docker is not approved, `WINDOWS_NATIVE_SETUP_GUIDE.md` has been reviewed and Python, Node.js, PostgreSQL, pgvector, and local port permissions are confirmed with IT.
 
 ## CI / Build Checks
 

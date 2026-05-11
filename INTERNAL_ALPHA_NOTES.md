@@ -48,6 +48,8 @@ Use the GitHub issue templates for peer-review feedback, bug reports, and featur
 
 If GitHub is blocked in the work environment, reviewers may access an internally hosted FTIAS instance if deployed by the FTI team. Feedback can still be collected manually using the same fields below and later entered into GitHub Issues when access is available.
 
+For environments where Docker/GitHub deployment is unavailable, reviewers may use a Windows-native setup if approved by IT. Disabled AI/API capabilities should be documented before review.
+
 For each issue, include:
 
 - Short title

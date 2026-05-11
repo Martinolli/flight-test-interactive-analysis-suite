@@ -3613,6 +3613,58 @@ git diff --check
 
 - Internal FTI server feasibility review.
 
+## P5.7 Windows Native Setup Guide and Environment Template Cleanup (2026-05-11)
+
+### Why this was added
+
+- The current internal work environment may allow GitHub access but not Docker.
+- Windows-native setup may require IT approval for Python, Node.js, pnpm, PostgreSQL, pgvector, local ports, and external AI/API access.
+- `.env.example` needed safe AI/RAG placeholders aligned with the real configuration shape without exposing secrets.
+
+### What changed
+
+**Environment template**
+
+- Updated `.env.example`.
+- Added safe AI/RAG placeholders:
+  - `OPENAI_API_KEY=`
+  - `EMBEDDING_MODEL=text-embedding-3-small`
+- Added comments explaining that AI/RAG features require approval and can be left blank when unavailable.
+- Converted the upload-size inline comment into a full-line comment.
+- Kept `gpt-4o-mini` as the lower-cost internal-alpha default for query/analysis model settings.
+- Kept `SECRET_KEY` and `JWT_SECRET_KEY` as placeholders with comments to change them before shared/internal deployment.
+
+**Windows native setup guide**
+
+- Added `WINDOWS_NATIVE_SETUP_GUIDE.md`.
+- Documented Windows setup scope for Internal Alpha / Technical Preview when Docker is not approved.
+- Added IT/FTI support checklist.
+- Documented required tools:
+  - Git for Windows
+  - Python 3.12
+  - Node.js LTS, preferably Node `20.19+` or `22.12+`
+  - pnpm
+  - PostgreSQL 15 or compatible
+  - pgvector for document/RAG vector search
+- Documented repository clone, backend virtual environment setup, frontend setup, PostgreSQL options, `.env` setup, migrations, run commands, smoke test, restricted operation, and troubleshooting.
+
+**Roadmap/docs**
+
+- Updated `README.md`, `RELEASE_READINESS.md`, `INTERNAL_ALPHA_NOTES.md`, `TODO.md`, and `frontend/TODO.md`.
+
+No backend, frontend, database, Docker, workflow, test, or application behavior changed.
+
+### Validation
+
+```powershell
+git diff -- .env.example WINDOWS_NATIVE_SETUP_GUIDE.md README.md RELEASE_READINESS.md INTERNAL_ALPHA_NOTES.md TODO.md frontend/TODO.md DOC_PROCESSING_FIX_SUMMARY_2026-04-04.md
+git diff --check
+```
+
+### Next planned step
+
+- Work IT dependency approval / Windows setup feasibility review.
+
 ## P3.1 Prompt-to-Mode Routing Guard (2026-04-24)
 
 ### Why this was added

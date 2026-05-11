@@ -379,10 +379,16 @@ These baseline controls should be protected by regression tests.
   * Added `LINUX_INTERNAL_DEPLOYMENT_GUIDE.md`.
   * Documented FTI server-team questions, Linux/Docker prerequisites, online and no-GitHub transfer options, environment setup, Compose startup, backups, smoke tests, and responsible-use boundaries.
 
-* [ ] Internal FTI server feasibility review
+* [x] P5.7 Windows local installation guide and environment template cleanup
+
+  * Added `WINDOWS_NATIVE_SETUP_GUIDE.md` for Windows-native internal alpha setup when Docker is not approved.
+  * Updated `.env.example` with safe AI/RAG placeholders for `OPENAI_API_KEY` and `EMBEDDING_MODEL`.
+  * Documented IT approval dependencies for Python, Node.js, pnpm, PostgreSQL, pgvector, local ports, and AI/API access.
+
+* [ ] Work IT dependency approval / Windows setup feasibility review
 
   * Next planned step.
-  * Review server policy, Docker/Compose availability, GitHub/registry access, internal URL/port plan, persistence, backups, and feedback collection path with the FTI server team.
+  * Confirm IT approval for Windows-native dependencies and run a controlled setup dry run with non-sensitive data.
 
 ---
 
